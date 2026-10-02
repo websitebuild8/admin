@@ -1,0 +1,9 @@
+node_modules/
+.next/
+.env
+.env.*
+!.env.example
+*.tsbuildinfo
+apps/admin/src/generated/prisma/
+test-results/
+.DS_Store

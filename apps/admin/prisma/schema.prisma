@@ -1,0 +1,111 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Profile {
+  id          String @id @default(uuid())
+  clerkUserId String @unique
+  name        String
+  createdAt   DateTime @default(now())
+  roles       RoleApplication[]
+}
+
+model RoleApplication {
+  id          String @id @default(uuid())
+  profileId   String
+  profile     Profile @relation(fields: [profileId], references: [id])
+  role        String
+  status      String @default("Pending")
+  reviewedBy  String?
+  reviewedAt  DateTime?
+  @@unique([profileId, role])
+}
+
+model Restaurant {
+  id                String @id @default(uuid())
+  name              String
+  initials          String
+  cuisine           String
+  area              String
+  contact           String
+  status            String @default("Pending")
+  prepTime          Int @default(20)
+  color             String @default("coffee")
+  documentsVerified Boolean @default(false)
+  orders            Order[]
+}
+
+model Rider {
+  id                String @id @default(uuid())
+  name              String
+  initials          String
+  area              String
+  phone             String
+  status            String @default("Pending")
+  online            Boolean @default(false)
+  deliveries        Int @default(0)
+  documentsVerified Boolean @default(false)
+  orders            Order[]
+}
+
+model Order {
+  id            String @id @default(uuid())
+  customerId    String
+  customer      String
+  restaurantId  String
+  restaurant    Restaurant @relation(fields: [restaurantId], references: [id])
+  items         String
+  amount        Int
+  area          String
+  address       String
+  status        String @default("Awaiting restaurant")
+  riderId       String?
+  rider         Rider? @relation(fields: [riderId], references: [id])
+  time          DateTime @default(now())
+  paid          Boolean @default(false)
+  paymentRef    String @unique
+  refunds       RefundReview[]
+  tickets       SupportCase[]
+  @@index([status, time])
+}
+
+model RefundReview {
+  id       String @id @default(uuid())
+  orderId  String
+  order    Order @relation(fields: [orderId], references: [id])
+  amount   Int
+  reason   String
+  status   String @default("Requested")
+  time     DateTime @default(now())
+}
+
+model SupportCase {
+  id       String @id @default(uuid())
+  orderId  String
+  order    Order @relation(fields: [orderId], references: [id])
+  subject  String
+  customer String
+  priority String @default("Normal")
+  status   String @default("Open")
+}
+
+model AuditEvent {
+  id    String @id @default(uuid())
+  text  String
+  actor String
+  time  DateTime @default(now())
+}
+
+model ServiceSettings {
+  id               String @id @default("default")
+  businessName     String @default("iGO")
+  supportEmail     String @default("")
+  deliveryFee      Int @default(2500)
+  maleEnabled      Boolean @default(true)
+  hulhumaleEnabled Boolean @default(true)
+}

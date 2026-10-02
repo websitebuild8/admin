@@ -1,0 +1,2 @@
+import Image from 'next/image';
+export default function Page() { return <main className="setup-page"><div className="setup-card"><Image className="login-logo" src="/brand/igo-logo.jpg" alt="iGO — You Order. I Go." width={160} height={160} priority/><h1>Workspace setup required</h1><p>This admin workspace is not ready for live access. Configure Clerk, an authorized administrator, and Neon before continuing.</p><p>No operational data is exposed while authentication is unavailable.</p></div></main>; }
