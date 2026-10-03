@@ -1,21 +1,27 @@
 import 'server-only';
 import { Prisma } from '@/generated/prisma/client';
 import { database } from './db';
+import type { Principal } from './fulfilment';
 import { applyCommand, stateSchema, type Command } from './domain';
-type Reader = Pick<Prisma.TransactionClient, 'order' | 'restaurant' | 'rider' | 'supportCase' | 'refundReview' | 'auditEvent' | 'serviceSettings'>;
+type Reader = Pick<Prisma.TransactionClient, 'order' | 'restaurant' | 'rider' | 'supportCase' | 'refundReview' | 'auditEvent' | 'serviceSettings' | 'notification'>;
 export async function readState(db: Reader = database()) {
-  const [orders, restaurants, riders, tickets, refunds, activity, settings] = await Promise.all([
-    db.order.findMany({ orderBy: { time: 'desc' } }), db.restaurant.findMany({ orderBy: { name: 'asc' } }), db.rider.findMany({ orderBy: { name: 'asc' } }), db.supportCase.findMany(), db.refundReview.findMany({ orderBy: { time: 'desc' } }), db.auditEvent.findMany({ orderBy: { time: 'desc' }, take: 100 }), db.serviceSettings.findUnique({ where: { id: 'default' } }),
+  const [orders, restaurants, riders, tickets, refunds, activity, settings, notifications] = await Promise.all([
+    db.order.findMany({ orderBy: { time: 'desc' } }), db.restaurant.findMany({ orderBy: { name: 'asc' } }), db.rider.findMany({ orderBy: { name: 'asc' } }), db.supportCase.findMany(), db.refundReview.findMany({ orderBy: { time: 'desc' } }), db.auditEvent.findMany({ orderBy: { time: 'desc' }, take: 100 }), db.serviceSettings.findUnique({ where: { id: 'default' } }), db.notification.findMany({orderBy:{time:'desc'},take:200}),
   ]);
-  return stateSchema.parse({ orders: orders.map(o => ({ ...o, time: o.time.toISOString() })), restaurants, riders, tickets, refunds: refunds.map(r => ({ ...r, time: r.time.toISOString() })), activity: activity.map(a => ({ ...a, time: a.time.toISOString() })), settings: settings ?? { businessName: 'iGO', supportEmail: '', deliveryFee: 2500, maleEnabled: true, hulhumaleEnabled: true } });
+  return stateSchema.parse({ orders: orders.map(o => ({ ...o, workflow: o.workflow ?? undefined, time: o.time.toISOString() })), restaurants, riders, tickets, refunds: refunds.map(r => ({ ...r, time: r.time.toISOString() })), activity: activity.map(a => ({ ...a, time: a.time.toISOString() })), notifications: notifications.map(n => ({...n, time:n.time.toISOString()})), settings: settings ?? { businessName: 'iGO', supportEmail: '', deliveryFee: 2500, maleEnabled: true, hulhumaleEnabled: true } });
 }
-export async function mutate(command: Command, actor: string) {
+export async function mutate(command: Command, actor: string, principal: Principal = {role:'admin',id:actor}) {
   return database().$transaction(async tx => {
     const before = await readState(tx);
-    const after = applyCommand(before, command, actor);
-    if (command.type === 'order-status' || command.type === 'assign-rider') {
-      const order = after.orders.find(o => o.id === command.id)!;
-      await tx.order.update({ where: { id: order.id }, data: { status: order.status, riderId: order.riderId } });
+    const after = applyCommand(before, command, actor, new Date().toISOString(), principal);
+    if (['preparation','delivery','dispatch','accept-offer','location','order-status','assign-rider'].includes(command.type)) {
+      for (const order of after.orders) {
+        const old = before.orders.find(o => o.id === order.id)!;
+        if (JSON.stringify(order) !== JSON.stringify(old)) await tx.order.update({where:{id:order.id},data:{status:order.status,riderId:order.riderId,workflow:order.workflow}});
+      }
+      for (const rider of after.riders) {
+        if (JSON.stringify(rider) !== JSON.stringify(before.riders.find(r => r.id === rider.id))) await tx.rider.update({where:{id:rider.id},data:{location:rider.location ?? Prisma.DbNull,deliveries:rider.deliveries}});
+      }
     } else if (command.type === 'partner-status') {
       const data = { status: command.status, documentsVerified: command.verified };
       if (command.kind === 'restaurant') await tx.restaurant.update({ where: { id: command.id }, data });
@@ -24,7 +30,10 @@ export async function mutate(command: Command, actor: string) {
       const refund = after.refunds[0];
       await tx.refundReview.create({ data: { ...refund, time: new Date(refund.time) } });
     } else if (command.type === 'resolve-ticket') await tx.supportCase.update({ where: { id: command.id }, data: { status: 'Resolved' } });
-    else await tx.serviceSettings.upsert({ where: { id: 'default' }, create: { id: 'default', ...command.values }, update: command.values });
+    else if (command.type === 'settings') await tx.serviceSettings.upsert({ where: { id: 'default' }, create: { id: 'default', ...command.values }, update: command.values });
+    const existing = new Set(before.notifications.map(n => n.id));
+    const notices = after.notifications.filter(n => !existing.has(n.id));
+    if (notices.length) await tx.notification.createMany({data:notices.map(n => ({...n,time:new Date(n.time)}))});
     const event = after.activity[0];
     await tx.auditEvent.create({ data: { ...event, time: new Date(event.time) } });
     return after;

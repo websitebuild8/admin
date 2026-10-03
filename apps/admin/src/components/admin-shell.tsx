@@ -12,6 +12,7 @@ import { useState } from 'react';
 
 export const navigation = [
   { href: '/', label: 'Overview', icon: LayoutDashboard },
+  { href: '/dispatch', label: 'Dispatch', icon: MapPin },
   { href: '/orders', label: 'Orders', icon: ClipboardList },
   { href: '/restaurants', label: 'Restaurants', icon: Store },
   { href: '/riders', label: 'Riders', icon: Bike },

@@ -6,7 +6,7 @@ import { applyCommand, stateSchema, type Command, type State } from '@/lib/domai
 
 type Data = { state: State | null; demo: boolean; error: string | null; execute: (command: Command) => Promise<boolean>; refresh: () => void; reset: () => void; busy: boolean };
 const Context = createContext<Data | null>(null);
-const storageKey = 'igo-admin-demo-v1';
+const storageKey = 'igo-admin-demo-v2';
 export function DataProvider({ children, demo }: { children: React.ReactNode; demo: boolean }) {
   const [state, setState] = useState<State | null>(null);
   const [error, setError] = useState<string | null>(null);

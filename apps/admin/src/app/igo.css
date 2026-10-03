@@ -15,3 +15,5 @@ body{background:#f8f9fb}.app-shell{background:radial-gradient(ellipse at 88% 0%,
 
 /* Keep navigation compact on laptop-height screens. */
 .nav-inner{padding-top:18px}.workspace-label{padding-top:6px;padding-bottom:22px}.nav-bottom{padding-top:18px}@media(max-height:820px){.region-card{display:none}.profile{margin-top:12px;padding-top:12px}.nav-inner{padding-top:12px;padding-bottom:12px}.workspace-label{padding-bottom:14px}.nav-caption{margin-bottom:8px}}@media(max-height:650px){.nav-item{min-height:34px;padding-top:7px;padding-bottom:7px}.nav-caption.second{margin-top:14px}.nav-bottom{padding-top:8px}}
+
+@media(max-height:820px){.nav-item{padding-top:9px;padding-bottom:9px}.nav-caption.second{margin-top:18px}}@media(max-height:650px){.nav-item{padding-top:5px;padding-bottom:5px;min-height:30px}.nav-caption.second{margin-top:10px}}

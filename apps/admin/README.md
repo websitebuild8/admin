@@ -21,8 +21,8 @@ Open http://localhost:3000. `IGO_DEMO_MODE=true` intentionally exposes fictional
 1. Create/configure your Clerk application. Set its publishable and secret keys in `.env.local`. Never use `NEXT_PUBLIC_` for a secret key or database URL.
 2. Create the administrator in Clerk; put the exact Clerk user ID in `ADMIN_CLERK_USER_IDS`. Comma-separated IDs are supported. No other signed-in user gets admin access. Enable MFA in your Clerk sign-in policy before real operations.
 3. Create a Neon development branch/database. Put its pooled URL in `DATABASE_URL` and its direct URL in `DIRECT_URL`; keep the provided TLS parameters. No local Postgres server is necessary.
-4. Prisma CLI loads `.env`, not Next.js `.env.local`. Supply `DIRECT_URL` in your shell or a private `.env` when running migrations. Do not paste credentials into chat or commit them.
-5. Run `npm run db:deploy` to apply the included initial migration to your development branch. Use `npm run db:migrate -- --name change_name` for future schema changes in development; never run development migrations against production. Review migrations before deploying to a production database.
+4. Both Next.js and Prisma read `.env.local`. Prisma also loads `.env` as a fallback; injected shell/deployment variables take precedence. Do not paste credentials into chat or commit them.
+5. Run `npm run db:deploy` to apply both included migrations to your development branch. Use `npm run db:migrate -- --name change_name` for future schema changes in development; never run development migrations against production. Review migrations before deploying to a production database.
 6. Set `IGO_DEMO_MODE=false`, restart, and verify sign-in, non-admin denial, data reads and writes. Live mode begins with an empty database; demo data is never automatically copied into it.
 
 The schema supports the initial admin records. Ingestion/onboarding APIs and a full checkout schema are the next backend phase. See `../../docs/architecture.md` for boundaries. The current complete-state queries need pagination before operating at scale.
@@ -31,7 +31,8 @@ The schema supports the initial admin records. Ingestion/onboarding APIs and a f
 
 - Data lists show at most 10 records per page, with previous/next controls and result counts. Search/filter changes reset to page one; CSV exports include all matching orders. This is display pagination; live API queries still load the complete dataset.
 - Overview with metrics computed from records, daily activity, attention queues, and CSV export.
-- Orders with search/filtering, details, constrained state progression and rider assignment.
+- Orders with separate preparation/delivery milestones, shared pickup events, approximate ETA and rider assignment.
+- Admin-only Dispatch page, nearby rider offers, expiring acceptance windows, status inbox events and a role-scoped mobile API. See `../../docs/live-tracking.md` for activation requirements and limits.
 - Restaurant/rider application reviews with verification acknowledgement and audit records.
 - Customer summaries grouped by customer ID.
 - Card-payment records and validated refund-review requests. No bank refund is issued.

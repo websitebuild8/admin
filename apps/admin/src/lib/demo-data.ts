@@ -1,7 +1,7 @@
-import type { State } from './domain';
+import { stateSchema, type State } from './domain';
 export function createDemoState(): State {
   const time = (minutes: number) => new Date(Date.now() - minutes * 60000).toISOString();
-  return {
+  const state = stateSchema.parse({
     restaurants: [
       { id: 'the-cafe', name: 'The Café', initials: 'TC', cuisine: 'Coffee · Breakfast', area: 'Malé', contact: 'cafe@example.com', status: 'Active', prepTime: 15, color: 'coffee', documentsVerified: true },
       { id: 'island-bites', name: 'Island Bites', initials: 'IB', cuisine: 'Maldivian · Local favorites', area: 'Hulhumalé', contact: 'island@example.com', status: 'Active', prepTime: 25, color: 'leaf', documentsVerified: true },
@@ -37,5 +37,9 @@ export function createDemoState(): State {
       { id: 'a4', text: 'A delivery issue was reported for IGO-4T6B9', actor: 'System', time: time(31) },
     ],
     settings: { businessName: 'iGO', supportEmail: '', deliveryFee: 2500, maleEnabled: true, hulhumaleEnabled: true },
-  };
+  });
+  state.restaurants.forEach(r => { r.location = r.area === 'Malé' ? { lat: 4.175, lng: 73.509 } : { lat: 4.213, lng: 73.54 }; });
+  state.orders.forEach(o => { o.destination = o.area === 'Malé' ? { lat: 4.178, lng: 73.515 } : { lat: 4.225, lng: 73.544 }; });
+  state.riders.forEach((r, i) => { r.location = { lat: r.area === 'Malé' ? 4.176 + i * 0.001 : 4.214, lng: r.area === 'Malé' ? 73.511 : 73.541, accuracy: 10, capturedAt: time(0), receivedAt: time(0), sequence: 1 }; });
+  return state;
 }

@@ -27,6 +27,8 @@ model RoleApplication {
 }
 
 model Restaurant {
+  clerkUserId       String? @unique
+  location          Json?
   id                String @id @default(uuid())
   name              String
   initials          String
@@ -41,6 +43,8 @@ model Restaurant {
 }
 
 model Rider {
+  clerkUserId       String? @unique
+  location          Json?
   id                String @id @default(uuid())
   name              String
   initials          String
@@ -54,6 +58,8 @@ model Rider {
 }
 
 model Order {
+  workflow      Json?
+  destination   Json?
   id            String @id @default(uuid())
   customerId    String
   customer      String
@@ -108,4 +114,13 @@ model ServiceSettings {
   deliveryFee      Int @default(2500)
   maleEnabled      Boolean @default(true)
   hulhumaleEnabled Boolean @default(true)
+}
+
+model Notification {
+  id String @id
+  orderId String
+  recipient String
+  text String
+  time DateTime @default(now())
+  @@index([recipient, time])
 }
