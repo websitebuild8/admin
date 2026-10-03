@@ -14,18 +14,32 @@ export async function mutate(command: Command, actor: string, principal: Princip
   return database().$transaction(async tx => {
     const before = await readState(tx);
     const after = applyCommand(before, command, actor, new Date().toISOString(), principal);
-    if (['preparation','delivery','dispatch','accept-offer','location','order-status','assign-rider'].includes(command.type)) {
+    if (['preparation','delivery','dispatch','accept-offer','order-status','assign-rider'].includes(command.type)) {
       for (const order of after.orders) {
         const old = before.orders.find(o => o.id === order.id)!;
         if (JSON.stringify(order) !== JSON.stringify(old)) await tx.order.update({where:{id:order.id},data:{status:order.status,riderId:order.riderId,workflow:order.workflow}});
       }
       for (const rider of after.riders) {
-        if (JSON.stringify(rider) !== JSON.stringify(before.riders.find(r => r.id === rider.id))) await tx.rider.update({where:{id:rider.id},data:{location:rider.location ?? Prisma.DbNull,deliveries:rider.deliveries}});
+        if (JSON.stringify(rider) !== JSON.stringify(before.riders.find(r => r.id === rider.id))) await tx.rider.update({where:{id:rider.id},data:{deliveries:rider.deliveries}});
       }
     } else if (command.type === 'partner-status') {
+      const partner=command.kind==='restaurant' ? await tx.restaurant.findUniqueOrThrow({where:{id:command.id}}) : await tx.rider.findUniqueOrThrow({where:{id:command.id}});
+      if(partner.clerkUserId) {
+        const profile=await tx.profile.findUnique({where:{clerkUserId:partner.clerkUserId}});
+        if(!profile || profile.primaryRole!==command.kind) throw new Error('Registration binding missing.');
+        await tx.roleApplication.update({where:{profileId_role:{profileId:profile.id,role:command.kind}},data:{status:command.status,reviewedBy:actor,reviewedAt:new Date()}});
+      }
       const data = { status: command.status, documentsVerified: command.verified };
-      if (command.kind === 'restaurant') await tx.restaurant.update({ where: { id: command.id }, data });
+      if (command.kind === 'restaurant') {
+        const restaurant=await tx.restaurant.findUniqueOrThrow({where:{id:command.id}});
+        const approved=command.status==='Active' ? restaurant.pendingPickupAddress : null;
+        const address=approved ? (await import('./mobile-contract')).addressInput.parse(approved) : null;
+        await tx.restaurant.update({where:{id:command.id},data:{...data,...(address ? {pickupAddress:address,pendingPickupAddress:Prisma.DbNull,area:address.area,location:{lat:address.latitude,lng:address.longitude}} : {}),...(command.status!=='Active' ? {acceptingOrders:false} : {})}});
+      }
       else await tx.rider.update({ where: { id: command.id }, data });
+    } else if (command.type === 'approve-pickup') {
+      const partner=after.restaurants.find(r=>r.id===command.id)!;
+      await tx.restaurant.update({where:{id:command.id},data:{pickupAddress:partner.pickupAddress!,pendingPickupAddress:Prisma.DbNull,location:partner.location!,area:partner.area}});
     } else if (command.type === 'request-refund') {
       const refund = after.refunds[0];
       await tx.refundReview.create({ data: { ...refund, time: new Date(refund.time) } });

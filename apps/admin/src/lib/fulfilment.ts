@@ -8,7 +8,7 @@ export const workflowSchema = z.object({
   preparation: preparationSchema, delivery: deliverySchema,
   confirmedAt: z.iso.datetime().nullable().default(null),
   wave: z.number().int().min(0).max(3).default(0),
-  offers: z.array(z.object({ riderId: z.string(), distanceKm: z.number(), expiresAt: z.iso.datetime() })).default([]),
+  offers: z.array(z.object({ riderId: z.string(), distanceKm: z.number().nullable().default(null), expiresAt: z.iso.datetime() })).default([]),
   events: z.array(z.object({ id: z.string(), text: z.string(), at: z.iso.datetime(), actor: z.string() })).default([]),
 });
 export const notificationSchema = z.object({ id: z.string(), orderId: z.string(), recipient: z.string(), text: z.string(), time: z.iso.datetime() });
@@ -20,7 +20,6 @@ export const fulfilmentCommands = [
   z.object({ type: z.literal('delivery'), id: z.string(), status: deliverySchema }),
   z.object({ type: z.literal('dispatch'), id: z.string() }),
   z.object({ type: z.literal('accept-offer'), id: z.string(), riderId: z.string() }),
-  z.object({ type: z.literal('location'), riderId: z.string(), point: pointSchema, accuracy: z.number().min(0).max(100), capturedAt: z.iso.datetime(), sequence: z.number().int().nonnegative() }),
 ] as const;
 export function distanceKm(a: Point, b: Point) {
   const rad = Math.PI / 180;

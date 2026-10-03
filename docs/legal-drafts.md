@@ -71,7 +71,7 @@ We use account details and contact information to provide sign-in and support; a
 
 Restaurant applicants provide business details and verification documents. Rider applicants provide the identity, licence, vehicle, and payment information required for the approved onboarding process. The exact required documents are listed before collection. These documents are accessible only to staff who need them for verification or administration.
 
-Customers may use device location to select an address or enter it manually. Riders' location is used during the disclosed online/working periods to allocate deliveries and track active jobs, including background collection where enabled and permitted. Assigned customers see the location needed to track their delivery, not an unrestricted rider history. Restaurant mode does not require continuous location tracking.
+Customers and restaurants place a saved entrance pin manually and provide building/unit details. iGO does not request device GPS permission or collect continuous rider location. Requests are allocated by the rider’s selected service area or by an administrator. Assigned riders receive pickup and delivery entrances, then may open Google Maps for directions. Google Maps handles its own device-location permissions under its own terms. Customers and restaurants receive order milestones and approximate delivery estimates, without a live rider map. Map tile providers receive ordinary technical requests while the entrance map is displayed.
 
 iGO does not receive or store full card numbers, CVVs, or bank authentication codes in its own systems. Payment information entered into the supported checkout is processed through BML and its payment providers. We retain only the limited transaction information needed for order and accounting operations.
 
@@ -83,7 +83,7 @@ We may provide information to authorities when legally required. We do not use d
 
 ### Security and retention
 
-We restrict access by role and use appropriate security controls, including protected connections and controlled access to sensitive records. No service can promise absolute security. We retain each data category according to {{PUBLISHED_RETENTION_SCHEDULE}}, including any required accounting/dispute records, and then delete or anonymize it. Raw location history has its own limited period, {{LOCATION_RETENTION_PERIOD}}, rather than inheriting the accounting retention period.
+We restrict access by role and use appropriate security controls, including protected connections and controlled access to sensitive records. No service can promise absolute security. We retain each data category according to {{PUBLISHED_RETENTION_SCHEDULE}}, including any required accounting/dispute records, and then delete or anonymize it. Saved entrance pins are treated as address information under the retention schedule. iGO does not maintain raw rider GPS history in this version.
 
 ### Choices and account deletion
 
@@ -95,13 +95,17 @@ Contact {{PRIVACY_CONTACT}} to request access, correction, or assistance with yo
 
 We publish material changes with their effective date and notify users where appropriate. The current notice is available from the app and {{PUBLIC_PRIVACY_URL}}.
 
-## Contextual rider-location notice
+## Restaurant and rider terms — draft
 
-Show immediately before the relevant permission request; finalize against actual tracking behavior:
+Partner access requires administrator approval. Restaurant operators must provide accurate business details, verify the approved pickup entrance, maintain menu prices/availability, and observe the applicable food, licensing, and business requirements. Riders must provide the identity, vehicle, and licence information required by the approved onboarding process, keep their service area and availability accurate, and record delivery milestones honestly.
 
-> iGO uses your location while you are online as a rider to find delivery jobs and track active deliveries, including when the app is in the background. Your assigned customer can see your location during their delivery. Tracking stops when you go offline after finishing your active delivery. You can manage location permission in your device settings. Read the Privacy Notice for retention and sharing details.
+The commercial agreement must specify {{PARTNER_FEES}}, {{SETTLEMENT_SCHEDULE}}, {{PAYMENT_RESPONSIBILITIES}}, {{INSURANCE_REQUIREMENTS}}, {{PARTNER_CLASSIFICATION}}, and {{DISPUTE_PROCESS}} before real service begins. These placeholders do not establish an employment classification or settlement entitlement. Partner approval in the pilot does not replace a signed commercial agreement or required business/vehicle approvals.
 
-Actions: **Continue** / **Not now**. Do not show this prompt in customer or restaurant mode. Do not begin background tracking before disclosure and the necessary OS permission.
+Entrance changes require review. Only the assigned rider receives job entrance information; use customer contact and address details solely for that delivery. Report missing items, unsafe conditions, or delivery problems to the approved support process. Do not collect cash, accept transfers, or charge additional undisclosed amounts.
+
+## Directions notice
+
+> Save the correct building entrance and add your floor/unit details. Riders can open Google Maps to navigate to the saved entrance. iGO uses order milestones and a distance estimate; it does not collect live rider GPS positions.
 
 ## Public account-deletion page copy
 

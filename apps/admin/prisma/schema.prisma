@@ -13,6 +13,10 @@ model Profile {
   name        String
   createdAt   DateTime @default(now())
   roles       RoleApplication[]
+  primaryRole String?
+  phone       String?
+  addresses   SavedAddress[]
+  consents    PolicyAcceptance[]
 }
 
 model RoleApplication {
@@ -23,6 +27,7 @@ model RoleApplication {
   status      String @default("Pending")
   reviewedBy  String?
   reviewedAt  DateTime?
+  details     Json?
   @@unique([profileId, role])
 }
 
@@ -39,7 +44,11 @@ model Restaurant {
   prepTime          Int @default(20)
   color             String @default("coffee")
   documentsVerified Boolean @default(false)
+  acceptingOrders   Boolean @default(false)
   orders            Order[]
+  menu              MenuItem[]
+  pickupAddress     Json?
+  pendingPickupAddress Json?
 }
 
 model Rider {
@@ -58,6 +67,10 @@ model Rider {
 }
 
 model Order {
+  publicId      String? @unique
+  pickupAddress Json?
+  addressSnapshot Json?
+  lineItems     Json?
   workflow      Json?
   destination   Json?
   id            String @id @default(uuid())
@@ -78,6 +91,67 @@ model Order {
   refunds       RefundReview[]
   tickets       SupportCase[]
   @@index([status, time])
+}
+
+model SavedAddress {
+  id           String @id @default(uuid())
+  profileId    String
+  profile      Profile @relation(fields: [profileId], references: [id])
+  kind         String
+  area         String
+  building     String
+  unit         String @default("")
+  instructions String @default("")
+  latitude     Float
+  longitude    Float
+  updatedAt    DateTime @updatedAt
+  @@unique([profileId, kind])
+}
+
+model MenuItem {
+  id           String @id @default(uuid())
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id])
+  name         String
+  description  String
+  price        Int
+  available    Boolean @default(true)
+  updatedAt    DateTime @updatedAt
+  @@index([restaurantId, available])
+}
+
+model PolicyAcceptance {
+  id           String @id @default(uuid())
+  profileId    String
+  profile      Profile @relation(fields: [profileId], references: [id])
+  version      String
+  acceptedAt   DateTime @default(now())
+  @@unique([profileId, version])
+}
+
+model CheckoutQuote {
+  id           String @id @default(uuid())
+  customerId   String
+  restaurantId String
+  snapshot     Json
+  amount       Int
+  currency     String @default("MVR")
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+  attempt      PaymentAttempt?
+  @@index([customerId, createdAt])
+}
+
+model PaymentAttempt {
+  id           String @id @default(uuid())
+  quoteId      String @unique
+  quote        CheckoutQuote @relation(fields: [quoteId], references: [id])
+  transactionId String? @unique
+  status       String @default("Created")
+  checkoutUrl  String?
+  orderId      String? @unique
+  createdAt    DateTime @default(now())
+  verifiedAt   DateTime?
 }
 
 model RefundReview {

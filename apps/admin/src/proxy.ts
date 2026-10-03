@@ -1,10 +1,13 @@
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
 import { NextResponse, type NextRequest, type NextFetchEvent } from 'next/server';
 import { hasClerkKeys, isDemoMode } from './lib/mode';
-const isPublic = createRouteMatcher(['/sign-in(.*)', '/setup']);
+const isPublic = createRouteMatcher(['/sign-in(.*)', '/setup','/legal(.*)']);
 const secured = clerkMiddleware(async (auth, request) => { if (!isPublic(request)) await auth.protect(); });
 export default function proxy(request: NextRequest, event: NextFetchEvent) {
   if (isDemoMode()) return NextResponse.next();
+  // Native APIs authenticate bearer session tokens themselves and return JSON
+  // errors; Clerk's page redirects must not intercept them or CORS preflights.
+  if (request.nextUrl.pathname.startsWith('/api/mobile/')) return NextResponse.next();
   if (request.nextUrl.pathname === '/api/dispatch/tick') return NextResponse.next();
   if (!hasClerkKeys()) {
     if (request.nextUrl.pathname.startsWith('/api/')) return NextResponse.json({ error: 'Authentication is not configured.' }, { status: 503 });

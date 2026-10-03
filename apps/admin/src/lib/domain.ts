@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { addressInput } from './mobile-contract';
 import { pointSchema, fixSchema, workflowSchema, notificationSchema, fulfilmentCommands, initialWorkflow, type Principal } from './fulfilment';
 import { applyFulfilment } from './workflow';
 
@@ -6,8 +7,8 @@ export class WorkflowError extends Error {}
 
 export const orderStatus = z.enum(['Awaiting restaurant', 'Preparing', 'Ready for pickup', 'On the way', 'Delivered', 'Needs attention']);
 export const partnerStatus = z.enum(['Pending', 'Active', 'Suspended', 'Rejected']);
-export const orderSchema = z.object({ id: z.string(), customerId: z.string(), customer: z.string(), restaurantId: z.string(), items: z.string(), amount: z.number().int().nonnegative(), area: z.enum(['Malé', 'Hulhumalé']), address: z.string(), status: orderStatus, riderId: z.string().nullable(), time: z.string(), paid: z.boolean(), paymentRef: z.string(), destination: pointSchema.nullable().default(null), workflow: workflowSchema.optional() }).transform(o => ({ ...o, workflow: o.workflow ?? initialWorkflow(o.status, o.riderId) }));
-export const restaurantSchema = z.object({ id: z.string(), name: z.string(), initials: z.string(), cuisine: z.string(), area: z.string(), contact: z.string(), status: partnerStatus, prepTime: z.number(), location: pointSchema.nullable().default(null), color: z.string(), documentsVerified: z.boolean() });
+export const orderSchema = z.object({ publicId:z.string().nullable().default(null), pickupAddress:addressInput.nullable().default(null), addressSnapshot:addressInput.nullable().default(null), id: z.string(), customerId: z.string(), customer: z.string(), restaurantId: z.string(), items: z.string(), amount: z.number().int().nonnegative(), area: z.enum(['Malé', 'Hulhumalé']), address: z.string(), status: orderStatus, riderId: z.string().nullable(), time: z.string(), paid: z.boolean(), paymentRef: z.string(), destination: pointSchema.nullable().default(null), workflow: workflowSchema.optional() }).transform(o => ({ ...o, workflow: o.workflow ?? initialWorkflow(o.status, o.riderId) }));
+export const restaurantSchema = z.object({ id: z.string(), name: z.string(), initials: z.string(), cuisine: z.string(), area: z.string(), contact: z.string(), status: partnerStatus, prepTime: z.number(), acceptingOrders:z.boolean().default(false), pickupAddress:addressInput.nullable().default(null), pendingPickupAddress:addressInput.nullable().default(null), location: pointSchema.nullable().default(null), color: z.string(), documentsVerified: z.boolean() });
 export const riderSchema = z.object({ id: z.string(), name: z.string(), initials: z.string(), area: z.string(), phone: z.string(), status: partnerStatus, online: z.boolean(), deliveries: z.number(), location: fixSchema.nullable().default(null), documentsVerified: z.boolean() });
 export const ticketSchema = z.object({ id: z.string(), orderId: z.string(), subject: z.string(), customer: z.string(), priority: z.enum(['High', 'Normal']), status: z.enum(['Open', 'Resolved']) });
 export const refundSchema = z.object({ id: z.string(), orderId: z.string(), amount: z.number().int().positive(), reason: z.string(), status: z.literal('Requested'), time: z.string() });
@@ -22,6 +23,7 @@ export const commandSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('order-status'), id: z.string(), status: orderStatus }),
   z.object({ type: z.literal('assign-rider'), id: z.string(), riderId: z.string() }),
   z.object({ type: z.literal('partner-status'), kind: z.enum(['restaurant', 'rider']), id: z.string(), status: partnerStatus, verified: z.boolean(), reason: z.string().max(500) }),
+  z.object({ type:z.literal('approve-pickup'), id:z.string() }),
   z.object({ type: z.literal('request-refund'), id: z.string(), amount: z.number().int().positive(), reason: z.string().trim().min(10).max(500) }),
   z.object({ type: z.literal('resolve-ticket'), id: z.string() }),
   z.object({ type: z.literal('settings'), values: settingsSchema }),
@@ -31,9 +33,9 @@ export const nextStatus: Partial<Record<Order['status'], Order['status']>> = { '
 export function applyCommand(input: State, raw: Command, actor: string, now = new Date().toISOString(), principal: Principal = { role: 'admin', id: actor }): State {
   const command = commandSchema.parse(raw);
   const state = stateSchema.parse(structuredClone(input));
-  if (principal.role !== 'admin' && !['preparation', 'delivery', 'accept-offer', 'location'].includes(command.type)) throw new WorkflowError('Not authorized.');
+  if (principal.role !== 'admin' && !['preparation', 'delivery', 'accept-offer'].includes(command.type)) throw new WorkflowError('Not authorized.');
   let text = '';
-  if (['preparation', 'delivery', 'dispatch', 'accept-offer', 'location', 'assign-rider', 'order-status'].includes(command.type)) {
+  if (['preparation', 'delivery', 'dispatch', 'accept-offer', 'assign-rider', 'order-status'].includes(command.type)) {
     text = applyFulfilment(state, command, actor, principal, now);
   } else if (command.type === 'partner-status') {
     const partner = (command.kind === 'restaurant' ? state.restaurants : state.riders).find(p => p.id === command.id);
@@ -45,6 +47,13 @@ export function applyCommand(input: State, raw: Command, actor: string, now = ne
     partner.status = command.status;
     partner.documentsVerified = command.verified;
     text = `${partner.name}: ${command.status.toLowerCase()}${command.reason ? ` — ${command.reason}` : ''}`;
+  } else if (command.type === 'approve-pickup') {
+    const partner=state.restaurants.find(r=>r.id===command.id);
+    if (!partner?.pendingPickupAddress || partner.status !== 'Active') throw new WorkflowError('No active restaurant entrance awaiting review.');
+    partner.pickupAddress=partner.pendingPickupAddress; partner.pendingPickupAddress=null;
+    partner.location={lat:partner.pickupAddress.latitude,lng:partner.pickupAddress.longitude};
+    partner.area=partner.pickupAddress.area;
+    text=`${partner.name}: pickup entrance approved`;
   } else if (command.type === 'request-refund') {
     const order = state.orders.find(o => o.id === command.id);
     if (!order?.paid) throw new WorkflowError('Only verified payments can enter refund review.');

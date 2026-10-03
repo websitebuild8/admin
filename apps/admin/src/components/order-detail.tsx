@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useData } from './data-provider';
 import type { Workflow } from '@/lib/fulfilment';
 import { money } from '@/lib/domain';
-import { eta, RADII_KM, orderView } from '@/lib/workflow';
+import { eta, orderView } from '@/lib/workflow';
 import { Status } from './shared';
 import { PaginatedList } from './paginated-list';
 export function OrderDetail({ id, close }: { id: string | null; close: () => void }) {
@@ -27,7 +27,7 @@ export function OrderDetail({ id, close }: { id: string | null; close: () => voi
         <p>{order.items}</p><p className="muted">{order.address}</p>
         <small>{order.paid ? 'Verified BML card payment' : 'Payment not verified'} · {order.paymentRef}</small>
         <section className="detail-section"><h3>Restaurant preparation</h3><p>{w.preparation}</p>
-          {w.preparation === 'Awaiting confirmation' && <Button disabled={busy || order.status === 'Needs attention'} onClick={()=>execute({type:'preparation',id:order.id,status:'Order confirmed'})}>Confirm order & alert nearby riders</Button>}
+          {w.preparation === 'Awaiting confirmation' && <Button disabled={busy || order.status === 'Needs attention'} onClick={()=>execute({type:'preparation',id:order.id,status:'Order confirmed'})}>Confirm order & alert available riders</Button>}
           {w.preparation === 'Order confirmed' && <Button disabled={busy} onClick={()=>execute({type:'preparation',id:order.id,status:'Ready for pickup'})}>Mark food ready for pickup</Button>}
         </section>
         <section className="detail-section"><h3>Rider progress</h3><p>{state.riders.find(r=>r.id===order.riderId)?.name ?? 'No rider assigned'} · {w.delivery}</p>
@@ -35,9 +35,9 @@ export function OrderDetail({ id, close }: { id: string | null; close: () => voi
           {w.delivery === 'Arrived at restaurant' && w.preparation === 'Ready for pickup' && <Button variant="outline" disabled={busy} onClick={()=>execute({type:'preparation',id:order.id,status:'Order picked up'})}>Record restaurant pickup confirmation</Button>}
           {!['On the way','Delivered','Needs attention','Awaiting restaurant'].includes(order.status) && <div className="inline-controls" style={{marginTop:12}}><Select value={riderId} onValueChange={v=>setRiderId(v??'')}><SelectTrigger><SelectValue placeholder="Assign / reassign rider">{state.riders.find(r=>r.id===riderId)?.name}</SelectValue></SelectTrigger><SelectContent>{state.riders.filter(r=>r.status==='Active' && r.online && r.documentsVerified && !state.orders.some(o=>o.riderId===r.id && o.status!=='Delivered')).map(r=><SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}</SelectContent></Select><Button disabled={busy||!riderId} onClick={async()=>{if(await execute({type:'assign-rider',id:order.id,riderId}))setRiderId('');}}>Assign</Button></div>}
         </section>
-        {!order.riderId && ['Preparing','Ready for pickup'].includes(order.status) && <section className="detail-section"><h3>Nearby rider requests</h3><p>{w.wave ? `Search ${w.wave} of 3 · ${RADII_KM[w.wave-1]} km radius` : 'Search not started'}</p><small>Fresh locations only. Offers expire after 45 seconds. Live scheduler checks each minute.</small>
-          <PaginatedList items={w.offers} label="rider offers">{offers=>offers.map(f=><div className="case-row" key={f.riderId}><div>{state.riders.find(r=>r.id===f.riderId)?.name}<small style={{display:'block'}}>{f.distanceKm.toFixed(1)} km · expires {new Date(f.expiresAt).toLocaleTimeString('en-GB',{timeZone:'Indian/Maldives'})}</small></div>{demo && <Button disabled={busy||Date.parse(f.expiresAt)<=now} onClick={()=>execute({type:'accept-offer',id:order.id,riderId:f.riderId})}>Simulate acceptance</Button>}</div>)}</PaginatedList>
-          {w.wave < 3 ? <Button variant="outline" disabled={busy||w.offers.some(f=>Date.parse(f.expiresAt)>now)} onClick={()=>execute({type:'dispatch',id:order.id})}>Search next radius</Button> : <p>No further search waves. Assign a rider manually.</p>}
+        {!order.riderId && ['Preparing','Ready for pickup'].includes(order.status) && <section className="detail-section"><h3>Service-area rider requests</h3><p>{w.wave ? `Request window ${w.wave} of 3` : 'Search not started'}</p><small>Online, available riders in the restaurant’s service area. Offers expire after 45 seconds. Live scheduler checks each minute.</small>
+          <PaginatedList items={w.offers} label="rider offers">{offers=>offers.map(f=><div className="case-row" key={f.riderId}><div>{state.riders.find(r=>r.id===f.riderId)?.name}<small style={{display:'block'}}>Offer expires {new Date(f.expiresAt).toLocaleTimeString('en-GB',{timeZone:'Indian/Maldives'})}</small></div>{demo && <Button disabled={busy||Date.parse(f.expiresAt)<=now} onClick={()=>execute({type:'accept-offer',id:order.id,riderId:f.riderId})}>Simulate acceptance</Button>}</div>)}</PaginatedList>
+          {w.wave < 3 ? <Button variant="outline" disabled={busy||w.offers.some(f=>Date.parse(f.expiresAt)>now)} onClick={()=>execute({type:'dispatch',id:order.id})}>Send requests again</Button> : <p>No further search waves. Assign a rider manually.</p>}
         </section>}
         <section className="notice-box" style={{display:'block'}}><h3>Customer status preview · no live map</h3><p>{w.preparation} · {w.delivery}</p><strong>{eta(state,order,new Date(now).toISOString())}</strong><p className="muted">Distance-based estimate, not a live road-route or traffic estimate.</p></section>
         <section className="detail-section"><h3>Order timeline</h3><PaginatedList items={[...orderView(state,order,{role:'admin',id:'preview'}).events].reverse()} label="order events">{events=>events.length ? events.map((e,i)=><p key={i}>{e.text}<small className="muted" style={{display:'block'}}>{new Date(e.at).toLocaleString('en-GB',{timeZone:'Indian/Maldives'})}</small></p>) : <p className="muted">New workflow events will appear here.</p>}</PaginatedList></section>

@@ -1,12 +1,12 @@
 import { WorkflowError, type State, type Command, type Order } from './domain';
 import { distanceKm, type Principal } from './fulfilment';
 
-export const RADII_KM = [1, 3, 8];
+export const MAX_OFFER_WINDOWS = 3;
 export const OFFER_SECONDS = 45;
-export function availableRiders(state: State, order: Order, now: string) {
+export function availableRiders(state: State, order: Order) {
   const restaurant = state.restaurants.find(r => r.id === order.restaurantId);
-  if (!restaurant?.location) return [];
-  return state.riders.filter(r => r.status === 'Active' && r.online && r.documentsVerified && r.location && Date.parse(now) - Date.parse(r.location.receivedAt) <= 120000 && !state.orders.some(o => o.riderId === r.id && o.status !== 'Delivered')).map(r => ({ rider: r, distanceKm: distanceKm(restaurant.location!, r.location!) })).sort((a, b) => a.distanceKm - b.distanceKm);
+  if (!restaurant) return [];
+  return state.riders.filter(r => r.status === 'Active' && r.online && r.documentsVerified && r.area === restaurant.area && !state.orders.some(o => o.riderId === r.id && o.status !== 'Delivered')).map(r => ({rider:r, distanceKm:null}));
 }
 function notify(state: State, order: Order, text: string, now: string, recipients?: string[]) {
   const targets = recipients ?? [`customer:${order.customerId}`, `restaurant:${order.restaurantId}`, ...(order.riderId ? [`rider:${order.riderId}`] : [])];
@@ -16,27 +16,13 @@ function dispatch(state: State, order: Order, now: string) {
   const w = order.workflow;
   if (order.riderId || w.preparation === 'Awaiting confirmation' || order.status === 'Needs attention') throw new WorkflowError('Confirm an unassigned order before dispatch.');
   if (w.offers.some(o => Date.parse(o.expiresAt) > Date.parse(now))) throw new WorkflowError('The current offer window is still open.');
-  if (w.wave >= RADII_KM.length) throw new WorkflowError('Search exhausted. Assign a rider manually.');
-  const radius = RADII_KM[w.wave++];
-  w.offers = availableRiders(state, order, now).filter(r => r.distanceKm <= radius).map(r => ({ riderId: r.rider.id, distanceKm: r.distanceKm, expiresAt: new Date(Date.parse(now) + OFFER_SECONDS * 1000).toISOString() }));
+  if (w.wave >= MAX_OFFER_WINDOWS) throw new WorkflowError('Search exhausted. Assign a rider manually.');
+  w.wave++;
+  w.offers = availableRiders(state, order).map(r => ({ riderId: r.rider.id, distanceKm: r.distanceKm, expiresAt: new Date(Date.parse(now) + OFFER_SECONDS * 1000).toISOString() }));
   notify(state, order, `Delivery request ${order.id}: respond within ${OFFER_SECONDS} seconds.`, now, w.offers.map(o => `rider:${o.riderId}`));
-  return `Nearby rider search: ${radius} km · ${w.offers.length} offers`;
+  return `Service-area requests: window ${w.wave} · ${w.offers.length} offers`;
 }
 export function applyFulfilment(state: State, command: Command, actor: string, principal: Principal, now: string): string {
-  if (command.type === 'location') {
-    if (principal.role !== 'admin' && (principal.role !== 'rider' || principal.id !== command.riderId)) throw new WorkflowError('Not authorized.');
-    const rider = state.riders.find(r => r.id === command.riderId);
-    if (!rider || rider.status !== 'Active' || !rider.online || !rider.documentsVerified) throw new WorkflowError('Only approved online riders can report location.');
-    const age = Date.parse(now) - Date.parse(command.capturedAt);
-    if (age < -10000 || age > 120000) throw new WorkflowError('Location is stale or in the future.');
-    if (rider.location && (command.sequence <= rider.location.sequence || Date.parse(command.capturedAt) <= Date.parse(rider.location.capturedAt))) throw new WorkflowError('Location updates must be in sequence.');
-    if (rider.location) {
-      const seconds = (Date.parse(command.capturedAt) - Date.parse(rider.location.capturedAt)) / 1000;
-      if (distanceKm(rider.location, command.point) * 1000 > seconds * 45 + rider.location.accuracy + command.accuracy) throw new WorkflowError('Location jump is implausible.');
-    }
-    rider.location = { ...command.point, accuracy: command.accuracy, capturedAt: command.capturedAt, receivedAt: now, sequence: command.sequence };
-    return `Location updated for ${rider.name}`;
-  }
   if (!('id' in command)) throw new WorkflowError('Unsupported action.');
   const order = state.orders.find(o => o.id === command.id);
   if (!order || !order.paid) throw new WorkflowError('A verified paid order is required.');
@@ -54,7 +40,7 @@ export function applyFulfilment(state: State, command: Command, actor: string, p
     if (state.orders.some(o => o.id !== order.id && o.riderId === rider.id && o.status !== 'Delivered')) throw new WorkflowError('This rider already has an active delivery.');
     if (command.type === 'accept-offer') {
       if (order.riderId || !w.offers.some(o => o.riderId === rider.id && Date.parse(o.expiresAt) > Date.parse(now))) throw new WorkflowError('This offer is expired or already accepted.');
-      if (!availableRiders(state, order, now).some(r => r.rider.id === rider.id)) throw new WorkflowError('Rider availability or location is no longer current.');
+      if (!availableRiders(state, order).some(r => r.rider.id === rider.id)) throw new WorkflowError('Rider availability or service area changed.');
     }
     if (order.riderId === rider.id) throw new WorkflowError('This rider is already assigned.');
     const previous = order.riderId;
@@ -100,19 +86,16 @@ export function eta(state: State, order: Order, now = new Date().toISOString()) 
   if (order.workflow.delivery === 'Arrived at customer') return 'Rider has arrived';
   const restaurant = state.restaurants.find(r => r.id === order.restaurantId);
   if (!restaurant?.location || !order.destination || order.status === 'Needs attention') return 'Delivery estimate pending';
-  const rider = state.riders.find(r => r.id === order.riderId);
-  const fresh = rider?.location && Date.parse(now) - Date.parse(rider.location.receivedAt) <= 120000;
-  if (order.riderId && !fresh) return 'Updating delivery estimate';
-  // Fallback, not a Google road route: allow for street detours and bridge travel.
-  const travel = (a: {lat:number;lng:number}, b: {lat:number;lng:number}) => Math.ceil(distanceKm(a,b) * 1.5 / 18 * 60) + ((a.lat < 4.195) !== (b.lat < 4.195) ? 10 : 0);
+  // A heuristic between saved entrance pins, never the rider's device location.
+  const pickup = order.pickupAddress ? {lat:order.pickupAddress.latitude,lng:order.pickupAddress.longitude} : restaurant.location;
+  const travel = Math.ceil(distanceKm(pickup!,order.destination) * 1.5 / 18 * 60) + ((pickup!.lat < 4.195) !== (order.destination.lat < 4.195) ? 10 : 0);
   const picked = order.workflow.preparation === 'Order picked up';
   const elapsed = order.workflow.confirmedAt ? Math.max(0,(Date.parse(now)-Date.parse(order.workflow.confirmedAt))/60000) : 0;
   const prep = order.workflow.preparation === 'Ready for pickup' || picked ? 0 : Math.max(0, restaurant.prepTime - elapsed);
-  const pickup = picked ? 0 : fresh ? travel(rider!.location!,restaurant.location) : 10;
-  const minutes = Math.ceil(Math.max(prep,pickup) + travel(picked && fresh ? rider!.location! : restaurant.location,order.destination) + 3);
+  const minutes = Math.ceil(prep + travel + (picked ? 3 : 10));
   return `About ${minutes}–${minutes+10} min · approximate distance estimate`;
 }
 export function orderView(state: State, order: Order, principal: Principal) {
   if (principal.role === 'customer' && order.customerId !== principal.id || principal.role === 'restaurant' && order.restaurantId !== principal.id || principal.role === 'rider' && order.riderId !== principal.id) throw new WorkflowError('Not authorized.');
-  return { ...(principal.role === 'rider' ? { job: { pickup: state.restaurants.find(r => r.id === order.restaurantId)?.location ?? null, destination: order.destination, address: order.address, items: order.items } } : {}), id: order.id, status: order.status, preparation: order.workflow.preparation, delivery: order.workflow.delivery, rider: state.riders.find(r => r.id === order.riderId)?.name ?? null, estimatedDelivery: eta(state, order), events: order.workflow.events.map(({text,at}) => ({text,at})) };
+  return { ...(principal.role === 'rider' ? { job: { pickup: order.pickupAddress ? {lat:order.pickupAddress.latitude,lng:order.pickupAddress.longitude} : state.restaurants.find(r => r.id === order.restaurantId)?.location ?? null, pickupLabel: order.pickupAddress ? [order.pickupAddress.building,order.pickupAddress.unit,order.pickupAddress.instructions].filter(Boolean).join(' · ') : '', destination: order.destination, address: order.address, items: order.items } } : {}), id: order.id, publicId:order.publicId ?? order.id, restaurant:state.restaurants.find(r=>r.id===order.restaurantId)?.name, amount:order.amount, items:order.items, status: order.status, preparation: order.workflow.preparation, delivery: order.workflow.delivery, rider: state.riders.find(r => r.id === order.riderId)?.name ?? null, estimatedDelivery: eta(state, order), events: order.workflow.events.map(({text,at}) => ({text,at})) };
 }

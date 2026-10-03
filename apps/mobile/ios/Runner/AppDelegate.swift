@@ -12,5 +12,8 @@ import UIKit
 
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
+    if let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "IgoGlassNavigation") {
+      registrar.register(IgoGlassNavigationFactory(messenger: registrar.messenger()), withId: "igo/glass-navigation")
+    }
   }
 }

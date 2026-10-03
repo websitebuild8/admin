@@ -1,74 +1,106 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'package:clerk_flutter/clerk_flutter.dart';
+
+import 'live_app.dart';
+import 'secure_session_store.dart';
+
 import 'package:url_launcher/url_launcher.dart';
 
+import 'entrance_map.dart';
 import 'models.dart';
 
 const yellow = Color(0xFFFFDF35);
 const ink = Color(0xFF181918);
 const muted = Color(0xFF72756F);
 const previewEnabled = bool.fromEnvironment('IGO_PREVIEW', defaultValue: false);
-void main() => runApp(const IgoApp());
+const clerkPublishableKey = String.fromEnvironment('CLERK_PUBLISHABLE_KEY');
+void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  runApp(const IgoApp());
+}
 
 class IgoApp extends StatelessWidget {
   final bool preview;
   const IgoApp({super.key, this.preview = previewEnabled});
   @override
-  Widget build(BuildContext context) => MaterialApp(
-    title: 'iGO',
-    debugShowCheckedModeBanner: false,
-    theme: ThemeData(
-      useMaterial3: true,
-      scaffoldBackgroundColor: const Color(0xFFF8F8F2),
-      colorScheme: ColorScheme.fromSeed(
-        seedColor: yellow,
-        primary: ink,
-        secondary: yellow,
-        surface: Colors.white,
-      ),
-      textTheme: const TextTheme(
-        headlineLarge: TextStyle(
-          fontSize: 36,
-          fontWeight: FontWeight.w800,
-          letterSpacing: -1.4,
-          color: ink,
+  Widget build(BuildContext context) {
+    final configured =
+        !preview &&
+        !kIsWeb &&
+        clerkPublishableKey.isNotEmpty &&
+        apiBase.isNotEmpty;
+    final app = MaterialApp(
+      title: 'iGO',
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        useMaterial3: true,
+        scaffoldBackgroundColor: const Color(0xFFF8F8F2),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: yellow,
+          primary: ink,
+          secondary: yellow,
+          surface: Colors.white,
         ),
-        headlineMedium: TextStyle(
-          fontSize: 28,
-          fontWeight: FontWeight.w800,
-          letterSpacing: -.8,
-          color: ink,
-        ),
-        titleLarge: TextStyle(
-          fontSize: 20,
-          fontWeight: FontWeight.w700,
-          color: ink,
-        ),
-        bodyMedium: TextStyle(fontSize: 14, height: 1.5, color: ink),
-      ),
-      filledButtonTheme: FilledButtonThemeData(
-        style: FilledButton.styleFrom(
-          backgroundColor: yellow,
-          foregroundColor: ink,
-          minimumSize: const Size(double.infinity, 54),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
+        textTheme: const TextTheme(
+          headlineLarge: TextStyle(
+            fontSize: 36,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -1.4,
+            color: ink,
           ),
-          textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+          headlineMedium: TextStyle(
+            fontSize: 28,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -.8,
+            color: ink,
+          ),
+          titleLarge: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+            color: ink,
+          ),
+          bodyMedium: TextStyle(fontSize: 14, height: 1.5, color: ink),
+        ),
+        filledButtonTheme: FilledButtonThemeData(
+          style: FilledButton.styleFrom(
+            backgroundColor: yellow,
+            foregroundColor: ink,
+            minimumSize: const Size(double.infinity, 54),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            textStyle: const TextStyle(
+              fontWeight: FontWeight.w700,
+              fontSize: 15,
+            ),
+          ),
+        ),
+        inputDecorationTheme: InputDecorationTheme(
+          filled: true,
+          fillColor: Colors.white.withValues(alpha: .8),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(18),
+            borderSide: BorderSide.none,
+          ),
         ),
       ),
-      inputDecorationTheme: InputDecorationTheme(
-        filled: true,
-        fillColor: Colors.white.withValues(alpha: .8),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(18),
-          borderSide: BorderSide.none,
-        ),
-      ),
-    ),
-    home: Welcome(preview: preview),
-  );
+      home: configured ? const LiveGate() : Welcome(preview: preview),
+    );
+    return configured
+        ? ClerkAuth(
+            config: ClerkAuthConfig(
+              publishableKey: clerkPublishableKey,
+              persistor: SecureSessionStore(),
+              telemetryPeriod: Duration.zero,
+              httpConnectionTimeout: const Duration(seconds: 10),
+            ),
+            child: app,
+          )
+        : app;
+  }
 }
 
 class Glass extends StatelessWidget {
@@ -313,12 +345,17 @@ class _WorkspaceState extends State<Workspace> {
   String area = 'Malé';
   String query = '';
   final cart = Cart();
+  PreviewAddress? pickupAddress;
   void toast(String text) =>
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
-  void menuPage() => Navigator.push(
-    context,
-    MaterialPageRoute(builder: (_) => MenuPage(cart: cart)),
-  );
+  void menuPage() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => MenuPage(cart: cart)),
+    );
+    if (mounted) setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) => CanvasPage(
     child: Column(
@@ -423,7 +460,11 @@ class _WorkspaceState extends State<Workspace> {
               TextButton.icon(
                 onPressed: address,
                 icon: const Icon(Icons.location_on_outlined, size: 18),
-                label: Text('Home · $area  ⌄'),
+                label: Text(
+                  '${cart.deliveryAddress?.building ?? 'Choose address'} · ${cart.deliveryAddress?.area ?? area}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
             ],
           ),
@@ -586,11 +627,28 @@ class _WorkspaceState extends State<Workspace> {
         ),
   ];
   void address() async {
+    final isPickup = widget.role == AppRole.restaurant;
+    final initial = isPickup ? pickupAddress : cart.deliveryAddress;
     final result = await Navigator.push<PreviewAddress>(
       context,
-      MaterialPageRoute(builder: (_) => AddressPage(area: area)),
+      MaterialPageRoute(
+        builder: (_) => AddressPage(
+          area: initial?.area ?? area,
+          initial: initial,
+          pickup: isPickup,
+        ),
+      ),
     );
-    if (result != null && mounted) setState(() => area = result.area);
+    if (result != null && mounted) {
+      setState(() {
+        area = result.area;
+        if (isPickup) {
+          pickupAddress = result;
+        } else {
+          cart.deliveryAddress = result;
+        }
+      });
+    }
   }
 
   List<Widget> customerOrders() => [
@@ -702,6 +760,14 @@ class _WorkspaceState extends State<Workspace> {
       icon: const Icon(Icons.location_on_outlined),
       label: const Text('Set pickup address'),
     ),
+    if (pickupAddress != null)
+      Padding(
+        padding: const EdgeInsets.only(top: 8),
+        child: Text(
+          '${pickupAddress!.label}\nEntrance: ${pickupAddress!.point.label}\nSaved in this preview. Branch review will be added before launch.',
+          style: const TextStyle(color: muted, fontSize: 12),
+        ),
+      ),
   ];
   List<Widget> rider() => [
     Text(
@@ -842,12 +908,17 @@ class _WorkspaceState extends State<Workspace> {
       ),
     ),
     const SizedBox(height: 16),
-    ListTile(
-      leading: const Icon(Icons.location_on_outlined),
-      title: const Text('Saved address'),
-      trailing: const Icon(Icons.chevron_right),
-      onTap: address,
-    ),
+    if (widget.role != AppRole.rider)
+      ListTile(
+        leading: const Icon(Icons.location_on_outlined),
+        title: Text(
+          widget.role == AppRole.restaurant
+              ? 'Pickup address'
+              : 'Saved address',
+        ),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: address,
+      ),
     ListTile(
       leading: const Icon(Icons.policy_outlined),
       title: const Text('Privacy & order policies'),
@@ -1011,7 +1082,7 @@ class Checkout extends StatefulWidget {
 
 class _CheckoutState extends State<Checkout> {
   bool agreed = false;
-  PreviewAddress? address;
+  PreviewAddress? get address => widget.cart.deliveryAddress;
   @override
   Widget build(BuildContext context) => CanvasPage(
     child: ListView(
@@ -1072,14 +1143,27 @@ class _CheckoutState extends State<Checkout> {
               final v = await Navigator.push<PreviewAddress>(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => const AddressPage(area: 'Malé'),
+                  builder: (_) => AddressPage(
+                    area: address?.area ?? 'Malé',
+                    initial: address,
+                  ),
                 ),
               );
-              if (v != null && mounted) setState(() => address = v);
+              if (v != null && mounted) {
+                setState(() => widget.cart.deliveryAddress = v);
+              }
             },
           ),
         ),
         const SizedBox(height: 18),
+        if (address != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: Text(
+              'Confirmed entrance: ${address!.point.label}',
+              style: const TextStyle(color: muted, fontSize: 12),
+            ),
+          ),
         const TextField(
           maxLines: 2,
           decoration: InputDecoration(
@@ -1137,9 +1221,26 @@ class _CheckoutState extends State<Checkout> {
   );
 }
 
+typedef EntranceMapBuilder = Widget Function(
+  String area,
+  GeoPoint? initialPoint,
+  ValueChanged<GeoPoint> onSelected,
+  ValueChanged<GeoPoint> onMoved,
+);
+
 class AddressPage extends StatefulWidget {
   final String area;
-  const AddressPage({super.key, required this.area});
+  final PreviewAddress? initial;
+  final bool pickup;
+  // Allows the form flow to be tested without platform views or tile requests.
+  final EntranceMapBuilder? mapBuilder;
+  const AddressPage({
+    super.key,
+    required this.area,
+    this.initial,
+    this.pickup = false,
+    this.mapBuilder,
+  });
   @override
   State<AddressPage> createState() => _AddressPageState();
 }
@@ -1149,13 +1250,94 @@ class _AddressPageState extends State<AddressPage> {
   final building = TextEditingController();
   final unit = TextEditingController();
   final instructions = TextEditingController();
-  late String area = widget.area;
+  final latitude = TextEditingController();
+  final longitude = TextEditingController();
+  late String area;
+  GeoPoint? point;
+  String? pinError;
+  int mapRevision = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    final initial = widget.initial;
+    area = initial?.area ?? widget.area;
+    point = initial?.point;
+    building.text = initial?.building ?? '';
+    unit.text = initial?.unit ?? '';
+    instructions.text = initial?.instructions ?? '';
+    if (point != null) {
+      latitude.text = '${point!.latitude}';
+      longitude.text = '${point!.longitude}';
+    }
+  }
+
   @override
   void dispose() {
     building.dispose();
     unit.dispose();
     instructions.dispose();
+    latitude.dispose();
+    longitude.dispose();
     super.dispose();
+  }
+
+  void selectPoint(GeoPoint value, {bool recenter = false}) {
+    if (!ServiceArea.named(area).contains(value)) {
+      setState(() => pinError = 'Choose an entrance in $area.');
+      return;
+    }
+    setState(() {
+      point = value;
+      pinError = null;
+      latitude.text = '${value.latitude}';
+      longitude.text = '${value.longitude}';
+      if (recenter) mapRevision++;
+    });
+  }
+
+  void useCoordinates() {
+    final lat = double.tryParse(latitude.text.trim());
+    final lng = double.tryParse(longitude.text.trim());
+    if (lat == null || lng == null || !GeoPoint(lat, lng).isValid) {
+      setState(() => pinError = 'Enter valid latitude and longitude.');
+      return;
+    }
+    selectPoint(GeoPoint(lat, lng), recenter: true);
+    FocusScope.of(context).unfocus();
+  }
+
+  void entranceMoved(GeoPoint candidate) {
+    final confirmed = point;
+    if (confirmed == null) return;
+    // Ignore harmless floating-point camera precision differences.
+    if ((confirmed.latitude - candidate.latitude).abs() > .000001 ||
+        (confirmed.longitude - candidate.longitude).abs() > .000001) {
+      setState(() {
+        point = null;
+        latitude.clear();
+        longitude.clear();
+        pinError = 'Pin moved. Confirm your entrance again.';
+      });
+    }
+  }
+
+  void save() {
+    final valid = form.currentState!.validate();
+    if (point == null) {
+      setState(() => pinError = 'Confirm your building entrance pin first.');
+    }
+    if (!valid || point == null) return;
+    Navigator.pop(
+      context,
+      PreviewAddress(
+        area: area,
+        building: building.text,
+        unit: unit.text,
+        instructions: instructions.text,
+        point: point!,
+      ),
+    );
   }
 
   @override
@@ -1173,37 +1355,139 @@ class _AddressPageState extends State<AddressPage> {
             ),
           ),
           Text(
-            'Right to your\ndoorstep.',
+            widget.pickup
+                ? 'Meet us at\nthe entrance.'
+                : 'Right to your\ndoorstep.',
             style: Theme.of(context).textTheme.headlineLarge,
           ),
+          const SizedBox(height: 8),
+          Text(
+            widget.pickup
+                ? 'Place the pin where riders should collect your orders.'
+                : 'Place the pin at the building entrance your rider should use.',
+            style: const TextStyle(color: muted),
+          ),
           const SizedBox(height: 16),
-          const Glass(
+          DropdownButtonFormField<String>(
+            key: const ValueKey('address-area'),
+            initialValue: area,
+            decoration: const InputDecoration(labelText: 'Island'),
+            items: ServiceArea.values
+                .map(
+                  (v) => DropdownMenuItem(value: v.name, child: Text(v.name)),
+                )
+                .toList(),
+            onChanged: (v) {
+              if (v == null || v == area) return;
+              setState(() {
+                area = v;
+                point = null;
+                pinError = null;
+                latitude.clear();
+                longitude.clear();
+              });
+            },
+          ),
+          const SizedBox(height: 16),
+          Glass(
+            padding: const EdgeInsets.all(14),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Icon(Icons.location_on_outlined, size: 44),
-                SizedBox(height: 12),
-                Text('Entrance pin selection is coming next.'),
+                const Text(
+                  'Move the map until the pin points at the entrance, then confirm.',
+                  style: TextStyle(fontSize: 12),
+                ),
+                const SizedBox(height: 12),
+                widget.mapBuilder?.call(
+                      area,
+                      point,
+                      selectPoint,
+                      entranceMoved,
+                    ) ??
+                    EntranceMap(
+                      key: ValueKey('$area:$mapRevision'),
+                      area: area,
+                      initialPoint: point,
+                      onSelected: selectPoint,
+                      onMoved: entranceMoved,
+                    ),
+                const SizedBox(height: 8),
                 Text(
-                  'No location permission or live tracking is used in this preview.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: muted, fontSize: 12),
+                  point == null
+                      ? 'An entrance pin has not been confirmed.'
+                      : 'Entrance confirmed · ${point!.label}',
+                  key: const ValueKey('entrance-confirmation'),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                if (pinError != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(
+                      pinError!,
+                      key: const ValueKey('entrance-error'),
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                    ),
+                  ),
+                const SizedBox(height: 8),
+                const Text(
+                  'No device location access is needed. Open map data may have fewer landmarks than Google Maps.',
+                  style: TextStyle(color: muted, fontSize: 11),
+                ),
+                const SizedBox(height: 8),
+                ExpansionTile(
+                  key: const ValueKey('manual-coordinates'),
+                  tilePadding: EdgeInsets.zero,
+                  title: const Text(
+                    'Have entrance coordinates?',
+                    style: TextStyle(fontSize: 13),
+                  ),
+                  children: [
+                    const Text(
+                      'Use latitude and longitude from an existing map pin if the map cannot load.',
+                      style: TextStyle(fontSize: 12, color: muted),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      key: const ValueKey('address-latitude'),
+                      controller: latitude,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                        signed: true,
+                      ),
+                      decoration: const InputDecoration(labelText: 'Latitude'),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      key: const ValueKey('address-longitude'),
+                      controller: longitude,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                        signed: true,
+                      ),
+                      decoration: const InputDecoration(labelText: 'Longitude'),
+                    ),
+                    const SizedBox(height: 12),
+                    OutlinedButton(
+                      key: const ValueKey('use-coordinates'),
+                      onPressed: useCoordinates,
+                      child: const Text('Use these coordinates'),
+                    ),
+                  ],
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 22),
-          DropdownButtonFormField<String>(
-            initialValue: area,
-            decoration: const InputDecoration(labelText: 'Island'),
-            items: [
-              'Malé',
-              'Hulhumalé',
-            ].map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(),
-            onChanged: (v) => setState(() => area = v!),
-          ),
           const SizedBox(height: 16),
           TextFormField(
+            key: const ValueKey('address-building'),
             controller: building,
+            maxLength: 100,
             decoration: const InputDecoration(
               labelText: 'Building / house name',
             ),
@@ -1213,14 +1497,18 @@ class _AddressPageState extends State<AddressPage> {
           ),
           const SizedBox(height: 16),
           TextFormField(
+            key: const ValueKey('address-unit'),
             controller: unit,
+            maxLength: 100,
             decoration: const InputDecoration(
               labelText: 'Apartment, floor, or pickup counter',
             ),
           ),
           const SizedBox(height: 16),
           TextFormField(
+            key: const ValueKey('address-instructions'),
             controller: instructions,
+            maxLength: 300,
             decoration: const InputDecoration(
               labelText: 'Entrance instructions',
             ),
@@ -1228,20 +1516,15 @@ class _AddressPageState extends State<AddressPage> {
           ),
           const SizedBox(height: 24),
           FilledButton(
-            onPressed: () {
-              if (form.currentState!.validate()) {
-                Navigator.pop(
-                  context,
-                  PreviewAddress(
-                    area,
-                    building.text.trim(),
-                    unit.text.trim(),
-                    instructions.text.trim(),
-                  ),
-                );
-              }
-            },
-            child: const Text('Use preview address'),
+            key: const ValueKey('save-address'),
+            onPressed: save,
+            child: const Text('Save preview address'),
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            'Saved only for this experience. Account storage and service coverage approval are coming next.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 12, color: muted),
           ),
         ],
       ),

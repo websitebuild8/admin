@@ -62,3 +62,28 @@ To add another administrator: create the user in Clerk, add their email to Clerk
 allowlist, add their exact user ID to ADMIN_CLERK_USER_IDS, and restart/redeploy.
 These instance-wide restrictions must be revisited for future public mobile
 registration, while preserving the server-owned admin ID check.
+
+## Flutter mobile preview and entrance addresses — 3–4 October 2026
+
+Flutter analysis and 12 sequential unit/widget checks pass. Checks cover integer
+cart totals, destination-only Maps URLs, finite coordinates, allowed-island
+validation, immutable address serialization, required pin confirmation, clearing
+the pin on island changes or subsequent map movement, manual-coordinate validation
+and returned address details, checkout address reuse, locked default registration, disabled payments,
+and all three role previews at 390 × 844. Widget tests replace the map platform
+view with a local fixture; real tile rendering requires a separate browser/device
+check. The web build passed; browser checks displayed Malé roads and landmark
+labels, confirmed an entrance, entered a building/unit/instructions, and returned
+the saved building label to customer home and the full address/pin to checkout.
+On the final web build, dragging the map cleared confirmation; confirming again
+used the updated camera coordinates. Switching to Hulhumalé cleared the Malé pin,
+loaded the second island map, and confirmed its entrance coordinates. Preview
+screenshots are in `docs/previews`.
+The tile provider logged a missing office sprite warning and Flutter logged an
+emoji font fallback warning; neither prevented address interaction. No account
+addresses, location fixes, orders or payments were written to the backend. Android
+explicitly removes transitive fine/coarse location permissions.
+
+The preview uses Flutter glass effects, not Apple's native Liquid Glass. Native
+Android/iOS builds, mobile Clerk sessions, production coverage validation, BML,
+shared role status updates, push and secure account persistence remain unverified.
