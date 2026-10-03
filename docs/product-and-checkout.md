@@ -1,5 +1,6 @@
 # Product and checkout specification
 
+> Latest decision (3 October 2026): continuous rider tracking is removed. Use saved customer/restaurant entrance pins, external Google Maps navigation, and service-area dispatch. See [mobile design](mobile-design.md). Earlier tracking implementation below is historical and must not be connected to mobile.
 Version: draft-2026-09-29. This specifies required behavior; it is not implemented application code.
 
 ## App structure and registration
