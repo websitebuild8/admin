@@ -1,0 +1,83 @@
+# Keep this file at the repository root. Flutter lives in apps/mobile;
+# apps/admin is the separate Next.js application deployed through Vercel.
+workflows:
+  igo-android-preview:
+    name: iGO Android APK - design preview
+    working_directory: apps/mobile
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    environment:
+      flutter: 3.47.2
+      java: 21
+    cache:
+      cache_paths:
+        - ~/.pub-cache
+        - ~/.gradle/caches
+    scripts:
+      - name: Install Flutter dependencies
+        script: |
+          set -eu
+          test -f pubspec.yaml
+          flutter pub get
+      - name: Check mobile code
+        script: flutter analyze --no-pub
+      - name: Run mobile tests
+        script: flutter test --no-pub --concurrency=1
+      - name: Build preview APK
+        script: flutter build apk --debug --no-pub --dart-define=IGO_PREVIEW=true
+    artifacts:
+      # Artifact paths are relative to the repository root, not working_directory.
+      - apps/mobile/build/app/outputs/flutter-apk/*.apk
+
+  igo-android-connected:
+    name: iGO Android APK - connected app
+    working_directory: apps/mobile
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    environment:
+      flutter: 3.47.2
+      java: 21
+      groups:
+        - igo_mobile
+    cache:
+      cache_paths:
+        - ~/.pub-cache
+        - ~/.gradle/caches
+    scripts:
+      - name: Validate public mobile settings
+        script: |
+          set -eu
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          from urllib.parse import urlparse
+
+          key = os.environ.get('CLERK_PUBLISHABLE_KEY', '').strip()
+          api = os.environ.get('IGO_API_BASE_URL', '').strip()
+          if not key.startswith(('pk_test_', 'pk_live_')):
+              raise SystemExit('Add CLERK_PUBLISHABLE_KEY to the igo_mobile variable group.')
+          parsed = urlparse(api)
+          if (parsed.scheme != 'https' or not parsed.hostname
+                  or parsed.username or parsed.password or parsed.query or parsed.fragment
+                  or parsed.hostname in ('localhost', '127.0.0.1', '10.0.2.2')):
+              raise SystemExit('IGO_API_BASE_URL must be your deployed HTTPS backend URL, without credentials or query parameters.')
+          Path('.env.ci.json').write_text(json.dumps({
+              'CLERK_PUBLISHABLE_KEY': key,
+              'IGO_API_BASE_URL': api,
+          }))
+          print('Public mobile settings validated.')
+          PY
+      - name: Install Flutter dependencies
+        script: |
+          set -eu
+          test -f pubspec.yaml
+          flutter pub get
+      - name: Check mobile code
+        script: flutter analyze --no-pub
+      - name: Run mobile tests
+        script: flutter test --no-pub --concurrency=1
+      - name: Build connected APK
+        script: flutter build apk --debug --no-pub --dart-define=IGO_PREVIEW=false --dart-define-from-file=.env.ci.json
+    artifacts:
+      - apps/mobile/build/app/outputs/flutter-apk/*.apk

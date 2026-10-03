@@ -1,5 +1,16 @@
 # iGO mobile
 
+## Build an Android APK with Codemagic
+
+Use the repository-root `codemagic.yaml`, which sets the Flutter project directory
+to `apps/mobile`. In Codemagic, scan the branch for this configuration and select
+**iGO Android APK - design preview** for the first test APK. The connected workflow
+uses the `igo_mobile` variable group for the Clerk public key and deployed HTTPS
+backend URL. See [the complete setup steps](../../docs/codemagic-android.md).
+
+APK compilation runs on Codemagic. Both workflows produce a debug APK for testing;
+release signing and Play Store publishing are separate setup steps.
+
 One Flutter application for customers, restaurants and riders. Android, iOS and web
 preview runners are included. Bundle identifiers are `mv.igo.igo_mobile` on Android and `mv.igo.igoMobile`
 on iOS and must be confirmed before store registration. Native launcher icons
@@ -18,10 +29,11 @@ The browser target is for design review, not a separate customer web product:
 flutter run -d web-server --web-hostname localhost --web-port 8080 --dart-define=IGO_PREVIEW=true
 ```
 
-Without `IGO_PREVIEW=true`, no sample workspace can be entered. Real registration
-is intentionally unavailable until mobile Clerk sessions and backend-approved role
-onboarding are implemented. No client choice grants a real role. Never put Clerk
-secret keys, database URLs, or Supabase service keys in this app.
+Without `IGO_PREVIEW=true`, no sample workspace can be entered. Configured native
+builds use Clerk authentication and shared backend registration. Customer access
+follows registration; restaurant/rider access requires approval. No client choice
+grants a real role. Never put Clerk secret keys, database URLs, or Supabase service
+keys in this app.
 
 ## First implementation
 
@@ -44,28 +56,37 @@ secret keys, database URLs, or Supabase service keys in this app.
 - Separate sample states are in memory and reset on leaving the experience. Sample
   restaurant/rider actions do not synchronize with one another or the backend.
 
-## Next integration work
+## Connected app capabilities and limits
 
-Clerk mobile authentication, registration forms/document submission, server-approved
-roles, live catalog and order APIs, account address storage, server-validated order
-address snapshots, BML hosted checkout, notification delivery, policy acceptance versions,
-and account deletion are not implemented yet. The admin Clerk instance is currently
-restricted to its approved email: public mobile onboarding requires a deliberate
-identity configuration change while preserving admin user-ID checks.
+Native builds with the public Clerk key and API URL use the existing Clerk
+application. The admin website still restricts access to its allowlisted admin IDs;
+public mobile registrations do not grant admin access. Sessions use secure device
+storage, and the backend verifies bearer tokens before checking approved roles and
+ownership.
 
-Use saved coordinates for restaurant pickup and customer drop-off; let the rider
-open Google Maps for navigation. Latest product decision removes continuous rider
-tracking and proximity-based dispatch: use selected service areas/admin assignment.
-The existing admin backend still contains the earlier GPS/nearby-offer implementation;
-it must be revised before connecting mobile operations. Do not enable that GPS flow.
+The connected app provides registration/pending approval screens, saved customer
+entrances, reviewed restaurant pickup entrances, menu/availability management,
+server-paginated catalog and orders, rider service-area requests, delivery milestones,
+status inbox updates and server-priced checkout quotes. Only the assigned rider
+receives job entrances for Google Maps navigation. Continuous GPS and proximity
+search are removed from both the mobile app and admin dispatch.
+
+BML collection is disabled until merchant setup and payment verification are ready.
+No unpaid order can be submitted. Production registration remains gated while
+business policies contain unapproved placeholders. Document upload verification,
+background push notifications, account-deletion execution and launch coverage
+polygons remain unfinished. The Flutter Clerk SDK is a pinned community beta;
+authentication and secure storage still require native device checks. Native iOS
+Liquid Glass navigation is added for iOS 26+, with older-device fallback, but awaits
+macOS compilation and device verification.
 
 The picker has no current-location button and requests no GPS permission. Drag the
 map to the entrance and explicitly confirm it, or enter existing latitude/longitude
 coordinates. It uses an approximate bounding rectangle for each island; this does
 not establish real building entrances, land boundaries or approved service coverage.
 The server must enforce actual service zones before accepting an order. The
-immutable address model exposes a snapshot serializer for that future integration.
-Nothing is persisted across restarts, and rider sample jobs still use fictional
+connected backend stores saved addresses and immutable checkout quote snapshots.
+Design-preview addresses stay in memory, and its rider sample jobs use fictional
 fixed destinations. Do not use these sample jobs for real deliveries.
 
 Map tiles are served by [OpenFreeMap](https://openfreemap.org/quick_start/) and
