@@ -25,9 +25,17 @@ workflows:
         script: flutter test --no-pub --concurrency=1
       - name: Build preview APK
         script: flutter build apk --debug --no-pub --dart-define=IGO_PREVIEW=true
+      - name: Prepare APK download
+        script: |
+          set -eu
+          igo_apk_path="$PWD/build/app/outputs/flutter-apk/app-debug.apk"
+          test -s "$igo_apk_path"
+          mkdir -p /tmp/igo-android-artifacts
+          cp "$igo_apk_path" /tmp/igo-android-artifacts/app-debug.apk
+          ls -lh /tmp/igo-android-artifacts/app-debug.apk
     artifacts:
-      # Artifact paths are relative to the repository root, not working_directory.
-      - apps/mobile/build/app/outputs/flutter-apk/*.apk
+      # An absolute path avoids ambiguity between the clone and working directories.
+      - /tmp/igo-android-artifacts/app-debug.apk
 
   igo-android-connected:
     name: iGO Android APK - connected app
@@ -79,5 +87,13 @@ workflows:
         script: flutter test --no-pub --concurrency=1
       - name: Build connected APK
         script: flutter build apk --debug --no-pub --dart-define=IGO_PREVIEW=false --dart-define-from-file=.env.ci.json
+      - name: Prepare APK download
+        script: |
+          set -eu
+          igo_apk_path="$PWD/build/app/outputs/flutter-apk/app-debug.apk"
+          test -s "$igo_apk_path"
+          mkdir -p /tmp/igo-android-artifacts
+          cp "$igo_apk_path" /tmp/igo-android-artifacts/app-debug.apk
+          ls -lh /tmp/igo-android-artifacts/app-debug.apk
     artifacts:
-      - apps/mobile/build/app/outputs/flutter-apk/*.apk
+      - /tmp/igo-android-artifacts/app-debug.apk

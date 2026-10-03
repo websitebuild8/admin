@@ -7,8 +7,9 @@ The repository is a monorepo: `apps/admin` contains Next.js, while
 `Failed to install dependencies ... /Users/builder/clone. Directory was not found`
 means the selected build configuration is looking for Flutter at the clone root.
 The root `codemagic.yaml` sets `working_directory: apps/mobile` for both workflows.
-APK artifact paths include `apps/mobile` because Codemagic resolves artifact paths
-relative to the clone root.
+After compilation, **Prepare APK download** verifies the APK exists and copies it
+to `/tmp/igo-android-artifacts/app-debug.apk`. The `artifacts` section uses this
+absolute path, avoiding ambiguity between the clone and working directories.
 
 ## First APK
 
@@ -16,7 +17,14 @@ relative to the clone root.
 2. Open the application settings in Codemagic, select that branch and use
    **Check for configuration file** to load the root YAML file.
 3. Start a new build and choose **iGO Android APK - design preview**.
-4. After it succeeds, download `app-debug.apk` from the build's **Artifacts**.
+4. After it succeeds, open that build's overview and download `app-debug.apk` from
+   **Artifacts** below the build details.
+
+If an earlier successful build shows **No artifacts were found** under Publishing,
+its APK was compiled but was not collected for download. Start a new build from the
+updated branch; reopening the old build cannot apply the corrected configuration.
+The new **Prepare APK download** step fails if the expected APK is missing, instead
+of silently continuing without a download.
 
 This APK uses clearly marked fictional data. It does not register accounts,
 charge cards, or write delivery operations to the backend. It is for checking
