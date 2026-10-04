@@ -1,39 +1,38 @@
-# Mobile design and current product direction
+# Mobile design and location flow
 
-3 October 2026. The user's attached original iGO mockup remains the visual reference.
-White and warm yellow, black typography, generous rounded surfaces, translucent
-panels and floating navigation. Keep blur restrained for readability/performance;
-honor accessibility settings. The supplied iGO logo is reused unchanged.
+Updated 5 October 2026. One Flutter app for backend-approved customers, restaurants
+and riders; admin remains the Next.js web application. The original iGO logo stays
+unchanged. White and warm yellow surfaces, black typography, generous rounded
+panels and translucent yellow floating navigation combine the supplied mockup with
+DoorDash-inspired restaurant browsing. iOS 26+ uses native Liquid Glass navigation;
+older iOS uses native blur, and Android uses Flutter glass with accessibility
+fallbacks. Those native effects require device verification.
 
-One Flutter app, three backend-approved experiences. Customer home → cafe menu →
-cart → confirmed delivery entrance/address → hosted BML card payment → verified
-paid order → status timeline. Restaurant dashboard shows confirmation, food-ready
-and handover. Rider dashboard shows service-area jobs, assignment, arrival at
-restaurant, pickup, arrival at customer and completion. Full destination details
-must be server-restricted to the assigned rider.
+Customer home features clear delivery details, search, cuisine chips and large
+restaurant cards. Real catalog search runs on the backend before pagination, with
+at most ten results per page. Restaurant cards show actual preparation availability;
+no invented real-world ratings, discounts or delivery estimates are displayed.
+Generated café photography is labeled sample content and stays in design preview;
+real restaurants show an honest image placeholder pending supplied photography.
+Menus retain an accessible cart button at the bottom of the screen.
 
-The wallet and live-tracking mockup screens are superseded. No bank transfers,
-cash, wallet balance, or continuous rider tracking. Customer support and legitimate
-remedies remain available even without change-of-mind cancellation.
+Customers and restaurants type a building/address, select a Google Places result,
+review its Google map location, and add their own unit and entrance instructions.
+Coordinates are resolved automatically; pin adjustment is optional. Changing the
+island or search text invalidates old selections, and late responses cannot select
+a different address. Missing/ambiguous buildings can use a nearby landmark plus
+an adjusted entrance, or manual coordinates. Island bounds are approximate pilot
+rectangles and require operational validation before launch.
 
-Location design: one-time pin selection for customer/restaurant entrances, saved
-address details and order snapshots; external Google Maps directions for riders.
-Offer jobs by selected service area/admin assignment rather than rider proximity.
-This supersedes earlier tracking sections in product-and-checkout.md and
-live-tracking.md; their legacy backend implementation is not mobile launch-ready.
+Only assigned riders receive job entrances. They can view pickup/dropoff endpoints
+on a Google map and open external Google Maps directions. iGO does not collect GPS
+or draw live rider positions. Restaurants update confirmation, ready-for-pickup and
+handover. Riders update assignment, arrival, pickup, arrival at customer and delivery
+completion. Customers receive milestones and approximate distance-based estimates.
+No paid order is created until verified hosted BML card payment; payment collection
+is currently disabled. Role approval and all operations share the existing backend.
 
-First milestone is an explicitly marked interactive design preview. It does not
-claim authenticated registration, real payment, synchronized dispatch or native
-Apple Liquid Glass. Those require separate integration and device verification.
-
-The entrance picker now renders an OpenFreeMap vector map through MapLibre. No
-Google SDK billing key or device GPS permission is required. Customer and restaurant
-forms require a building and explicitly confirmed pin, retain existing details when
-edited, and offer manual coordinate entry if tiles cannot load. Customer home and
-checkout share one in-memory address. Switching islands clears the old pin. The
-island rectangles are approximate preview validation; server coverage polygons,
-branch review, saved accounts and order snapshots remain integration work. Rider
-sample navigation still opens fixed fictional destinations, not a real placed order.
-
-Map data is OpenStreetMap-based and is not a copy of Google Maps landmark data.
-OpenFreeMap/OpenMapTiles/OpenStreetMap credits are visible alongside the map.
+The Google setup, quotas, privacy text and retention behavior are documented in
+[google-maps-setup.md](google-maps-setup.md). Policies retain the agreed business
+placeholders and remain draft-only. Authentication, maps, Liquid Glass and native
+APK/iOS compilation need device checks with configured credentials.

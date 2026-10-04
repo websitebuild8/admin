@@ -1,4 +1,8 @@
 import 'dart:ui';
+import 'dart:async';
+
+import 'browse_widgets.dart';
+import 'places_lookup.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
@@ -147,7 +151,7 @@ class CanvasPage extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFFFFF6BC), Color(0xFFF8F8F2), Color(0xFFF0F3EE)],
+          colors: [Color(0xFFFFF9DF), Color(0xFFFAFAF6), Color(0xFFFFF5CC)],
         ),
       ),
       child: SafeArea(
@@ -344,6 +348,7 @@ class _WorkspaceState extends State<Workspace> {
   bool online = true;
   String area = 'Malé';
   String query = '';
+  String cuisine = 'All';
   final cart = Cart();
   PreviewAddress? pickupAddress;
   void toast(String text) =>
@@ -358,88 +363,44 @@ class _WorkspaceState extends State<Workspace> {
 
   @override
   Widget build(BuildContext context) => CanvasPage(
-    child: Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 6, 20, 0),
-          child: Row(
-            children: [
-              const Text(
-                'PREVIEW',
-                style: TextStyle(
-                  fontSize: 10,
-                  letterSpacing: 1.6,
-                  fontWeight: FontWeight.w800,
-                ),
+    child: FloatingWorkspace(
+      labels: widget.role == AppRole.customer
+          ? const ['Explore', 'Orders', 'Account']
+          : widget.role == AppRole.restaurant
+          ? const ['Kitchen', 'Orders', 'Account']
+          : const ['Requests', 'Deliveries', 'Account'],
+      selected: tab,
+      onSelected: (v) => setState(() => tab = v),
+      header: Padding(
+        padding: const EdgeInsets.fromLTRB(24, 6, 16, 0),
+        child: Row(
+          children: [
+            const Text(
+              'PREVIEW',
+              style: TextStyle(
+                fontSize: 10,
+                letterSpacing: 1.6,
+                fontWeight: FontWeight.w800,
               ),
-              const Spacer(),
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Change experience'),
-              ),
-            ],
-          ),
-        ),
-        Expanded(
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(24, 10, 24, 24),
-            children: tab == 2
-                ? profile()
-                : widget.role == AppRole.customer
-                ? (tab == 0 ? customer() : customerOrders())
-                : widget.role == AppRole.restaurant
-                ? restaurant()
-                : rider(),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(18, 0, 18, 12),
-          child: Glass(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-            child: Row(
-              children: [
-                for (int i = 0; i < 3; i++)
-                  Expanded(
-                    child: Semantics(
-                      selected: tab == i,
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(22),
-                        onTap: () => setState(() => tab = i),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          decoration: BoxDecoration(
-                            color: tab == i ? yellow : Colors.transparent,
-                            borderRadius: BorderRadius.circular(22),
-                          ),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                [
-                                  Icons.home_outlined,
-                                  Icons.receipt_long_outlined,
-                                  Icons.person_outline,
-                                ][i],
-                              ),
-                              const SizedBox(height: 3),
-                              Text(
-                                ['Home', 'Orders', 'Account'][i],
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
             ),
-          ),
+            const Spacer(),
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Change experience'),
+            ),
+          ],
         ),
-      ],
+      ),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(24, 10, 24, 118),
+        children: tab == 2
+            ? profile()
+            : widget.role == AppRole.customer
+            ? (tab == 0 ? customer() : customerOrders())
+            : widget.role == AppRole.restaurant
+            ? restaurant()
+            : rider(),
+      ),
     ),
   );
   List<Widget> customer() => [
@@ -477,153 +438,57 @@ class _WorkspaceState extends State<Workspace> {
     ),
     const SizedBox(height: 16),
     Text(
-      'What sounds\ngood today?',
+      'Your next favourite.\nJust a tap away.',
       style: Theme.of(context).textTheme.headlineLarge,
     ),
     const SizedBox(height: 20),
     TextField(
       onChanged: (v) => setState(() => query = v),
       decoration: const InputDecoration(
-        hintText: 'Search restaurants or food',
+        hintText: 'Search restaurants or cuisines',
         prefixIcon: Icon(Icons.search),
       ),
     ),
+    const SizedBox(height: 14),
+    CuisineFilters(
+      selected: cuisine,
+      onSelected: (v) => setState(() => cuisine = v),
+    ),
     const SizedBox(height: 20),
+    CafeFeature(onTap: menuPage),
+    const SizedBox(height: 26),
     Row(
       children: [
-        for (final item in [
-          ('🍔', 'Food'),
-          ('☕', 'Coffee'),
-          ('🛍️', 'Shops'),
-          ('📦', 'Anything'),
-        ])
-          Expanded(
-            child: InkWell(
-              onTap: () {
-                if (item.$2 == 'Coffee' || item.$2 == 'Food') {
-                  setState(() => query = item.$2 == 'Coffee' ? 'Cafe' : '');
-                } else {
-                  toast('More categories are coming soon.');
-                }
-              },
-              child: Column(
-                children: [
-                  Text(item.$1, style: const TextStyle(fontSize: 30)),
-                  const SizedBox(height: 8),
-                  Text(item.$2, style: const TextStyle(fontSize: 12)),
-                ],
-              ),
-            ),
+        Expanded(
+          child: Text(
+            'Find your flavour',
+            style: Theme.of(context).textTheme.titleLarge,
           ),
+        ),
+        const Text(
+          '3 sample places',
+          style: TextStyle(color: muted, fontSize: 11),
+        ),
       ],
     ),
-    const SizedBox(height: 24),
-    Container(
-      padding: const EdgeInsets.all(22),
-      decoration: BoxDecoration(
-        color: yellow,
-        borderRadius: BorderRadius.circular(28),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'YOUR DAILY LITTLE TREAT',
-                  style: TextStyle(
-                    fontSize: 9,
-                    letterSpacing: 1.3,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Good coffee.\nGreat day.',
-                  style: TextStyle(
-                    fontSize: 27,
-                    fontWeight: FontWeight.w800,
-                    height: 1.15,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextButton(
-                  onPressed: menuPage,
-                  style: TextButton.styleFrom(
-                    backgroundColor: ink,
-                    foregroundColor: Colors.white,
-                  ),
-                  child: const Text('Find your favourite  →'),
-                ),
-              ],
-            ),
-          ),
-          const Text('☕', style: TextStyle(fontSize: 70)),
-        ],
-      ),
-    ),
-    const SizedBox(height: 28),
-    Text('Popular near you', style: Theme.of(context).textTheme.titleLarge),
     const SizedBox(height: 14),
     for (final shop in [
-      ('The Cafe', 'Coffee • Snacks', '☕', '25–35'),
-      ('Island Bites', 'Maldivian • Local favourites', '🍛', '30–40'),
-      ('Pizza Wave', 'Pizza • Italian', '🍕', '25–40'),
+      ('The Cafe', 'Coffee • Snacks', '25–35'),
+      ('Island Bites', 'Maldivian • Local favourites', '30–40'),
+      ('Pizza Wave', 'Pizza • Italian', '25–40'),
     ])
-      if ('${shop.$1} ${shop.$2}'.toLowerCase().contains(query.toLowerCase()))
-        Padding(
-          padding: const EdgeInsets.only(bottom: 14),
-          child: Glass(
-            child: InkWell(
-              onTap: shop.$1 == 'The Cafe'
-                  ? menuPage
-                  : () => toast('This sample menu is coming next.'),
-              child: Row(
-                children: [
-                  Container(
-                    width: 76,
-                    height: 76,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF4EBD8),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Center(
-                      child: Text(
-                        shop.$3,
-                        style: const TextStyle(fontSize: 42),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          shop.$1,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w800,
-                            fontSize: 17,
-                          ),
-                        ),
-                        Text(
-                          shop.$2,
-                          style: const TextStyle(color: muted, fontSize: 12),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          '★ 4.8   •   ${shop.$4} min',
-                          style: const TextStyle(fontSize: 12),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const Icon(Icons.chevron_right),
-                ],
-              ),
-            ),
-          ),
+      if ('${shop.$1} ${shop.$2}'.toLowerCase().contains(query.toLowerCase()) &&
+          (cuisine == 'All' || shop.$2.contains(cuisine)))
+        RestaurantCard(
+          name: shop.$1,
+          subtitle: '${shop.$2} · $area',
+          detail: 'Sample estimate · ${shop.$3} min',
+          imageAsset: shop.$1 == 'The Cafe'
+              ? 'assets/food/cafe-preview.png'
+              : null,
+          onTap: shop.$1 == 'The Cafe'
+              ? menuPage
+              : () => toast('This sample menu is coming next.'),
         ),
   ];
   void address() async {
@@ -828,6 +693,10 @@ class _WorkspaceState extends State<Workspace> {
               subtitle: Text('Malé · sample pickup entrance'),
             ),
             if (delivery > 0) ...[
+              const JobMap(
+                pickup: GeoPoint(4.1755, 73.5093),
+                destination: GeoPoint(4.172, 73.515),
+              ),
               OutlinedButton.icon(
                 onPressed: () => navigate(4.1755, 73.5093),
                 icon: const Icon(Icons.near_me_outlined),
@@ -969,16 +838,13 @@ class _MenuPageState extends State<MenuPage> {
                   icon: const Icon(Icons.arrow_back),
                 ),
               ),
-              Container(
-                height: 170,
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFFD9C4A0), Color(0xFFF4E7D0)],
-                  ),
-                  borderRadius: BorderRadius.circular(30),
-                ),
-                child: const Center(
-                  child: Text('☕', style: TextStyle(fontSize: 100)),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(28),
+                child: Image.asset(
+                  'assets/food/cafe-preview.png',
+                  height: 190,
+                  fit: BoxFit.cover,
+                  semanticLabel: 'Sample café food photography',
                 ),
               ),
               const SizedBox(height: 22),
@@ -1234,12 +1100,14 @@ class AddressPage extends StatefulWidget {
   final bool pickup;
   // Allows the form flow to be tested without platform views or tile requests.
   final EntranceMapBuilder? mapBuilder;
+  final PlacesLookup? places;
   const AddressPage({
     super.key,
     required this.area,
     this.initial,
     this.pickup = false,
     this.mapBuilder,
+    this.places,
   });
   @override
   State<AddressPage> createState() => _AddressPageState();
@@ -1252,6 +1120,14 @@ class _AddressPageState extends State<AddressPage> {
   final instructions = TextEditingController();
   final latitude = TextEditingController();
   final longitude = TextEditingController();
+  final search = TextEditingController();
+  Timer? debounce;
+  String session = newPlacesSession();
+  int searchRevision = 0;
+  bool searching = false, resolving = false, searched = false;
+  String? searchError, selectedLabel;
+  List<PlaceSuggestion> suggestions = [];
+  Map<String, dynamic>? google;
   late String area;
   GeoPoint? point;
   String? pinError;
@@ -1263,6 +1139,7 @@ class _AddressPageState extends State<AddressPage> {
     final initial = widget.initial;
     area = initial?.area ?? widget.area;
     point = initial?.point;
+    google = initial?.google;
     building.text = initial?.building ?? '';
     unit.text = initial?.unit ?? '';
     instructions.text = initial?.instructions ?? '';
@@ -1274,6 +1151,8 @@ class _AddressPageState extends State<AddressPage> {
 
   @override
   void dispose() {
+    debounce?.cancel();
+    search.dispose();
     building.dispose();
     unit.dispose();
     instructions.dispose();
@@ -1289,6 +1168,7 @@ class _AddressPageState extends State<AddressPage> {
     }
     setState(() {
       point = value;
+      google = null;
       pinError = null;
       latitude.text = '${value.latitude}';
       longitude.text = '${value.longitude}';
@@ -1307,6 +1187,102 @@ class _AddressPageState extends State<AddressPage> {
     FocusScope.of(context).unfocus();
   }
 
+  void resetSearch() {
+    debounce?.cancel();
+    searchRevision++;
+    search.clear();
+    suggestions = [];
+    searched = false;
+    searching = false;
+    resolving = false;
+    searchError = null;
+    selectedLabel = null;
+    session = newPlacesSession();
+  }
+
+  void searchChanged(String input) {
+    debounce?.cancel();
+    final revision = ++searchRevision;
+    setState(() {
+      suggestions = [];
+      searchError = null;
+      selectedLabel = null;
+      searched = false;
+      searching = input.trim().length >= 3;
+      point = null;
+      google = null;
+      latitude.clear();
+      longitude.clear();
+    });
+    if (!searching || widget.places == null) return;
+    final selectedArea = area, selectedSession = session;
+    debounce = Timer(const Duration(milliseconds: 450), () async {
+      try {
+        final results = await widget.places!.search(
+          input.trim(),
+          selectedArea,
+          selectedSession,
+        );
+        if (mounted && revision == searchRevision) {
+          setState(() {
+            suggestions = results;
+            searched = true;
+          });
+        }
+      } catch (e) {
+        if (mounted && revision == searchRevision) {
+          setState(() => searchError = e.toString());
+        }
+      } finally {
+        if (mounted && revision == searchRevision) {
+          setState(() => searching = false);
+        }
+      }
+    });
+  }
+
+  Future<void> chooseSuggestion(PlaceSuggestion suggestion) async {
+    if (resolving || widget.places == null) return;
+    debounce?.cancel();
+    final revision = ++searchRevision,
+        selectedArea = area,
+        selectedSession = session;
+    final typedBuilding = search.text.trim();
+    setState(() {
+      resolving = true;
+      searchError = null;
+    });
+    try {
+      final result = await widget.places!.resolve(
+        suggestion.id,
+        selectedArea,
+        selectedSession,
+      );
+      if (!mounted || revision != searchRevision) return;
+      if (!ServiceArea.named(area).contains(result.point)) {
+        throw Exception('Choose a building in $area.');
+      }
+      selectPoint(result.point, recenter: true);
+      setState(() {
+        google = result.google;
+        selectedLabel = suggestion.label;
+        // Keep the user's own building text; Google labels stay transient.
+        building.text = typedBuilding;
+        suggestions = [];
+        session = newPlacesSession();
+      });
+      FocusScope.of(context).unfocus();
+    } catch (e) {
+      if (mounted && revision == searchRevision) {
+        setState(() => searchError = e.toString());
+      }
+    } finally {
+      if (mounted && revision == searchRevision) {
+        setState(() => resolving = false);
+      }
+    }
+  }
+
   void entranceMoved(GeoPoint candidate) {
     final confirmed = point;
     if (confirmed == null) return;
@@ -1315,6 +1291,7 @@ class _AddressPageState extends State<AddressPage> {
         (confirmed.longitude - candidate.longitude).abs() > .000001) {
       setState(() {
         point = null;
+        google = null;
         latitude.clear();
         longitude.clear();
         pinError = 'Pin moved. Confirm your entrance again.';
@@ -1336,6 +1313,7 @@ class _AddressPageState extends State<AddressPage> {
         unit: unit.text,
         instructions: instructions.text,
         point: point!,
+        google: google,
       ),
     );
   }
@@ -1363,8 +1341,8 @@ class _AddressPageState extends State<AddressPage> {
           const SizedBox(height: 8),
           Text(
             widget.pickup
-                ? 'Place the pin where riders should collect your orders.'
-                : 'Place the pin at the building entrance your rider should use.',
+                ? 'Search for your restaurant, review its entrance, and add pickup instructions.'
+                : 'Search for your building or address, then add your floor and unit.',
             style: const TextStyle(color: muted),
           ),
           const SizedBox(height: 16),
@@ -1381,7 +1359,9 @@ class _AddressPageState extends State<AddressPage> {
               if (v == null || v == area) return;
               setState(() {
                 area = v;
+                resetSearch();
                 point = null;
+                google = null;
                 pinError = null;
                 latitude.clear();
                 longitude.clear();
@@ -1389,13 +1369,111 @@ class _AddressPageState extends State<AddressPage> {
             },
           ),
           const SizedBox(height: 16),
+          TextField(
+            key: const ValueKey('address-search'),
+            maxLength: 150,
+            controller: search,
+            enabled: widget.places != null && !resolving,
+            decoration: const InputDecoration(
+              labelText: 'Find building or address',
+              hintText: 'Type a building, road or landmark',
+              prefixIcon: Icon(Icons.search),
+            ),
+            onChanged: searchChanged,
+          ),
+          if (widget.places == null)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 10),
+              child: Text(
+                'Automatic search becomes available when iGO location services are connected. You can still choose an entrance below.',
+                style: TextStyle(color: muted, fontSize: 12),
+              ),
+            ),
+          if (searching || resolving)
+            const Padding(
+              padding: EdgeInsets.all(12),
+              child: LinearProgressIndicator(),
+            ),
+          if (searchError != null)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              child: Text(
+                searchError!,
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
+            ),
+          if (suggestions.isNotEmpty)
+            Glass(
+              padding: const EdgeInsets.all(6),
+              child: Column(
+                children: [
+                  for (final suggestion in suggestions)
+                    ListTile(
+                      leading: const Icon(Icons.place_outlined),
+                      title: Text(suggestion.label),
+                      onTap: resolving
+                          ? null
+                          : () => chooseSuggestion(suggestion),
+                    ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(10, 10, 10, 5),
+                    child: Align(
+                      alignment: Alignment.centerRight,
+                      child: Image.asset(
+                        'assets/maps/google-maps.png',
+                        height: 18,
+                        semanticLabel: 'Google Maps',
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          if (searched &&
+              !searching &&
+              !resolving &&
+              suggestions.isEmpty &&
+              selectedLabel == null &&
+              searchError == null)
+            const Padding(
+              padding: EdgeInsets.all(12),
+              child: Text(
+                'No matching place. Try the road name or a nearby landmark, then adjust the entrance on the map.',
+              ),
+            ),
+          if (selectedLabel != null)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Selected: $selectedLabel',
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(10, 10, 10, 5),
+                    child: Image.asset(
+                      'assets/maps/google-maps.png',
+                      height: 18,
+                      semanticLabel: 'Google Maps',
+                    ),
+                  ),
+                  const Text(
+                    'Review the correct building and entrance before saving.',
+                    style: TextStyle(fontSize: 12, color: muted),
+                  ),
+                ],
+              ),
+            ),
+          const SizedBox(height: 16),
           Glass(
             padding: const EdgeInsets.all(14),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const Text(
-                  'Move the map until the pin points at the entrance, then confirm.',
+                  'Your selected place appears automatically. Adjust the entrance only if needed.',
                   style: TextStyle(fontSize: 12),
                 ),
                 const SizedBox(height: 12),
@@ -1436,7 +1514,7 @@ class _AddressPageState extends State<AddressPage> {
                   ),
                 const SizedBox(height: 8),
                 const Text(
-                  'No device location access is needed. Open map data may have fewer landmarks than Google Maps.',
+                  'iGO does not access your device GPS. Riders open Google Maps for directions to this entrance.',
                   style: TextStyle(color: muted, fontSize: 11),
                 ),
                 const SizedBox(height: 8),

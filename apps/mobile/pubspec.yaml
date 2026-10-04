@@ -8,7 +8,8 @@ dependencies:
   flutter:
     sdk: flutter
   cupertino_icons: ^1.0.8
-  maplibre_gl: ^0.27.1
+  google_maps_flutter: ^2.18.2
+  google_maps_flutter_ios_sdk10: ^2.19.0
   clerk_flutter: 0.0.18-beta
   clerk_auth: 0.0.18-beta
   flutter_secure_storage: ^11.2.0
@@ -22,3 +23,5 @@ flutter:
   uses-material-design: true
   assets:
     - assets/brand/igo-logo.jpg
+    - assets/food/cafe-preview.png
+    - assets/maps/google-maps.png

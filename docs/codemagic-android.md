@@ -37,19 +37,21 @@ are the reproducible configuration for this repository.
 ## Connected APK
 
 In Codemagic application settings, create an environment variable group called
-`igo_mobile` with these two values:
+`igo_mobile` with these values:
 
 | Variable | Value |
 | --- | --- |
 | `CLERK_PUBLISHABLE_KEY` | The existing Clerk application's public `pk_test_...` key for pilot testing. |
 | `IGO_API_BASE_URL` | The deployed admin/backend HTTPS origin, such as `https://YOUR-ADMIN-DOMAIN`. |
+| `GOOGLE_MAPS_API_KEY` | Optional restricted Android Maps SDK key; required to display native maps. |
+| `IGO_ANDROID_DEBUG_KEYSTORE_BASE64` | Optional secret base64 of a stable debug keystore, keeping the Maps signing fingerprint consistent. |
 
 Then select **iGO Android APK - connected app**. Its setup script validates the
 settings and writes an ignored build configuration file containing only those
-two public values. Local `.env.local.json` files are intentionally absent from Git.
+public Clerk/API/Maps values. The private Places key stays on the backend. Local `.env.local.json` files are intentionally absent from Git.
 A phone cannot reach the development server using your computer's `localhost`.
 
-Clerk secret keys, Supabase database URLs/service keys, BML credentials and
+Clerk secret keys, the Google Places server key, Supabase database URLs/service keys, BML credentials and
 administrator ID settings stay on the backend; they do not belong in this group
 or the APK. The backend must run with `IGO_DEMO_MODE=false`, matching Clerk keys,
 and the Supabase migrations applied.
@@ -73,3 +75,5 @@ do not prove native compilation; the successful Codemagic build confirms that.
 References: [Codemagic monorepo configuration](https://docs.codemagic.io/getting-started/adding-apps/),
 [Flutter YAML builds](https://docs.codemagic.io/yaml-quick-start/building-a-flutter-app/),
 [YAML configuration and artifact paths](https://docs.codemagic.io/yaml-basic-configuration/yaml-getting-started/).
+
+Google Maps configuration and signing-fingerprint steps: [Google Maps setup](google-maps-setup.md).

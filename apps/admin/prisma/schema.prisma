@@ -94,6 +94,7 @@ model Order {
 }
 
 model SavedAddress {
+  google       Json?
   id           String @id @default(uuid())
   profileId    String
   profile      Profile @relation(fields: [profileId], references: [id])
@@ -106,6 +107,13 @@ model SavedAddress {
   longitude    Float
   updatedAt    DateTime @updatedAt
   @@unique([profileId, kind])
+}
+
+model MapUsageBucket {
+  key       String @id
+  count     Int
+  expiresAt DateTime
+  @@index([expiresAt])
 }
 
 model MenuItem {

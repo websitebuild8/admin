@@ -5,10 +5,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import 'main.dart' show CanvasPage, Glass, AddressPage, yellow, ink, muted;
+import 'main.dart' show CanvasPage, Glass, AddressPage, muted;
 import 'models.dart';
 import 'mobile_api.dart';
-import 'native_glass_bar.dart';
+import 'browse_widgets.dart';
+import 'places_lookup.dart';
+import 'entrance_map.dart';
 
 const apiBase = String.fromEnvironment('IGO_API_BASE_URL');
 
@@ -412,6 +414,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
                               context,
                               MaterialPageRoute(
                                 builder: (_) => AddressPage(
+                                  places: MobilePlacesLookup(widget.api),
                                   area: area,
                                   initial: pickup,
                                   pickup: true,
@@ -489,6 +492,9 @@ PreviewAddress? storedAddress(Map<String, dynamic>? v) {
   if (v == null) return null;
   try {
     return PreviewAddress(
+      google: v['google'] == null
+          ? null
+          : Map<String, dynamic>.from(v['google']),
       area: v['area'],
       building: v['building'],
       unit: v['unit'] ?? '',
@@ -528,6 +534,7 @@ Future<void> editAddress(
     context,
     MaterialPageRoute(
       builder: (_) => AddressPage(
+        places: MobilePlacesLookup(api),
         area: initial?.area ?? account['restaurant']?['area'] ?? 'Malé',
         initial: initial,
         pickup: pickup,
@@ -573,7 +580,10 @@ class _LiveWorkspaceState extends State<LiveWorkspace>
   String? error;
   bool busy = false, fetching = false, foreground = true;
   int tab = 0, page = 1, catalogPage = 1;
-  Timer? timer;
+  Timer? timer, filterTimer;
+  bool refreshAgain = false;
+  String query = '', cuisine = 'All';
+  int catalogRevision = 0;
   String get role => widget.account['access']['role'];
   @override
   void initState() {
@@ -588,6 +598,7 @@ class _LiveWorkspaceState extends State<LiveWorkspace>
   @override
   void dispose() {
     timer?.cancel();
+    filterTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -599,8 +610,15 @@ class _LiveWorkspaceState extends State<LiveWorkspace>
   }
 
   Future<void> refresh({bool checkAccount = false}) async {
-    if (fetching) return;
+    if (fetching) {
+      refreshAgain = true;
+      return;
+    }
     fetching = true;
+    final revision = catalogRevision,
+        listPage = catalogPage,
+        currentQuery = query,
+        currentCuisine = cuisine;
     try {
       if (checkAccount) await widget.refreshAccount();
       final result = await widget.api.request(
@@ -609,19 +627,34 @@ class _LiveWorkspaceState extends State<LiveWorkspace>
         page: page,
       );
       final list = role == 'customer'
-          ? await widget.api.request('catalog', page: catalogPage)
+          ? await widget.api.request(
+              'catalog',
+              page: listPage,
+              query: {'q': currentQuery, 'cuisine': currentCuisine},
+            )
           : role == 'restaurant'
           ? await widget.api.request('menu', page: catalogPage)
           : null;
       if (mounted) {
         setState(() {
-          final oldIds=(data?['notifications'] as List? ?? []).map((n)=>n['id']).toSet();
-          final incoming=(result['notifications'] as List).where((n)=>!oldIds.contains(n['id'])).toList();
-          if(data!=null && incoming.isNotEmpty) {
-            WidgetsBinding.instance.addPostFrameCallback((_){if(mounted){message(context,incoming.first['text']);if(role=='rider')SystemSound.play(SystemSoundType.alert);}});
+          final oldIds = (data?['notifications'] as List? ?? [])
+              .map((n) => n['id'])
+              .toSet();
+          final incoming = (result['notifications'] as List)
+              .where((n) => !oldIds.contains(n['id']))
+              .toList();
+          if (data != null && incoming.isNotEmpty) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) {
+                message(context, incoming.first['text']);
+                if (role == 'rider') SystemSound.play(SystemSoundType.alert);
+              }
+            });
           }
           data = result;
-          catalog = list;
+          if (revision == catalogRevision && listPage == catalogPage) {
+            catalog = list;
+          }
           error = null;
         });
       }
@@ -629,7 +662,24 @@ class _LiveWorkspaceState extends State<LiveWorkspace>
       if (mounted) setState(() => error = e.toString());
     } finally {
       fetching = false;
+      if (mounted && refreshAgain) {
+        refreshAgain = false;
+        unawaited(refresh());
+      }
     }
+  }
+
+  void filterCatalog({String? query, String? category}) {
+    filterTimer?.cancel();
+    setState(() {
+      if (query != null) this.query = query;
+      if (category != null) cuisine = category;
+      catalogPage = 1;
+      catalogRevision++;
+    });
+    filterTimer = Timer(Duration(milliseconds: query == null ? 0 : 450), () {
+      if (mounted) refresh();
+    });
   }
 
   Future<void> action(Map<String, dynamic> command) async {
@@ -647,91 +697,111 @@ class _LiveWorkspaceState extends State<LiveWorkspace>
 
   @override
   Widget build(BuildContext context) => CanvasPage(
-    child: Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 16, 12, 0),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Hi, ${widget.account['name']}',
-                      style: const TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w800,
-                      ),
+    child: FloatingWorkspace(
+      labels: role == 'customer'
+          ? const ['Explore', 'Orders', 'Account']
+          : role == 'restaurant'
+          ? const ['Kitchen', 'Orders', 'Account']
+          : const ['Requests', 'Deliveries', 'Account'],
+      selected: tab,
+      onSelected: (v) => setState(() => tab = v),
+      header: Padding(
+        padding: const EdgeInsets.fromLTRB(24, 16, 12, 4),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Hi, ${widget.account['name']}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 22,
+                      letterSpacing: -.5,
+                      fontWeight: FontWeight.w800,
                     ),
-                    Text(
-                      {
-                        'customer': 'Your everyday, delivered.',
-                        'restaurant': 'Your restaurant workspace.',
-                        'rider': 'Your next delivery.',
-                      }[role]!,
-                      style: const TextStyle(color: muted),
+                  ),
+                  Text(
+                    {
+                      'customer': 'Your everyday, delivered.',
+                      'restaurant': 'Your restaurant workspace.',
+                      'rider': 'Your next delivery.',
+                    }[role]!,
+                    style: const TextStyle(color: muted, fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+            IconButton(
+              onPressed: () => showModalBottomSheet<void>(
+                context: context,
+                builder: (context) => SafeArea(
+                  child: ListView(
+                    shrinkWrap: true,
+                    children: [
+                      const ListTile(
+                        title: Text(
+                          'Your updates',
+                          style: TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                      if ((data?['notifications'] as List? ?? []).isEmpty)
+                        const ListTile(title: Text('No updates yet.')),
+                      for (final notice
+                          in data?['notifications'] as List? ?? [])
+                        ListTile(
+                          title: Text(notice['text']),
+                          subtitle: Text(
+                            DateTime.parse(notice['time']).toLocal().toString(),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+              tooltip: 'Updates',
+              icon: const Icon(Icons.notifications_none),
+            ),
+            IconButton(
+              onPressed: () => refresh(checkAccount: true),
+              tooltip: 'Refresh',
+              icon: const Icon(Icons.refresh, size: 21),
+            ),
+          ],
+        ),
+      ),
+      body: RefreshIndicator(
+        onRefresh: () => refresh(checkAccount: true),
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(24, 18, 24, 118),
+          children: [
+            if (error != null)
+              Glass(
+                child: Column(
+                  children: [
+                    Text(error!),
+                    TextButton(
+                      onPressed: () => refresh(checkAccount: true),
+                      child: const Text('Try again'),
                     ),
                   ],
                 ),
               ),
-              IconButton(
-                onPressed:()=>showModalBottomSheet<void>(context:context,builder:(context)=>SafeArea(child:ListView(shrinkWrap:true,children:[const ListTile(title:Text('Your updates',style:TextStyle(fontWeight:FontWeight.w700))),if((data?['notifications'] as List? ?? []).isEmpty)const ListTile(title:Text('No updates yet.')),for(final notice in data?['notifications'] as List? ?? [])ListTile(title:Text(notice['text']),subtitle:Text(DateTime.parse(notice['time']).toLocal().toString()))]))),
-                tooltip:'Updates',icon:const Icon(Icons.notifications_none),
-              ),
-              IconButton(
-                onPressed: () => refresh(checkAccount: true),
-                tooltip: 'Refresh',
-                icon: const Icon(Icons.refresh),
-              ),
-            ],
-          ),
+            if (tab == 2)
+              profile()
+            else if (tab == 1)
+              orders()
+            else if (role == 'customer')
+              restaurants()
+            else if (role == 'restaurant')
+              restaurantHome()
+            else
+              riderHome(),
+          ],
         ),
-        Expanded(
-          child: RefreshIndicator(
-            onRefresh: () => refresh(checkAccount: true),
-            child: ListView(
-              padding: const EdgeInsets.all(20),
-              children: [
-                if (error != null)
-                  Glass(
-                    child: Column(
-                      children: [
-                        Text(error!),
-                        TextButton(
-                          onPressed: () => refresh(checkAccount: true),
-                          child: const Text('Try again'),
-                        ),
-                      ],
-                    ),
-                  ),
-                if (tab == 2)
-                  profile()
-                else if (tab == 1)
-                  orders()
-                else if (role == 'customer')
-                  restaurants()
-                else if (role == 'restaurant')
-                  restaurantHome()
-                else
-                  riderHome(),
-              ],
-            ),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
-          child: NativeGlassBar(
-            labels: role == 'customer'
-                ? const ['Explore', 'Orders', 'Account']
-                : role == 'restaurant'
-                ? const ['Kitchen', 'Orders', 'Account']
-                : const ['Requests', 'Deliveries', 'Account'],
-            selected: tab,
-            onSelected: (v) => setState(() => tab = v),
-          ),
-        ),
-      ],
+      ),
     ),
   );
   Widget profile() => Column(
@@ -827,18 +897,39 @@ class _LiveWorkspaceState extends State<LiveWorkspace>
     if (catalog == null) {
       return const Center(child: CircularProgressIndicator());
     }
+    final address = storedAddress(deliveryRecord(widget.account));
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Glass(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Row(
             children: [
-              const Text('Deliver to', style: TextStyle(color: muted)),
-              Text(
-                storedAddress(deliveryRecord(widget.account))?.label ??
-                    'Choose your building entrance',
-                style: const TextStyle(fontWeight: FontWeight.w700),
+              const Icon(Icons.place_outlined, size: 22),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'DELIVER TO',
+                      style: TextStyle(
+                        fontSize: 9,
+                        letterSpacing: 1.3,
+                        color: muted,
+                      ),
+                    ),
+                    Text(
+                      address?.label ?? 'Choose your building entrance',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
               ),
               TextButton(
                 onPressed: () => editAddress(
@@ -847,51 +938,72 @@ class _LiveWorkspaceState extends State<LiveWorkspace>
                   widget.account,
                   after: widget.refreshAccount,
                 ),
-                child: const Text('Change entrance'),
+                child: const Text(
+                  'Change entrance',
+                  style: TextStyle(fontSize: 11),
+                ),
               ),
             ],
           ),
         ),
         const SizedBox(height: 24),
         Text(
-          'Good food.\nCloser than ever.',
+          'Your next favourite.\nJust a tap away.',
           style: Theme.of(context).textTheme.headlineLarge,
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 20),
+        TextField(
+          key: const ValueKey('catalog-search'),
+          onChanged: (v) => filterCatalog(query: v),
+          decoration: const InputDecoration(
+            hintText: 'Search restaurants or food',
+            prefixIcon: Icon(Icons.search),
+          ),
+        ),
+        const SizedBox(height: 14),
+        CuisineFilters(
+          selected: cuisine,
+          onSelected: (v) => filterCatalog(category: v),
+        ),
+        const SizedBox(height: 24),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                'Find your flavour',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+            ),
+            Text(
+              '${catalog!['total']} places',
+              style: const TextStyle(fontSize: 11, color: muted),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
         if ((catalog!['items'] as List).isEmpty)
-          const Glass(
+          Glass(
             child: Text(
-              'Restaurants will appear here after approval and menu setup.',
+              query.isNotEmpty || cuisine != 'All'
+                  ? 'No restaurants match. Try another search or cuisine.'
+                  : 'Restaurants will appear here after approval and menu setup.',
             ),
           ),
         for (final r in catalog!['items'])
-          Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: Glass(
-              child: ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const CircleAvatar(
-                  backgroundColor: yellow,
-                  child: Icon(Icons.restaurant, color: ink),
-                ),
-                title: Text(
-                  r['name'],
-                  style: const TextStyle(fontWeight: FontWeight.w700),
-                ),
-                subtitle: Text(
-                  '${r['cuisine']} · ${r['area']}\n${r['acceptingOrders'] == true ? '${r['prepTime']} min preparation' : 'Currently closed'}',
-                ),
-                trailing: const Icon(Icons.arrow_forward),
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => LiveMenu(
-                      api: widget.api,
-                      restaurant: Map<String, dynamic>.from(r),
-                      account: widget.account,
-                      refreshAccount: widget.refreshAccount,
-                    ),
-                  ),
+          RestaurantCard(
+            name: r['name'],
+            subtitle: '${r['cuisine']} · ${r['area']}',
+            detail: r['acceptingOrders'] == true
+                ? '${r['prepTime']} min preparation · Delivery estimate at checkout'
+                : 'Currently closed',
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => LiveMenu(
+                  api: widget.api,
+                  restaurant: Map<String, dynamic>.from(r),
+                  account: widget.account,
+                  refreshAccount: widget.refreshAccount,
                 ),
               ),
             ),
@@ -1221,6 +1333,22 @@ class _LiveWorkspaceState extends State<LiveWorkspace>
               child: Text(nextPreparation),
             ),
           if (role == 'rider') ...[
+            if (delivery != 'Delivery complete' &&
+                order['job']?['pickup'] != null &&
+                order['job']?['destination'] != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: JobMap(
+                  pickup: GeoPoint(
+                    (order['job']['pickup']['lat'] as num).toDouble(),
+                    (order['job']['pickup']['lng'] as num).toDouble(),
+                  ),
+                  destination: GeoPoint(
+                    (order['job']['destination']['lat'] as num).toDouble(),
+                    (order['job']['destination']['lng'] as num).toDouble(),
+                  ),
+                ),
+              ),
             for (final entry in {
               'pickup': 'Navigate to restaurant',
               'destination': 'Navigate to customer',
@@ -1449,84 +1577,152 @@ class _LiveMenuState extends State<LiveMenu> {
 
   @override
   Widget build(BuildContext context) => CanvasPage(
-    child: ListView(
-      padding: const EdgeInsets.all(24),
+    child: Column(
       children: [
-        Align(
-          alignment: Alignment.centerLeft,
-          child: IconButton(
-            onPressed: () => Navigator.pop(context),
-            icon: const Icon(Icons.arrow_back),
-          ),
-        ),
-        const Icon(Icons.restaurant_menu, size: 64),
-        const SizedBox(height: 16),
-        Text(
-          widget.restaurant['name'],
-          style: Theme.of(context).textTheme.headlineLarge,
-        ),
-        Text('${widget.restaurant['cuisine']} · ${widget.restaurant['area']}'),
-        const SizedBox(height: 20),
-        if (error != null) ...[
-          Text(error!),
-          TextButton(onPressed: refresh, child: const Text('Try again')),
-        ],
-        if (data == null && error == null)
-          const Center(child: CircularProgressIndicator()),
-        if (data != null) ...[
-          if (data!['restaurant']['acceptingOrders'] != true)
-            const Glass(child: Text('This restaurant is currently closed.')),
-          if ((data!['items'] as List).isEmpty)
-            const Glass(
-              child: Text('The menu is being prepared. Check back soon.'),
-            ),
-          for (final item in data!['items'])
-            Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Glass(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+        Expanded(
+          child: ListView(
+            padding: const EdgeInsets.all(24),
+            children: [
+              Align(
+                alignment: Alignment.centerLeft,
+                child: IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.arrow_back),
+                ),
+              ),
+              Container(
+                height: 165,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(28),
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFFFFEE9F), Color(0xFFF8F4E9)],
+                  ),
+                ),
+                child: const Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
+                    Icon(Icons.restaurant_menu, size: 48),
+                    SizedBox(height: 10),
                     Text(
-                      item['name'],
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                      ),
+                      'Fresh from the kitchen.',
+                      style: TextStyle(fontWeight: FontWeight.w700),
                     ),
-                    Text(item['description']),
-                    Row(
-                      children: [
-                        Expanded(child: Text(price(item['price']))),
-                        IconButton(
-                          onPressed: () =>
-                              quantity(Map<String, dynamic>.from(item), -1),
-                          icon: const Icon(Icons.remove),
-                        ),
-                        Text('${cart[item['id']]?['quantity'] ?? 0}'),
-                        IconButton(
-                          onPressed: () =>
-                              quantity(Map<String, dynamic>.from(item), 1),
-                          icon: const Icon(Icons.add),
-                        ),
-                      ],
+                    Text(
+                      'Restaurant photo coming soon',
+                      style: TextStyle(color: muted, fontSize: 11),
                     ),
                   ],
                 ),
               ),
+              const SizedBox(height: 20),
+              Text(
+                widget.restaurant['name'],
+                style: Theme.of(context).textTheme.headlineLarge,
+              ),
+              Text(
+                '${widget.restaurant['cuisine']} · ${widget.restaurant['area']}',
+                style: const TextStyle(color: muted),
+              ),
+              const SizedBox(height: 8),
+              if (widget.restaurant['prepTime'] != null)
+                Text(
+                  '${widget.restaurant['prepTime']} min preparation',
+                  style: const TextStyle(fontSize: 12),
+                ),
+              const SizedBox(height: 24),
+              Text(
+                'On the menu',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 16),
+              if (error != null) ...[
+                Text(error!),
+                TextButton(onPressed: refresh, child: const Text('Try again')),
+              ],
+              if (data == null && error == null)
+                const Center(child: CircularProgressIndicator()),
+              if (data != null) ...[
+                if (data!['restaurant']['acceptingOrders'] != true)
+                  const Glass(
+                    child: Text('This restaurant is currently closed.'),
+                  ),
+                if ((data!['items'] as List).isEmpty)
+                  const Glass(
+                    child: Text('The menu is being prepared. Check back soon.'),
+                  ),
+                for (final item in data!['items'])
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 14),
+                    child: Glass(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            item['name'],
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          Text(
+                            item['description'],
+                            style: const TextStyle(color: muted),
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  price(item['price']),
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                              IconButton(
+                                tooltip: 'Remove ${item['name']}',
+                                onPressed: () => quantity(
+                                  Map<String, dynamic>.from(item),
+                                  -1,
+                                ),
+                                icon: const Icon(Icons.remove),
+                              ),
+                              Text('${cart[item['id']]?['quantity'] ?? 0}'),
+                              IconButton.filledTonal(
+                                tooltip: 'Add ${item['name']}',
+                                onPressed: () => quantity(
+                                  Map<String, dynamic>.from(item),
+                                  1,
+                                ),
+                                icon: const Icon(Icons.add),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                pagination(data!, page, (p) {
+                  setState(() => page = p);
+                  refresh();
+                }),
+              ],
+            ],
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(18, 0, 18, 12),
+          child: Glass(
+            padding: const EdgeInsets.all(8),
+            child: FilledButton(
+              onPressed:
+                  cart.isNotEmpty &&
+                      data?['restaurant']['acceptingOrders'] == true
+                  ? checkout
+                  : null,
+              child: Text('View cart · ${price(subtotal)}'),
             ),
-          pagination(data!, page, (p) {
-            setState(() => page = p);
-            refresh();
-          }),
-        ],
-        const SizedBox(height: 20),
-        FilledButton(
-          onPressed:
-              cart.isNotEmpty && data?['restaurant']['acceptingOrders'] == true
-              ? checkout
-              : null,
-          child: Text('View cart · ${price(subtotal)}'),
+          ),
         ),
       ],
     ),
@@ -1622,12 +1818,16 @@ class _LiveCheckoutState extends State<LiveCheckout> {
         Glass(
           child: Column(
             children: [
-              for (final item in (quote?['snapshot']?['lineItems'] as List? ?? widget.cart))
+              for (final item
+                  in (quote?['snapshot']?['lineItems'] as List? ?? widget.cart))
                 ListTile(
                   contentPadding: EdgeInsets.zero,
                   title: Text('${item['name']} × ${item['quantity']}'),
                   trailing: Text(
-                    price(((item['unitPrice']??item['price']) as int) * (item['quantity'] as int)),
+                    price(
+                      ((item['unitPrice'] ?? item['price']) as int) *
+                          (item['quantity'] as int),
+                    ),
                   ),
                 ),
             ],

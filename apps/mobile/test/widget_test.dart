@@ -207,6 +207,13 @@ void main() {
       );
       await tester.tap(find.text('Choose address'));
       await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.text('Have entrance coordinates?'),
+        160,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Have entrance coordinates?'));
       await tester.pumpAndSettle();
       await tester.scrollUntilVisible(
@@ -214,6 +221,7 @@ void main() {
         180,
         scrollable: find.byType(Scrollable).first,
       );
+      await tester.pumpAndSettle();
       await tester.enterText(
         find.byKey(const ValueKey('address-latitude')),
         '4.216',
@@ -223,6 +231,7 @@ void main() {
         '73.541',
       );
       await tester.ensureVisible(find.byKey(const ValueKey('use-coordinates')));
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('use-coordinates')));
       await tester.pumpAndSettle();
       await tester.scrollUntilVisible(
@@ -230,12 +239,14 @@ void main() {
         -180,
         scrollable: find.byType(Scrollable).first,
       );
+      await tester.pumpAndSettle();
       expect(find.text('Choose an entrance in Malé.'), findsOneWidget);
       await tester.scrollUntilVisible(
         find.byKey(const ValueKey('address-latitude')),
         180,
         scrollable: find.byType(Scrollable).first,
       );
+      await tester.pumpAndSettle();
       await tester.enterText(
         find.byKey(const ValueKey('address-latitude')),
         '4.1755',
@@ -245,6 +256,7 @@ void main() {
         '73.5093',
       );
       await tester.ensureVisible(find.byKey(const ValueKey('use-coordinates')));
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('use-coordinates')));
       await tester.pumpAndSettle();
       await tester.scrollUntilVisible(
@@ -252,6 +264,7 @@ void main() {
         180,
         scrollable: find.byType(Scrollable).first,
       );
+      await tester.pumpAndSettle();
       await tester.enterText(
         find.byKey(const ValueKey('address-building')),
         'Sample home',
@@ -262,11 +275,13 @@ void main() {
         180,
         scrollable: find.byType(Scrollable).first,
       );
+      await tester.pumpAndSettle();
       await tester.enterText(
         find.byKey(const ValueKey('address-instructions')),
         'Side door',
       );
       await tester.ensureVisible(find.byKey(const ValueKey('save-address')));
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('save-address')));
       await tester.pumpAndSettle();
       expect(result?.area, 'Malé');

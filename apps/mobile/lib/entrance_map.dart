@@ -1,19 +1,83 @@
-import 'dart:async';
-
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
-import 'package:maplibre_gl/maplibre_gl.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter/material.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import 'models.dart';
 
-/// Maps only an entrance. Never enables the platform location engine.
+import 'dart:math' as math;
+
+const googleMapsKey = String.fromEnvironment('GOOGLE_MAPS_API_KEY');
+
+/// Assigned job endpoints only: no rider marker, origin or location permission.
+class JobMap extends StatelessWidget {
+  final GeoPoint pickup, destination;
+  const JobMap({super.key, required this.pickup, required this.destination});
+  @override
+  Widget build(BuildContext context) {
+    if (kIsWeb || googleMapsKey.isEmpty) return const SizedBox.shrink();
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(22),
+      child: SizedBox(
+        height: 220,
+        child: GoogleMap(
+          initialCameraPosition: CameraPosition(
+            target: LatLng(pickup.latitude, pickup.longitude),
+            zoom: 16,
+          ),
+          myLocationEnabled: false,
+          myLocationButtonEnabled: false,
+          mapToolbarEnabled: false,
+          zoomControlsEnabled: false,
+          rotateGesturesEnabled: false,
+          tiltGesturesEnabled: false,
+          markers: {
+            Marker(
+              markerId: const MarkerId('pickup'),
+              position: LatLng(pickup.latitude, pickup.longitude),
+              infoWindow: const InfoWindow(title: 'Restaurant pickup'),
+              icon: BitmapDescriptor.defaultMarkerWithHue(
+                BitmapDescriptor.hueYellow,
+              ),
+            ),
+            Marker(
+              markerId: const MarkerId('delivery'),
+              position: LatLng(destination.latitude, destination.longitude),
+              infoWindow: const InfoWindow(title: 'Customer entrance'),
+            ),
+          },
+          onMapCreated: (controller) {
+            if ((pickup.latitude - destination.latitude).abs() < .000001 &&
+                (pickup.longitude - destination.longitude).abs() < .000001) {
+              return;
+            }
+            controller.moveCamera(
+              CameraUpdate.newLatLngBounds(
+                LatLngBounds(
+                  southwest: LatLng(
+                    math.min(pickup.latitude, destination.latitude) - .0001,
+                    math.min(pickup.longitude, destination.longitude) - .0001,
+                  ),
+                  northeast: LatLng(
+                    math.max(pickup.latitude, destination.latitude) + .0001,
+                    math.max(pickup.longitude, destination.longitude) + .0001,
+                  ),
+                ),
+                36,
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+/// Displays a saved/search-selected entrance. Device GPS is never enabled.
 class EntranceMap extends StatefulWidget {
   final String area;
   final GeoPoint? initialPoint;
-  final ValueChanged<GeoPoint> onSelected;
-  final ValueChanged<GeoPoint> onMoved;
+  final ValueChanged<GeoPoint> onSelected, onMoved;
   const EntranceMap({
     super.key,
     required this.area,
@@ -21,181 +85,121 @@ class EntranceMap extends StatefulWidget {
     required this.onMoved,
     this.initialPoint,
   });
-
   @override
   State<EntranceMap> createState() => _EntranceMapState();
 }
 
 class _EntranceMapState extends State<EntranceMap> {
-  // Public tiles need no key. Swap the provider without changing address data.
-  static const styleUrl = String.fromEnvironment(
-    'IGO_MAP_STYLE_URL',
-    defaultValue: 'https://tiles.openfreemap.org/styles/liberty',
-  );
-  MapLibreMapController? controller;
   late GeoPoint center =
       widget.initialPoint ?? ServiceArea.named(widget.area).center;
-  bool ready = false, slow = false;
-  late final Timer loadingTimer;
+  bool ready = false;
 
   @override
-  void initState() {
-    super.initState();
-    loadingTimer = Timer(const Duration(seconds: 20), () {
-      if (mounted && !ready) setState(() => slow = true);
-    });
-  }
-
-  @override
-  void dispose() {
-    loadingTimer.cancel();
-    // MapLibreMap owns and disposes its controller.
-    super.dispose();
-  }
-
-  void updateCenter() {
-    final target = controller?.cameraPosition?.target;
-    if (target != null && mounted) {
-      setState(() => center = GeoPoint(target.latitude, target.longitude));
-      widget.onMoved(center);
+  Widget build(BuildContext context) {
+    if (kIsWeb || googleMapsKey.isEmpty) {
+      return Container(
+        height: 170,
+        alignment: Alignment.center,
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFFF7C9),
+          borderRadius: BorderRadius.circular(22),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.map_outlined, size: 32),
+            const SizedBox(height: 12),
+            Text(
+              widget.initialPoint == null
+                  ? 'Search for your building above. The interactive map will be available in the configured mobile app.'
+                  : 'Location selected · ${widget.initialPoint!.label}\nReview your building and entrance details below.',
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      );
     }
-  }
-
-  Future<void> attribution(String url) async {
-    try {
-      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
-    } catch (_) {
-      // Attribution remains visible even when an external browser is unavailable.
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    children: [
-      ClipRRect(
-        borderRadius: BorderRadius.circular(22),
-        child: SizedBox(
-          height: 255,
-          child: Semantics(
-            label:
-                'Entrance map for ${widget.area}. Move the map to your entrance.',
-            child: Stack(
-              children: [
-                MapLibreMap(
-                  styleString: styleUrl,
-                  initialCameraPosition: CameraPosition(
-                    target: LatLng(center.latitude, center.longitude),
-                    zoom: 16,
-                  ),
-                  cameraTargetBounds: CameraTargetBounds(
-                    LatLngBounds(
-                      southwest: const LatLng(4.158, 73.49),
-                      northeast: const LatLng(4.253, 73.565),
+    final area = ServiceArea.named(widget.area);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(22),
+          child: SizedBox(
+            height: 255,
+            child: Semantics(
+              label:
+                  'Google map for ${widget.area}. Adjust the entrance only if necessary.',
+              child: Stack(
+                children: [
+                  GoogleMap(
+                    initialCameraPosition: CameraPosition(
+                      target: LatLng(center.latitude, center.longitude),
+                      zoom: 17,
                     ),
-                  ),
-                  minMaxZoomPreference: const MinMaxZoomPreference(13, 20),
-                  myLocationEnabled: false,
-                  myLocationTrackingMode: MyLocationTrackingMode.none,
-                  trackCameraPosition: true,
-                  rotateGesturesEnabled: false,
-                  tiltGesturesEnabled: false,
-                  compassEnabled: false,
-                  gestureRecognizers: {
-                    Factory<OneSequenceGestureRecognizer>(
-                      () => EagerGestureRecognizer(),
-                    ),
-                  },
-                  onMapCreated: (value) => controller = value,
-                  onStyleLoadedCallback: () {
-                    if (mounted) setState(() => ready = true);
-                    loadingTimer.cancel();
-                  },
-                  onCameraIdle: updateCenter,
-                  onCameraMove: (camera) {
-                    center = GeoPoint(
-                      camera.target.latitude,
-                      camera.target.longitude,
-                    );
-                    widget.onMoved(center);
-                  },
-                ),
-                const Center(
-                  child: IgnorePointer(
-                    child: Padding(
-                      // Place the pin tip, rather than its center, at the target.
-                      padding: EdgeInsets.only(bottom: 40),
-                      child: Icon(
-                        Icons.location_on,
-                        size: 48,
-                        color: Color(0xFF181918),
-                        shadows: [
-                          Shadow(color: Color(0xFFFFDF35), blurRadius: 8),
-                        ],
+                    cameraTargetBounds: CameraTargetBounds(
+                      LatLngBounds(
+                        southwest: LatLng(
+                          area.southWest.latitude,
+                          area.southWest.longitude,
+                        ),
+                        northeast: LatLng(
+                          area.northEast.latitude,
+                          area.northEast.longitude,
+                        ),
                       ),
                     ),
+                    minMaxZoomPreference: const MinMaxZoomPreference(13, 20),
+                    myLocationEnabled: false,
+                    myLocationButtonEnabled: false,
+                    zoomControlsEnabled: false,
+                    mapToolbarEnabled: false,
+                    rotateGesturesEnabled: false,
+                    tiltGesturesEnabled: false,
+                    gestureRecognizers: {
+                      Factory<OneSequenceGestureRecognizer>(
+                        () => EagerGestureRecognizer(),
+                      ),
+                    },
+                    onMapCreated: (_) {
+                      if (mounted) setState(() => ready = true);
+                    },
+                    onCameraMove: (camera) {
+                      center = GeoPoint(
+                        camera.target.latitude,
+                        camera.target.longitude,
+                      );
+                      widget.onMoved(center);
+                    },
                   ),
-                ),
-                if (!ready)
-                  Positioned(
-                    left: 12,
-                    right: 12,
-                    top: 12,
+                  const Center(
                     child: IgnorePointer(
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: .94),
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.all(12),
-                          child: Text(
-                            slow
-                                ? 'Map taking too long? Enter coordinates below.'
-                                : 'Loading your neighbourhood…',
-                            textAlign: TextAlign.center,
-                          ),
+                      child: Padding(
+                        padding: EdgeInsets.only(bottom: 40),
+                        child: Icon(
+                          Icons.location_on,
+                          size: 48,
+                          color: Color(0xFF181918),
+                          shadows: [
+                            Shadow(color: Color(0xFFFFDF35), blurRadius: 8),
+                          ],
                         ),
                       ),
                     ),
                   ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
-      ),
-      // Visible provider/data credits accompany the SDK attribution control.
-      Wrap(
-        alignment: WrapAlignment.center,
-        children: [
-          TextButton(
-            onPressed: () => attribution('https://openfreemap.org/'),
-            child: const Text('OpenFreeMap', style: TextStyle(fontSize: 11)),
-          ),
-          TextButton(
-            onPressed: () => attribution('https://www.openmaptiles.org/'),
-            child: const Text('OpenMapTiles', style: TextStyle(fontSize: 11)),
-          ),
-          TextButton(
-            onPressed: () =>
-                attribution('https://www.openstreetmap.org/copyright'),
-            child: const Text(
-              '© OpenStreetMap',
-              style: TextStyle(fontSize: 11),
-            ),
-          ),
-        ],
-      ),
-      OutlinedButton.icon(
-        onPressed: ready
-            ? () {
-                updateCenter();
-                widget.onSelected(center);
-              }
-            : null,
-        icon: const Icon(Icons.place_outlined),
-        label: const Text('Confirm entrance pin'),
-      ),
-    ],
-  );
+        const SizedBox(height: 10),
+        OutlinedButton.icon(
+          onPressed: ready ? () => widget.onSelected(center) : null,
+          icon: const Icon(Icons.place_outlined),
+          label: const Text('Confirm adjusted entrance'),
+        ),
+      ],
+    );
+  }
 }

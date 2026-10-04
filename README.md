@@ -1,6 +1,6 @@
 # iGO — agreed product and legal foundation
 
-Status: admin application under development, updated 3 October 2026. The Next.js admin lives in `apps/admin`; the first role-based Flutter design preview lives in `apps/mobile`. Clerk is the identity provider and Supabase/PostgreSQL is the database. No live BML integration or deployed legal pages exist yet. These files do not certify legal compliance.
+Status: admin and connected role-based Flutter app under development, updated 5 October 2026. The Next.js admin lives in `apps/admin`; the role-based Flutter application lives in `apps/mobile`. Clerk is the identity provider and Supabase/PostgreSQL is the database. BML collection is disabled; legal drafts retain business placeholders. These files do not certify legal compliance.
 
 - [Admin setup and capabilities](apps/admin/README.md)
 - [Current architecture and implementation limits](docs/architecture.md)
@@ -16,3 +16,5 @@ All `{{PLACEHOLDERS}}` are intentional. Business registration is in progress. Do
 
 - [Mobile preview setup](apps/mobile/README.md)
 - [Latest mobile design and navigation decisions](docs/mobile-design.md)
+
+- [Google Maps search, credentials and retention](docs/google-maps-setup.md)

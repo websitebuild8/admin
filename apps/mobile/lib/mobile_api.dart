@@ -38,6 +38,7 @@ class MobileApi {
     bool operations = false,
     int page = 1,
     String? restaurantId,
+    Map<String, String> query = const {},
   }) async {
     final uri = base
         .resolve(
@@ -47,6 +48,7 @@ class MobileApi {
           queryParameters: {
             if (data == null) 'page': '$page',
             'restaurantId': ?restaurantId,
+            ...query,
           },
         );
     try {

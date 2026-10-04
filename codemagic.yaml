@@ -52,6 +52,21 @@ workflows:
         - ~/.pub-cache
         - ~/.gradle/caches
     scripts:
+      - name: Restore stable debug signing key if supplied
+        script: |
+          set -eu
+          python3 - <<'PY'
+          import base64
+          import os
+          from pathlib import Path
+          value = os.environ.get('IGO_ANDROID_DEBUG_KEYSTORE_BASE64', '').strip()
+          if value:
+              path = Path.home() / '.android' / 'debug.keystore'
+              path.parent.mkdir(parents=True, exist_ok=True)
+              path.write_bytes(base64.b64decode(value, validate=True))
+              path.chmod(0o600)
+              print('Stable debug signing key restored.')
+          PY
       - name: Validate public mobile settings
         script: |
           set -eu
@@ -73,6 +88,7 @@ workflows:
           Path('.env.ci.json').write_text(json.dumps({
               'CLERK_PUBLISHABLE_KEY': key,
               'IGO_API_BASE_URL': api,
+              'GOOGLE_MAPS_API_KEY': os.environ.get('GOOGLE_MAPS_API_KEY', '').strip(),
           }))
           print('Public mobile settings validated.')
           PY
@@ -87,6 +103,8 @@ workflows:
         script: flutter test --no-pub --concurrency=1
       - name: Build connected APK
         script: flutter build apk --debug --no-pub --dart-define=IGO_PREVIEW=false --dart-define-from-file=.env.ci.json
+      - name: Show Maps signing fingerprint
+        script: keytool -list -v -keystore ~/.android/debug.keystore -alias androiddebugkey -storepass android -keypass android
       - name: Prepare APK download
         script: |
           set -eu

@@ -11,6 +11,7 @@ const bounds = {
   'Hulhumalé': [4.199, 73.528, 4.248, 73.559],
 } as const;
 export const addressInput = z.object({
+  google: z.object({placeId:z.string().max(255),expiresAt:z.iso.datetime(),proof:z.string().regex(/^[a-f0-9]{64}$/)}).strict().optional(),
   area: island,
   building: z.string().trim().min(1).max(100),
   unit: z.string().trim().max(100).default(''),
@@ -57,7 +58,7 @@ export function approvedPrincipal(profile: {id:string; primaryRole:string|null; 
   if (!entity || entity.status !== 'Active' || !entity.documentsVerified) return null;
   return {role:role as 'restaurant'|'rider',id:entity.id};
 }
-export function policyVersion() { return process.env.IGO_POLICY_VERSION ?? 'draft-2026-10-04'; }
+export function policyVersion() { return process.env.IGO_POLICY_VERSION ?? 'draft-2026-10-05'; }
 export function policiesReady() { return process.env.IGO_POLICIES_APPROVED === 'true' && !policyVersion().startsWith('draft'); }
 export function requireCurrentPolicies(version:string) {
   if (version !== policyVersion()) throw new MobileError('Policies changed. Refresh and review them again.',409);

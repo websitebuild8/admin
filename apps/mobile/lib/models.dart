@@ -102,12 +102,14 @@ class ServiceArea {
 class PreviewAddress {
   final String area, building, unit, instructions;
   final GeoPoint point;
+  final Map<String, dynamic>? google;
   const PreviewAddress._(
     this.area,
     this.building,
     this.unit,
     this.instructions,
     this.point,
+    this.google,
   );
 
   factory PreviewAddress({
@@ -116,6 +118,7 @@ class PreviewAddress {
     String unit = '',
     String instructions = '',
     required GeoPoint point,
+    Map<String, dynamic>? google,
   }) {
     if (building.trim().isEmpty || !ServiceArea.named(area).contains(point)) {
       throw ArgumentError(
@@ -128,6 +131,7 @@ class PreviewAddress {
       unit.trim(),
       instructions.trim(),
       point,
+      google == null ? null : Map.unmodifiable(google),
     );
   }
 
@@ -145,5 +149,6 @@ class PreviewAddress {
     'instructions': instructions,
     'latitude': point.latitude,
     'longitude': point.longitude,
+    'google': ?google,
   };
 }

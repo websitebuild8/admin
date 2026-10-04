@@ -1,8 +1,17 @@
+import java.util.Base64
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
+
+// Flutter passes base64-encoded Dart defines to Gradle; the same restricted
+// Android Maps key configures both the native SDK and the Flutter UI.
+val igoDefines = (project.findProperty("dart-defines") as? String).orEmpty()
+    .split(",").filter { it.isNotBlank() }.map { String(Base64.getDecoder().decode(it), Charsets.UTF_8) }
+val igoMapsKey = igoDefines.firstOrNull { it.startsWith("GOOGLE_MAPS_API_KEY=") }
+    ?.substringAfter("=").orEmpty()
 
 android {
     namespace = "mv.igo.igo_mobile"
@@ -17,6 +26,7 @@ android {
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId = "mv.igo.igo_mobile"
+        manifestPlaceholders["GOOGLE_MAPS_API_KEY"] = igoMapsKey
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion

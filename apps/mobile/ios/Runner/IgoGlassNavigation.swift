@@ -21,6 +21,8 @@ final class IgoGlassNavigation: NSObject, FlutterPlatformView {
     channel = FlutterMethodChannel(name: "igo/glass-navigation/\(viewId)", binaryMessenger: messenger)
     super.init()
     container.frame = frame
+    // Match Flutter's white/yellow light theme even when iOS uses dark mode.
+    container.overrideUserInterfaceStyle = .light
     container.layer.cornerRadius = 28
     container.layer.cornerCurve = .continuous
     container.clipsToBounds = true
@@ -46,12 +48,13 @@ final class IgoGlassNavigation: NSObject, FlutterPlatformView {
   private func configureEffect() {
     if UIAccessibility.isReduceTransparencyEnabled {
       container.effect = nil
-      container.backgroundColor = .systemBackground
+      container.backgroundColor = UIColor(red: 1, green: 0.95, blue: 0.67, alpha: 1)
     } else {
-      container.backgroundColor = .clear
+      container.backgroundColor = UIColor(red: 1, green: 0.875, blue: 0.208, alpha: 0.16)
       #if compiler(>=6.2)
       if #available(iOS 26.0, *) {
         let effect = UIGlassEffect(style: .regular)
+        effect.tintColor = UIColor(red: 1, green: 0.875, blue: 0.208, alpha: 0.26)
         effect.isInteractive = !UIAccessibility.isReduceMotionEnabled
         container.effect = effect
       } else { container.effect = UIBlurEffect(style: .systemMaterial) }
@@ -74,13 +77,13 @@ final class IgoGlassNavigation: NSObject, FlutterPlatformView {
       config.image = UIImage(systemName: ["house", "list.bullet.rectangle", "person.crop.circle"][min(index, 2)])
       config.imagePlacement = .top
       config.imagePadding = 2
-      config.baseForegroundColor = .label
+      config.baseForegroundColor = UIColor(red: 0.094, green: 0.098, blue: 0.094, alpha: 1)
       config.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { attributes in
         var attributes = attributes
         attributes.font = UIFont.preferredFont(forTextStyle: .caption1)
         return attributes
       }
-      config.background.backgroundColor = index == selected ? UIColor(red: 1, green: 0.875, blue: 0.208, alpha: 1) : .clear
+      config.background.backgroundColor = index == selected ? UIColor.white.withAlphaComponent(UIAccessibility.isReduceTransparencyEnabled ? 1 : 0.67) : .clear
       config.background.cornerRadius = 22
       button.configuration = config
       button.accessibilityLabel = label

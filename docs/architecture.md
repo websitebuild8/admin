@@ -1,34 +1,46 @@
 # iGO application architecture
 
-Updated 3 October 2026. Supabase replaces the earlier Neon database choice; Clerk remains the identity provider.
+Updated 5 October 2026. One repository and shared backend: Next.js/shadcn admin,
+one role-based Flutter mobile app, Clerk identity, Supabase PostgreSQL through
+Prisma 7, and Zod server validation. `apps/admin` contains the backend/admin,
+`apps/mobile` the native app, `packages/contracts` the API boundary notes, and
+`docs` product/setup/legal decisions.
 
-- Admin: Next.js App Router, TypeScript, Tailwind CSS, official shadcn/ui components.
-- Identity: Clerk. An authenticated account is not automatically an administrator or an approved restaurant/rider.
-- Storage: Supabase PostgreSQL, Prisma 7 with the PostgreSQL driver adapter.
-- Validation: Zod on both form and server boundaries; React Hook Form for forms.
-- Mobile, later: one Flutter application with customer, restaurant, and rider modes, approved by the backend.
-- Brand: white surfaces, yellow actions, black typography, translucent panels with restrained blur.
+Mobile native clients send a verified Clerk bearer token to versioned Next.js APIs.
+A server-owned admin ID allowlist separately protects every admin page/API. Public
+mobile registration cannot grant admin access. Database roles and current partner
+approval determine the mobile experience; restaurant/rider applicants remain
+pending until trusted approval. Clients cannot set approval or select an arbitrary
+operational role. Sessions use secure device storage.
 
-## Repository
+Customer addresses and reviewed restaurant pickup entrances share the backend.
+Google Places search resolves an explicitly selected building automatically, and
+Google native maps display the entrance. Unit and access instructions are user
+provided. Only assigned riders receive delivery coordinates and may open external
+Google Maps directions. No iGO device-GPS permission or rider location broadcasts
+are implemented. Dispatch uses service areas and availability, while ETA is a
+labeled distance-based fallback, not traffic-aware Google routing.
 
-`apps/admin` is the working admin application. `apps/mobile` reserves the future Flutter project. `packages/contracts` records the future shared API-contract boundary. `docs` retains product and legal decisions. This is one repository; a heavyweight workspace orchestrator is intentionally not required for one Node app and a future Dart app.
+Authenticated address-search requests use a server-only Places key, minimal fields,
+short-lived search sessions, durable account/global request limits and Google
+coordinate expiry. Supabase Cron removes expired provider coordinates. Details
+and credential restrictions are in [Google Maps setup](google-maps-setup.md).
+Admin/mobile roles continue to share the existing workflow and audit records.
 
-## Current implementation
+Catalog/menu/order responses are server-paginated at ten entries; catalog search
+and cuisine filters apply before pagination. Admin lists have ten-row display
+pagination but still read complete operational state. Scoped admin queries,
+outbox/push delivery, operational monitoring and concurrency/load exercises remain
+scaling work. Direct public-client access to business tables is revoked with RLS.
 
-The app has a local demo provider and a server database provider. Demo changes persist in this browser only. All demo rows are fictional. Live mode reads normalized Prisma tables and makes validated changes in a serializable transaction with an audit record. Conflicting transactions return a retryable error instead of silently overwriting another action.
+Checkout quotes snapshot server-priced line items and entrance details, using
+integer laari. BML card collection is disabled until merchant setup and authenticated
+payment verification are ready; no unpaid order is submitted. Callback idempotency,
+reconciliation, money-moving refunds, payouts, tax receipts, document uploads,
+account-deletion execution and validated coverage polygons remain launch work.
 
-Clerk proxy protection is supplemented by server-side checks in both the workspace layout and every admin API. A server-owned allowlist of Clerk user IDs bootstraps administration. Move to database-managed staff permission assignments when finance/support roles are introduced. No client-editable role metadata grants access.
-
-Supabase holds business state. Mobile must later call authenticated versioned APIs; it must never receive database credentials or Clerk server secrets. Restaurant/rider approval must be connected to identity memberships before mobile access is enabled; the initial partner tables are operational records, not a complete membership system.
-
-## Deliberate boundaries
-
-- BML capture, webhook verification, reconciliation and money-moving refunds are not implemented. Refund review records are requests only.
-- The admin-only location intake, dispatch rules, participant API and status inbox foundation are implemented; see live-tracking.md. Phone GPS collection, mobile push delivery, merchant payouts and document upload are not connected.
-- Customer views summarize order history by customer ID; they are not a full identity-management interface.
-- Admin lists display at most 10 records per page, but currently load complete operational datasets. Add server-side pagination/date-scoped queries before significant production volume.
-- The first order schema stores a display summary. Before mobile checkout, add immutable line items, quotes, payment attempts, tax/fee snapshots, branch memberships and the checkout idempotency/outbox model described in the product specification.
-- Service settings are persisted for future checkout integration; this admin project does not yet enforce delivery zones in a customer checkout.
-- Clerk/Supabase require user-supplied credentials, migrations and verification; demo success does not validate those external services.
-
-No public deployment or legal compliance sign-off has been performed.
+Policies retain the agreed business placeholders and production registration is
+gated pending published approved policies. Provider/backup retention and native
+Clerk/Google/Liquid Glass behavior require deployment/device checks. No public
+deployment or legal compliance sign-off is claimed. See [verification](verification.md)
+and [launch requirements](launch-requirements.md).

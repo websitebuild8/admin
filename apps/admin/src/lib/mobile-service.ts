@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { database } from './db';
 import { participant } from './participant-auth';
 import { verifiedIdentity } from './mobile-http';
+import { verifyGoogleAddress } from './places-service';
 import { addressInput, registrationInput, menuInput, quoteInput, MobileError, policyVersion, policiesReady, requireCurrentPolicies, approvedPrincipal, addressLabel } from './mobile-contract';
 
 export function parse<T extends z.ZodType>(schema:T,input:unknown):z.infer<T> {
@@ -27,7 +28,7 @@ export async function account(userId:string) {
     registered:!!profile?.primaryRole, name:profile?.name??'', role:profile?.primaryRole??null,
     status:profile?.roles.find(r=>r.role===profile.primaryRole)?.status??null,
     access:profile ? approvedPrincipal(profile,restaurant,rider) : null,
-    addresses:profile?.addresses.map(({id,kind,area,building,unit,instructions,latitude,longitude})=>({id,kind,area,building,unit,instructions,latitude,longitude}))??[],
+    addresses:profile?.addresses.filter(a=>!a.google || Date.parse((a.google as {expiresAt:string}).expiresAt)>Date.now()).map(({id,kind,area,building,unit,instructions,latitude,longitude,google})=>({id,kind,area,building,unit,instructions,latitude,longitude,google}))??[],
     restaurant:restaurant ? {id:restaurant.id,name:restaurant.name,area:restaurant.area,acceptingOrders:restaurant.acceptingOrders,pickup:restaurant.pickupAddress,pendingPickup:restaurant.pendingPickupAddress} : null,
     rider:rider ? {id:rider.id,area:rider.area,online:rider.online} : null,
     policy:{version:policyVersion(),published:policiesReady(),accepted:!!profile?.consents.length,links:['/legal/terms','/legal/privacy','/legal/refunds','/legal/partners']},
@@ -36,6 +37,7 @@ export async function account(userId:string) {
 }
 export async function register(userId:string,input:unknown) {
   const v=parse(registrationInput,input); requireCurrentPolicies(v.policyVersion);
+  if(v.pickup) verifyGoogleAddress(userId,v.pickup);
   await verifiedIdentity(userId);
   const db=database();
   await db.$transaction(async tx=>{
@@ -62,6 +64,7 @@ export async function acceptPolicies(userId:string,input:unknown) {
 }
 export async function saveAddress(userId:string,input:unknown) {
   const address=parse(addressInput,input);
+  verifyGoogleAddress(userId,address);
   const db=database();const profile=await db.profile.findUnique({where:{clerkUserId:userId}});
   if(!profile || !['customer','restaurant'].includes(profile.primaryRole??'')) throw new MobileError('Address access unavailable.',403);
   // Pending restaurants may correct their application; only admin can activate the entrance.
@@ -71,11 +74,13 @@ export async function saveAddress(userId:string,input:unknown) {
       await tx.auditEvent.create({data:{text:'Restaurant pickup entrance submitted for review',actor:userId}});
     }
     const kind=profile.primaryRole==='customer'?'delivery':'pickup';
-    return tx.savedAddress.upsert({where:{profileId_kind:{profileId:profile.id,kind}},create:{profileId:profile.id,kind,...address},update:address});
+    const data={...address,google:address.google??Prisma.DbNull};
+    return tx.savedAddress.upsert({where:{profileId_kind:{profileId:profile.id,kind}},create:{profileId:profile.id,kind,...data},update:data});
   });
 }
-export async function catalog(userId:string,page:number,restaurantId:string|null) {
+export async function catalog(userId:string,page:number,restaurantId:string|null,q='',cuisine='All') {
   await participant(userId);const db=database();
+  const filter=parse(z.object({q:z.string().trim().max(100),cuisine:z.enum(['All','Coffee','Maldivian','Pizza'])}),{q,cuisine});
   if(restaurantId) {
     if(!z.uuid().safeParse(restaurantId).success) throw new MobileError('Invalid restaurant.');
     const restaurant=await db.restaurant.findFirst({where:{id:restaurantId,status:'Active',documentsVerified:true}});
@@ -84,7 +89,10 @@ export async function catalog(userId:string,page:number,restaurantId:string|null
     const [items,total]=await Promise.all([db.menuItem.findMany({where,orderBy:[{name:'asc'},{id:'asc'}],skip:(page-1)*10,take:10}),db.menuItem.count({where})]);
     return {items,total,page,pageSize:10,restaurant:{id:restaurant.id,name:restaurant.name,acceptingOrders:restaurant.acceptingOrders,area:restaurant.area}};
   }
-  const where={status:'Active',documentsVerified:true,pickupAddress:{not:Prisma.DbNull}};
+  const where:Prisma.RestaurantWhereInput={status:'Active',documentsVerified:true,pickupAddress:{not:Prisma.DbNull},
+    ...(filter.cuisine==='All'?{}:{cuisine:{contains:filter.cuisine,mode:'insensitive'}}),
+    ...(filter.q?{OR:[{name:{contains:filter.q,mode:'insensitive'}},{cuisine:{contains:filter.q,mode:'insensitive'}},
+      {menu:{some:{available:true,name:{contains:filter.q,mode:'insensitive'}}}}]}:{})};
   const [items,total]=await Promise.all([db.restaurant.findMany({where,orderBy:[{name:'asc'},{id:'asc'}],skip:(page-1)*10,take:10,select:{id:true,name:true,cuisine:true,area:true,prepTime:true,acceptingOrders:true}}),db.restaurant.count({where})]);
   return {items,total,page,pageSize:10};
 }
@@ -132,7 +140,8 @@ export async function quote(userId:string,input:unknown) {
     if(!restaurant||restaurant.status!=='Active'||!restaurant.documentsVerified||!restaurant.acceptingOrders||!restaurant.pickupAddress) throw new MobileError('Restaurant is not taking orders.',409);
     if(!address) throw new MobileError('Save your delivery entrance first.');
     if(menu.length!==v.items.length) throw new MobileError('Menu availability changed. Refresh your cart.',409);
-    const pickup=parse(addressInput,restaurant.pickupAddress),destination=parse(addressInput,{area:address.area,building:address.building,unit:address.unit,instructions:address.instructions,latitude:address.latitude,longitude:address.longitude});
+    const pickup=parse(addressInput,restaurant.pickupAddress),destination=parse(addressInput,{area:address.area,building:address.building,unit:address.unit,instructions:address.instructions,latitude:address.latitude,longitude:address.longitude,...(address.google?{google:address.google}:{})});
+    for(const a of [pickup,destination]) if(a.google && Date.parse(a.google.expiresAt)<=Date.now()) throw new MobileError('Refresh the saved entrance before ordering.',409);
     for(const a of [pickup.area,destination.area]) if(settings && !(a==='Malé'?settings.maleEnabled:settings.hulhumaleEnabled)) throw new MobileError('This service area is currently closed.',409);
     const lineItems=v.items.map(i=>{const item=menu.find(m=>m.id===i.id)!;return {id:item.id,name:item.name,unitPrice:item.price,quantity:i.quantity};});
     const subtotal=lineItems.reduce((sum,i)=>sum+i.unitPrice*i.quantity,0),deliveryFee=settings?.deliveryFee??2500;

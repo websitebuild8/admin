@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -43,7 +45,7 @@ class _NativeGlassBarState extends State<NativeGlassBar> {
   Widget build(BuildContext context) {
     if (native) {
       return SizedBox(
-        height: 64,
+        height: 74,
         child: UiKitView(
           viewType: 'igo/glass-navigation',
           creationParams: {
@@ -65,27 +67,95 @@ class _NativeGlassBarState extends State<NativeGlassBar> {
         ),
       );
     }
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(28),
-      child: NavigationBar(
-        backgroundColor: Colors.white.withValues(alpha: .94),
-        indicatorColor: const Color(0xFFFFDF35),
-        selectedIndex: widget.selected,
-        onDestinationSelected: widget.onSelected,
-        height: 70,
-        destinations: [
-          for (var i = 0; i < widget.labels.length; i++)
-            NavigationDestination(
-              icon: Icon(
-                [
-                  Icons.home_outlined,
-                  Icons.receipt_long_outlined,
-                  Icons.person_outline,
-                ][i],
-              ),
-              label: widget.labels[i],
-            ),
+    final reduced =
+        MediaQuery.of(context).highContrast ||
+        MediaQuery.of(context).disableAnimations;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(30),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x14181918),
+            blurRadius: 24,
+            offset: Offset(0, 8),
+          ),
         ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(30),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(
+            sigmaX: reduced ? 0 : 24,
+            sigmaY: reduced ? 0 : 24,
+          ),
+          child: Container(
+            height: 74,
+            padding: const EdgeInsets.all(7),
+            decoration: BoxDecoration(
+              color: reduced
+                  ? const Color(0xFFFFF2AA)
+                  : const Color(0xFFFFDF35).withValues(alpha: .26),
+              borderRadius: BorderRadius.circular(30),
+              border: Border.all(color: Colors.white.withValues(alpha: .8)),
+            ),
+            child: Row(
+              children: [
+                for (var i = 0; i < widget.labels.length; i++)
+                  Expanded(
+                    child: Semantics(
+                      selected: widget.selected == i,
+                      button: true,
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(24),
+                          onTap: () => widget.onSelected(i),
+                          child: AnimatedContainer(
+                            duration: reduced
+                                ? Duration.zero
+                                : const Duration(milliseconds: 180),
+                            decoration: BoxDecoration(
+                              color: widget.selected == i
+                                  ? Colors.white.withValues(
+                                      alpha: reduced ? 1 : .67,
+                                    )
+                                  : Colors.transparent,
+                              borderRadius: BorderRadius.circular(24),
+                            ),
+                            child: Center(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    [
+                                      Icons.home_outlined,
+                                      Icons.receipt_long_outlined,
+                                      Icons.person_outline,
+                                    ][i],
+                                    size: 23,
+                                    color: const Color(0xFF181918),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    widget.labels[i],
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                      color: Color(0xFF181918),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

@@ -87,3 +87,35 @@ explicitly removes transitive fine/coarse location permissions.
 The preview uses Flutter glass effects, not Apple's native Liquid Glass. Native
 Android/iOS builds, mobile Clerk sessions, production coverage validation, BML,
 shared role status updates, push and secure account persistence remain unverified.
+
+## Google address search and mobile redesign — 5 October 2026
+
+Flutter analysis and all 22 sequential tests pass. Address tests cover automatic
+coordinate selection, unchanged Places sessions within a search/resolve sequence,
+new sessions after selection, stale responses, island changes, out-of-zone results,
+manual coordinates and required location confirmation. Three role previews fit
+390 × 844. Customer home and restaurant-card PNGs were rendered with real fonts,
+icons and the sample café photo, then visually inspected. The capture harness was
+removed; preview artifacts are in docs/previews.
+
+All 31 backend tests, TypeScript, ESLint and the final Next.js production build
+pass. Provider tests verify Maldives/island restrictions, minimum field masks,
+sanitized errors and no provider-key leakage. Lease tests reject altered users,
+coordinates or expiry and reject expired proof. Supabase migration five was
+applied; Google-content cleanup is scheduled hourly and ran successfully. A
+transactional verification confirmed coordinate-copy deletion across saved
+addresses, restaurant endpoints, orders and quotes; preservation of user/manual
+records; private/RLS counter access; and the conditional PostgreSQL usage cap.
+All verification fixture writes were rolled back.
+
+Codemagic YAML and every script's shell syntax were validated. Both workflows
+retain the corrected absolute APK artifact path. Connected builds accept the
+restricted Android Maps key and an optional stable private debug keystore; they
+print the certificate fingerprint without exposing the private key. No new native
+APK or iOS binary was built locally.
+
+Google Maps/Places keys are not configured yet; no real provider request was made.
+The local backend signing secret was generated without printing or committing it.
+Device validation of Google map rendering, Android/iOS key restrictions and Liquid
+Glass remains pending. Legal texts retain placeholders, BML collection is disabled,
+and no public deployment or legal sign-off is claimed.

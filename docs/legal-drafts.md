@@ -71,7 +71,11 @@ We use account details and contact information to provide sign-in and support; a
 
 Restaurant applicants provide business details and verification documents. Rider applicants provide the identity, licence, vehicle, and payment information required for the approved onboarding process. The exact required documents are listed before collection. These documents are accessible only to staff who need them for verification or administration.
 
-Customers and restaurants place a saved entrance pin manually and provide building/unit details. iGO does not request device GPS permission or collect continuous rider location. Requests are allocated by the rider’s selected service area or by an administrator. Assigned riders receive pickup and delivery entrances, then may open Google Maps for directions. Google Maps handles its own device-location permissions under its own terms. Customers and restaurants receive order milestones and approximate delivery estimates, without a live rider map. Map tile providers receive ordinary technical requests while the entrance map is displayed.
+Customers and restaurants can search for a building/address, select a Google Maps suggestion, review the entrance, and add their own building/unit and access instructions. Search text and selected place identifiers are sent through iGO to Google Maps Platform for suggestions and location resolution. Google receives ordinary map/network requests while maps are displayed. Do not include unit numbers, contact details or private delivery instructions in the location-search field. Those details are entered separately for iGO delivery operations.
+
+Google Maps Platform provides the map and location-search services under Google's Terms of Service (https://maps.google.com/help/terms_maps/) and Privacy Policy (https://policies.google.com/privacy). Search suggestions and selected Google labels are transient, and iGO does not retain a copy of Google's landmark catalogue. Google-derived coordinates expire after 26 days and are removed by scheduled database cleanup, including associated order/quote coordinate copies. A saved entrance may then need another lookup; restaurant entrances require review before use. User-entered address text is retained under iGO's published retention schedule. Database backups and recovery copies require a separately confirmed retention/deletion policy before launch.
+
+iGO does not request device GPS permission or collect continuous rider location. Requests are allocated by the rider's selected service area or by an administrator. Only assigned riders receive pickup and delivery entrances; they can see those endpoints on a Google map and open Google Maps for directions. Google Maps handles its own device-location permissions under its own terms. Customers and restaurants receive order milestones and approximate delivery estimates without a live rider map.
 
 iGO does not receive or store full card numbers, CVVs, or bank authentication codes in its own systems. Payment information entered into the supported checkout is processed through BML and its payment providers. We retain only the limited transaction information needed for order and accounting operations.
 
@@ -105,7 +109,7 @@ Entrance changes require review. Only the assigned rider receives job entrance i
 
 ## Directions notice
 
-> Save the correct building entrance and add your floor/unit details. Riders can open Google Maps to navigate to the saved entrance. iGO uses order milestones and a distance estimate; it does not collect live rider GPS positions.
+> Search for your building or address, review the selected entrance, and add your floor/unit details. Riders can open Google Maps to navigate to the saved entrance. iGO uses order milestones and a distance estimate; it does not collect live rider GPS positions.
 
 ## Public account-deletion page copy
 

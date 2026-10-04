@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { mobileUser,mobileOptions,mobileResponse,body } from '@/lib/mobile-http';
 import { account,register,saveAddress,catalog,ownMenu,saveMenu,availability,quote,checkout,support,acceptPolicies,pageNumber } from '@/lib/mobile-service';
 import { MobileError } from '@/lib/mobile-contract';
+import { lookupPlace } from '@/lib/places-service';
 export const runtime='nodejs';
 type Context={params:Promise<{resource:string}>};
 export const OPTIONS=mobileOptions;
@@ -9,7 +10,7 @@ export async function GET(request:NextRequest,context:Context) {
   return mobileResponse(request,async()=>{
     const user=await mobileUser(request),{resource}=await context.params;
     if(resource==='account') return account(user);
-    if(resource==='catalog') return catalog(user,pageNumber(request.nextUrl.searchParams.get('page')),request.nextUrl.searchParams.get('restaurantId'));
+    if(resource==='catalog') return catalog(user,pageNumber(request.nextUrl.searchParams.get('page')),request.nextUrl.searchParams.get('restaurantId'),request.nextUrl.searchParams.get('q')??'',request.nextUrl.searchParams.get('cuisine')??'All');
     if(resource==='menu') return ownMenu(user,pageNumber(request.nextUrl.searchParams.get('page')));
     throw new MobileError('Not found.',404);
   });
@@ -17,6 +18,7 @@ export async function GET(request:NextRequest,context:Context) {
 export async function POST(request:NextRequest,context:Context) {
   return mobileResponse(request,async()=>{
     const user=await mobileUser(request),{resource}=await context.params,input=await body(request);
+    if(resource==='places') return lookupPlace(user,input);
     if(resource==='register') return register(user,input);
     if(resource==='policies') return acceptPolicies(user,input);
     if(resource==='address') return saveAddress(user,input);

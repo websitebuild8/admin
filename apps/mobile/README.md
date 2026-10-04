@@ -39,16 +39,16 @@ keys in this app.
 
 - Original iGO logo, yellow/white surfaces, black typography, rounded glass panels
   and floating translucent navigation inspired by the supplied mockup.
-- Flutter-rendered glass effect, not native Apple Liquid Glass. Stronger opacity
-  and no blur when high contrast or reduced motion is requested.
+- Floating translucent yellow navigation. iOS 26+ uses native Liquid Glass;
+  older iOS uses native blur, and Android uses Flutter glass. Reduced transparency
+  and motion settings use accessible fallbacks. Native device verification is pending.
 - Customer home/search, sample cafe menu, quantity-aware cart using integer laari,
   confirmed entrance/address form and card-only checkout presentation. Payments
   remain disabled.
-- MapLibre entrance picker with OpenFreeMap/OpenStreetMap tiles, visible data
-  credits and a manual coordinate alternative. Approximate Malé/Hulhumalé bounds
-  reject mismatched island pins. Building, unit, entrance instructions and pin are
-  retained together; home and checkout reuse the same in-memory customer address.
-  Restaurant pickup addresses are separate and can be edited with existing values.
+- Google Maps entrance picker and authenticated Google Places search. Choose an
+  address suggestion to fill coordinates automatically, review the location, and
+  add building/unit/access instructions. Pin adjustment and manual coordinates
+  remain available. Search is restricted to approximate Malé/Hulhumalé bounds.
 - Restaurant sample preparation workflow and availability switch.
 - Rider service-area selection, sample job acceptance and sequential delivery
   milestones. Google Maps directions use destination coordinates without an API key.
@@ -80,22 +80,22 @@ authentication and secure storage still require native device checks. Native iOS
 Liquid Glass navigation is added for iOS 26+, with older-device fallback, but awaits
 macOS compilation and device verification.
 
-The picker has no current-location button and requests no GPS permission. Drag the
-map to the entrance and explicitly confirm it, or enter existing latitude/longitude
-coordinates. It uses an approximate bounding rectangle for each island; this does
-not establish real building entrances, land boundaries or approved service coverage.
-The server must enforce actual service zones before accepting an order. The
-connected backend stores saved addresses and immutable checkout quote snapshots.
-Design-preview addresses stay in memory, and its rider sample jobs use fictional
-fixed destinations. Do not use these sample jobs for real deliveries.
+The picker has no current-location button and requests no GPS permission. Search
+suggestions and coordinates require Google credentials, enabled billing, and a
+connected native account. Design preview contains sample food imagery and fictional
+jobs; Google search is unavailable in that preview. The browser runner is for UI
+review and does not load native Google Maps. It offers the coordinate fallback.
 
-Map tiles are served by [OpenFreeMap](https://openfreemap.org/quick_start/) and
-rendered by [MapLibre](https://pub.dev/packages/maplibre_gl). This data is independent
-of Google's listings, and does not guarantee all Google Maps landmarks. Public tile
-hosting has no service-level guarantee. Change the provider through
-`--dart-define=IGO_MAP_STYLE_URL=https://your-provider/style.json` when necessary.
-The web runner needs WebGL2 and network access to the MapLibre CDN and tile provider.
-Android builds need JDK 21 for the map dependency. iOS currently targets iOS 15+.
+The server independently validates the selected island. These approximate
+rectangles are not surveyed land/service polygons. Real operating coverage must
+be confirmed before accepting paid orders. Google search does not guarantee every
+Maldivian building or entrance is indexed. Users review results before saving.
+
+See [Google Maps setup](../../docs/google-maps-setup.md) for Android/iOS restrictions,
+backend Places credentials, usage limits, and Google coordinate retention. Native
+SDK configuration uses `GOOGLE_MAPS_API_KEY` from the Flutter build defines; Android
+and iOS must use separate restricted keys. iOS targets **16+** for the current
+Google SDK, with Liquid Glass on 26+.
 
 ## Checks
 
