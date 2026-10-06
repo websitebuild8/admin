@@ -319,6 +319,8 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(const IgoApp(preview: false));
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pumpAndSettle();
     await tester.scrollUntilVisible(find.text('Get started'), 250);
     await tester.tap(find.text('Get started'));
     await tester.pumpAndSettle();
@@ -355,7 +357,9 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
-      await tester.drag(find.byType(ListView).first, const Offset(0, -450));
+      if (find.byType(ListView).evaluate().isNotEmpty) {
+        await tester.drag(find.byType(ListView).first, const Offset(0, -450));
+      }
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
     }

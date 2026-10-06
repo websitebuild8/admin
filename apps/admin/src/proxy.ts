@@ -8,6 +8,9 @@ export default function proxy(request: NextRequest, event: NextFetchEvent) {
   // Native APIs authenticate bearer session tokens themselves and return JSON
   // errors; Clerk's page redirects must not intercept them or CORS preflights.
   if (request.nextUrl.pathname.startsWith('/api/mobile/')) return NextResponse.next();
+  // A demo key grants access only to an isolated fictional DemoSession. It is
+  // never accepted by real mobile or administrator APIs.
+  if (request.nextUrl.pathname.startsWith('/api/demo/mobile/')) return NextResponse.next();
   if (request.nextUrl.pathname === '/api/dispatch/tick') return NextResponse.next();
   if (!hasClerkKeys()) {
     if (request.nextUrl.pathname.startsWith('/api/')) return NextResponse.json({ error: 'Authentication is not configured.' }, { status: 503 });

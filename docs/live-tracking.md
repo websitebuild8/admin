@@ -1,6 +1,6 @@
 # Delivery locations and order milestones
 
-Updated 5 October 2026. The agreed product uses Google entrance search/maps and
+Updated 7 October 2026. The agreed product uses Google entrance search/maps and
 external directions. Continuous rider tracking and GPS-based proximity dispatch
 are removed, including from the admin workspace.
 
@@ -9,7 +9,8 @@ review the automatically resolved entrance. Unit/access instructions remain
 separate. Restaurant changes await admin approval. Only assigned riders receive
 job endpoint coordinates. They can see pickup/dropoff on a Google map and open
 Google Maps directions; Google Maps manages its own navigation/GPS permissions.
-iGO collects no continuous rider positions. See [Maps setup](google-maps-setup.md).
+Customers also see fixed saved endpoints for their own order in the redesigned
+status view. iGO collects no continuous rider positions. See [Maps setup](google-maps-setup.md).
 
 Restaurant milestones: order confirmed → ready for pickup → order picked up.
 Rider milestones: order assigned → arrived at restaurant → order picked up →

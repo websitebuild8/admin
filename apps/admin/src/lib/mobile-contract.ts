@@ -41,8 +41,11 @@ export const registrationInput = z.object({
 export const menuInput = z.object({
   id: z.uuid().optional(), name: z.string().trim().min(2).max(100),
   description: z.string().trim().max(300), price: z.number().int().min(100).max(1000000),
+  category: z.string().trim().min(1).max(60).default('General'),
   available: z.boolean(),
 }).strict();
+export const menuDeleteInput = z.object({id:z.uuid()}).strict();
+export const menuStockInput = z.object({id:z.uuid(),available:z.boolean()}).strict();
 export const quoteInput = z.object({
   restaurantId: z.uuid(), addressId: z.uuid(),
   items: z.array(z.object({id:z.uuid(),quantity:z.number().int().min(1).max(20)}).strict()).min(1).max(30),

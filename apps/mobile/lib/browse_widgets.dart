@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 
 import 'native_glass_bar.dart';
 
-const _ink = Color(0xFF181918);
+const browseInk = Color(0xFF181918);
+const browseMuted = Color(0xFF72756F);
+const browseYellow = Color(0xFFFFDF35);
 
 class FloatingWorkspace extends StatelessWidget {
   final Widget header, body;
@@ -27,8 +29,8 @@ class FloatingWorkspace extends StatelessWidget {
         ],
       ),
       Positioned(
-        left: 18,
-        right: 18,
+        left: 16,
+        right: 16,
         bottom: 12,
         child: NativeGlassBar(
           labels: labels,
@@ -40,6 +42,126 @@ class FloatingWorkspace extends StatelessWidget {
   );
 }
 
+class SectionHeading extends StatelessWidget {
+  final String title;
+  final String? subtitle, action;
+  final VoidCallback? onAction;
+  const SectionHeading({
+    super.key,
+    required this.title,
+    this.subtitle,
+    this.action,
+    this.onAction,
+  });
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(top: 24, bottom: 14),
+    child: Row(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 23,
+                  height: 1.15,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -.6,
+                ),
+              ),
+              if (subtitle != null) ...[
+                const SizedBox(height: 5),
+                Text(
+                  subtitle!,
+                  style: const TextStyle(fontSize: 12, color: browseMuted),
+                ),
+              ],
+            ],
+          ),
+        ),
+        if (action != null)
+          TextButton(
+            onPressed: onAction,
+            child: Text(action!, style: const TextStyle(fontSize: 12)),
+          ),
+      ],
+    ),
+  );
+}
+
+class DeliveryAddressHeader extends StatelessWidget {
+  final String address, area;
+  final VoidCallback onTap;
+  const DeliveryAddressHeader({
+    super.key,
+    required this.address,
+    required this.area,
+    required this.onTap,
+  });
+  @override
+  Widget build(BuildContext context) => Row(
+    children: [
+      Expanded(
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(18),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Delivery · Now',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: browseMuted,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    const Icon(Icons.place, size: 18),
+                    const SizedBox(width: 5),
+                    Flexible(
+                      child: Text(
+                        address,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -.4,
+                        ),
+                      ),
+                    ),
+                    const Icon(Icons.expand_more, size: 19),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+      Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: .8),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: const Color(0xFFE8E8E4)),
+        ),
+        child: Text(
+          area,
+          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
+        ),
+      ),
+    ],
+  );
+}
+
+/// Only cuisines supported by the real catalog are offered as shortcuts.
 class CuisineFilters extends StatelessWidget {
   final String selected;
   final ValueChanged<String> onSelected;
@@ -50,38 +172,58 @@ class CuisineFilters extends StatelessWidget {
   });
   @override
   Widget build(BuildContext context) => SizedBox(
-    height: 49,
+    height: 88 + MediaQuery.textScalerOf(context).scale(11) - 11,
     child: ListView(
       scrollDirection: Axis.horizontal,
       children: [
         for (final item in [
-          (Icons.restaurant_outlined, 'All'),
-          (Icons.coffee_outlined, 'Coffee'),
-          (Icons.ramen_dining_outlined, 'Maldivian'),
-          (Icons.local_pizza_outlined, 'Pizza'),
+          (Icons.restaurant, 'All'),
+          (Icons.coffee, 'Coffee'),
+          (Icons.ramen_dining, 'Maldivian'),
+          (Icons.local_pizza, 'Pizza'),
         ])
           Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: ChoiceChip(
-              avatar: Icon(
-                item.$1,
-                size: 17,
-                color: selected == item.$2 ? Colors.white : _ink,
-              ),
-              label: Text(item.$2),
+            padding: const EdgeInsets.only(right: 16),
+            child: Semantics(
               selected: selected == item.$2,
-              showCheckmark: false,
-              selectedColor: _ink,
-              backgroundColor: Colors.white.withValues(alpha: .7),
-              labelStyle: TextStyle(
-                color: selected == item.$2 ? Colors.white : _ink,
-                fontWeight: FontWeight.w600,
+              button: true,
+              child: InkWell(
+                onTap: () => onSelected(item.$2),
+                borderRadius: BorderRadius.circular(18),
+                child: SizedBox(
+                  width: 65,
+                  child: Column(
+                    children: [
+                      Container(
+                        width: 58,
+                        height: 58,
+                        decoration: BoxDecoration(
+                          color: selected == item.$2
+                              ? browseYellow.withValues(alpha: .65)
+                              : Colors.white.withValues(alpha: .8),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: selected == item.$2
+                                ? browseYellow
+                                : const Color(0xFFE8E8E4),
+                          ),
+                        ),
+                        child: Icon(item.$1, size: 27, color: browseInk),
+                      ),
+                      const SizedBox(height: 7),
+                      Text(
+                        item.$2,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
-              side: BorderSide(color: Colors.white.withValues(alpha: .8)),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(24),
-              ),
-              onSelected: (_) => onSelected(item.$2),
             ),
           ),
       ],
@@ -89,12 +231,63 @@ class CuisineFilters extends StatelessWidget {
   );
 }
 
-/// Sample photography is used only in preview; real catalogue entries display
-/// an honest placeholder until restaurants supply their own images.
+class FoodCover extends StatelessWidget {
+  final String name;
+  final String? imageAsset;
+  final double height;
+  const FoodCover({
+    super.key,
+    required this.name,
+    this.imageAsset,
+    this.height = 150,
+  });
+  @override
+  Widget build(BuildContext context) => SizedBox(
+    height: height,
+    child: imageAsset != null
+        ? Image.asset(
+            imageAsset!,
+            fit: BoxFit.cover,
+            semanticLabel: 'Sample food photography',
+          )
+        : Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xFFFFE989), Color(0xFFFFF6D3)],
+              ),
+            ),
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    name.toLowerCase().contains('pizza')
+                        ? Icons.local_pizza_outlined
+                        : name.toLowerCase().contains('cafe')
+                        ? Icons.coffee_outlined
+                        : Icons.ramen_dining,
+                    size: 38,
+                    color: browseInk,
+                  ),
+                  const SizedBox(height: 6),
+                  const Text(
+                    'Photo coming soon',
+                    style: TextStyle(fontSize: 10, color: browseMuted),
+                  ),
+                ],
+              ),
+            ),
+          ),
+  );
+}
+
 class RestaurantCard extends StatelessWidget {
   final String name, subtitle, detail;
   final String? imageAsset;
   final VoidCallback onTap;
+  final bool compact;
   const RestaurantCard({
     super.key,
     required this.name,
@@ -102,101 +295,60 @@ class RestaurantCard extends StatelessWidget {
     required this.detail,
     required this.onTap,
     this.imageAsset,
+    this.compact = false,
   });
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(bottom: 20),
+    padding: EdgeInsets.only(bottom: compact ? 0 : 18),
     child: Material(
-      color: Colors.white.withValues(alpha: .72),
-      borderRadius: BorderRadius.circular(26),
+      color: Colors.white.withValues(alpha: .6),
+      borderRadius: BorderRadius.circular(22),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            SizedBox(
-              height: 160,
-              child: imageAsset != null
-                  ? Image.asset(
-                      imageAsset!,
-                      fit: BoxFit.cover,
-                      semanticLabel: 'Sample café food photography',
-                    )
-                  : Container(
-                      decoration: const BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [Color(0xFFFFF2AF), Color(0xFFF4F0E3)],
-                        ),
-                      ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(
-                            Icons.restaurant_outlined,
-                            size: 42,
-                            color: _ink,
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            name,
-                            style: const TextStyle(fontWeight: FontWeight.w700),
-                          ),
-                          const Text(
-                            'Photo coming soon',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: Color(0xFF72756F),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(22),
+              child: FoodCover(
+                name: name,
+                imageAsset: imageAsset,
+                height: compact ? 116 : 166,
+              ),
             ),
             Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
+              padding: const EdgeInsets.fromLTRB(12, 11, 12, 13),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          name,
-                          style: const TextStyle(
-                            fontSize: 19,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: -.4,
-                          ),
-                        ),
-                        const SizedBox(height: 3),
-                        Text(
-                          subtitle,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: Color(0xFF72756F),
-                          ),
-                        ),
-                        const SizedBox(height: 9),
-                        Row(
-                          children: [
-                            const Icon(Icons.schedule, size: 14),
-                            const SizedBox(width: 5),
-                            Expanded(
-                              child: Text(
-                                detail,
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
+                  Text(
+                    name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: compact ? 16 : 19,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -.4,
                     ),
                   ),
-                  const Icon(Icons.arrow_outward, size: 20),
+                  const SizedBox(height: 3),
+                  Text(
+                    subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 11, color: browseMuted),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    detail,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -207,79 +359,95 @@ class RestaurantCard extends StatelessWidget {
   );
 }
 
+class RestaurantRail extends StatelessWidget {
+  final List<Widget> cards;
+  const RestaurantRail({super.key, required this.cards});
+  @override
+  Widget build(BuildContext context) => SizedBox(
+    height: 236 + (MediaQuery.textScalerOf(context).scale(14) - 14) * 8,
+    child: ListView.separated(
+      scrollDirection: Axis.horizontal,
+      itemCount: cards.length,
+      separatorBuilder: (_, _) => const SizedBox(width: 12),
+      itemBuilder: (_, index) => SizedBox(width: 225, child: cards[index]),
+    ),
+  );
+}
+
 class CafeFeature extends StatelessWidget {
   final VoidCallback onTap;
   const CafeFeature({super.key, required this.onTap});
   @override
-  Widget build(BuildContext context) => ClipRRect(
-    borderRadius: BorderRadius.circular(28),
-    child: ConstrainedBox(
-      constraints: const BoxConstraints(minHeight: 220),
-      child: Stack(
-        children: [
-          Positioned.fill(
-            child: Image.asset(
-              'assets/food/cafe-preview.png',
-              fit: BoxFit.cover,
-              alignment: Alignment.centerRight,
-            ),
-          ),
-          const Positioned.fill(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Color(0xFFFFE969), Color(0x00FFE969)],
-                  stops: [0, .74],
+  Widget build(BuildContext context) => Material(
+    color: browseInk,
+    borderRadius: BorderRadius.circular(24),
+    clipBehavior: Clip.antiAlias,
+    child: InkWell(
+      onTap: onTap,
+      child: IntrinsicHeight(
+        child: Row(
+          children: [
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(18),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'YOUR DAILY LITTLE JOY',
+                      style: TextStyle(
+                        color: browseYellow,
+                        fontSize: 9,
+                        letterSpacing: 1.1,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    const Text(
+                      'Good mornings.\nBetter coffee.',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 23,
+                        height: 1.1,
+                        letterSpacing: -.6,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    const Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            'Explore The Cafe',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        SizedBox(width: 5),
+                        Icon(
+                          Icons.arrow_forward,
+                          color: browseYellow,
+                          size: 16,
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'A LITTLE MOMENT, DELIVERED',
-                  style: TextStyle(
-                    fontSize: 9,
-                    letterSpacing: 1.1,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                const Text(
-                  'Your coffee.\nYour kind of day.',
-                  style: TextStyle(
-                    fontSize: 26,
-                    height: 1.1,
-                    letterSpacing: -.8,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 22),
-                TextButton(
-                  onPressed: onTap,
-                  style: TextButton.styleFrom(
-                    backgroundColor: _ink,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 18,
-                      vertical: 12,
-                    ),
-                  ),
-                  child: const Text('Explore The Cafe  →'),
-                ),
-                const SizedBox(height: 5),
-                const Text(
-                  'Sample restaurant · design preview',
-                  style: TextStyle(fontSize: 9),
-                ),
-              ],
+            SizedBox(
+              width: 114,
+              child: Image.asset(
+                'assets/food/cafe-preview.png',
+                fit: BoxFit.cover,
+                semanticLabel: 'Sample café photography',
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     ),
   );

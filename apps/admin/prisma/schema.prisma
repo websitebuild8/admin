@@ -122,6 +122,7 @@ model MenuItem {
   restaurant   Restaurant @relation(fields: [restaurantId], references: [id])
   name         String
   description  String
+  category     String @default("General")
   price        Int
   available    Boolean @default(true)
   updatedAt    DateTime @updatedAt
@@ -205,4 +206,15 @@ model Notification {
   text String
   time DateTime @default(now())
   @@index([recipient, time])
+}
+
+// A closed, fictional workspace. Never related to operational/payment tables.
+model DemoSession {
+  id           String   @id @default(uuid())
+  ownerClerkId String
+  keyHash      String   @unique
+  payload      Json
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+  @@index([ownerClerkId, createdAt])
 }

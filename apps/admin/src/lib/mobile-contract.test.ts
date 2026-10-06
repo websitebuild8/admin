@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {approvedPrincipal,addressInput,registrationInput,quoteInput,publicOrderId,menuInput} from './mobile-contract';
+import {approvedPrincipal,addressInput,registrationInput,quoteInput,publicOrderId,menuInput,menuDeleteInput,menuStockInput} from './mobile-contract';
 const entrance={area:'Malé',building:'Example building',unit:'2A',instructions:'East entrance',latitude:4.1755,longitude:73.5093};
 test('pending partner cannot fall back to customer despite an old customer role',()=>{
  const p={id:'p',primaryRole:'rider',roles:[{role:'rider',status:'Pending'},{role:'customer',status:'Active'}]};
@@ -38,4 +38,13 @@ test('menu prices are integer laari and item ownership cannot be injected',()=>{
 });
 test('public order references have high-entropy identifiers',()=>{
  const ids=Array.from({length:1000},publicOrderId);assert.equal(new Set(ids).size,ids.length);assert.ok(ids.every(id=>/^IGO-[A-F0-9]{16}$/.test(id)));
+});
+
+test('menu categories and mutations reject ownership and invalid payloads',()=>{
+ const id=crypto.randomUUID();assert.ok(menuDeleteInput.safeParse({id}).success);
+ assert.ok(menuStockInput.safeParse({id,available:false}).success);
+ assert.equal(menuDeleteInput.safeParse({id,restaurantId:'other'}).success,false);
+ assert.equal(menuStockInput.safeParse({id,available:'false'}).success,false);
+ assert.equal(menuInput.safeParse({name:'Cake',description:'',price:6000,available:true,category:'  '}).success,false);
+ assert.equal(menuInput.safeParse({name:'Cake',description:'',price:6000,available:true,category:'a'.repeat(61)}).success,false);
 });

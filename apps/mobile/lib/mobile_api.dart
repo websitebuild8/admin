@@ -15,10 +15,16 @@ class ApiFailure implements Exception {
 class MobileApi {
   final Uri base;
   final Future<String> Function() token;
+  final String? demoRole;
+  bool get isDemo => demoRole != null;
   final http.Client _client;
-  MobileApi({required String baseUrl, required this.token, http.Client? client})
-    : base = Uri.parse(baseUrl),
-      _client = client ?? http.Client() {
+  MobileApi({
+    required String baseUrl,
+    required this.token,
+    this.demoRole,
+    http.Client? client,
+  }) : base = Uri.parse(baseUrl),
+       _client = client ?? http.Client() {
     final developmentHost = [
       'localhost',
       '127.0.0.1',
@@ -31,7 +37,22 @@ class MobileApi {
             (kReleaseMode || base.scheme != 'http' || !developmentHost))) {
       throw const ApiFailure('Use a secure iGO server address.');
     }
+    if (demoRole != null &&
+        !['customer', 'restaurant', 'rider'].contains(demoRole)) {
+      throw const ApiFailure('Choose a fictional demo role.');
+    }
   }
+  MobileApi.demo({
+    required String baseUrl,
+    required String key,
+    required String role,
+    http.Client? client,
+  }) : this(
+         baseUrl: baseUrl,
+         token: () async => key,
+         demoRole: role,
+         client: client,
+       );
   Future<Map<String, dynamic>> request(
     String resource, {
     Map<String, dynamic>? data,
@@ -42,7 +63,11 @@ class MobileApi {
   }) async {
     final uri = base
         .resolve(
-          operations ? '/api/mobile/operations' : '/api/mobile/v1/$resource',
+          isDemo
+              ? '/api/demo/mobile/${operations ? 'operations' : resource}'
+              : operations
+              ? '/api/mobile/operations'
+              : '/api/mobile/v1/$resource',
         )
         .replace(
           queryParameters: {
@@ -56,6 +81,7 @@ class MobileApi {
       if (jwt.isEmpty) throw const ApiFailure('Sign in again.', 401);
       final headers = {
         'Authorization': 'Bearer $jwt',
+        if (isDemo) 'X-iGO-Demo-Role': demoRole!,
         'Accept': 'application/json',
         if (data != null) 'Content-Type': 'application/json',
       };

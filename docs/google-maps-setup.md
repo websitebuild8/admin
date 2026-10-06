@@ -1,6 +1,6 @@
 # Google Maps and automatic address search
 
-Updated 5 October 2026. iGO uses Google Maps native SDKs plus Places API (New).
+Updated 7 October 2026. iGO uses Google Maps native SDKs plus Places API (New).
 Eeezap's [privacy policy](https://eeezap.com/privacy-policy) confirms Google Maps
 and Places usage, but does not document its exact UI or software architecture.
 This implementation follows the agreed iGO flow rather than claiming to reproduce
@@ -16,6 +16,8 @@ Eeezap's private implementation.
    private details have separate fields and are not sent to Places search.
 4. Save. Restaurant entrance changes await admin review. Riders receive only their
    assigned job's pickup/dropoff locations and can open Google Maps directions.
+   Customers can view fixed saved entrances for their own orders on the status map;
+   no role receives a live rider position.
 
 Search has a 450 ms debounce, minimum three characters, at most five suggestions,
 separate sessions for completed searches, and stale-response protection. Both

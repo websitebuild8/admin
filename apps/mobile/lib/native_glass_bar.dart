@@ -127,17 +127,23 @@ class _NativeGlassBarState extends State<NativeGlassBar> {
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Icon(
-                                    [
-                                      Icons.home_outlined,
-                                      Icons.receipt_long_outlined,
-                                      Icons.person_outline,
-                                    ][i],
+                                    switch (widget.labels[i]) {
+                                      'Home' => Icons.home_outlined,
+                                      'Search' => Icons.search,
+                                      'Kitchen' => Icons.storefront_outlined,
+                                      'Menu' => Icons.restaurant_menu,
+                                      'Map' => Icons.map_outlined,
+                                      'Account' => Icons.person_outline,
+                                      _ => Icons.receipt_long_outlined,
+                                    },
                                     size: 23,
                                     color: const Color(0xFF181918),
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
                                     widget.labels[i],
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                     style: const TextStyle(
                                       fontSize: 11,
                                       fontWeight: FontWeight.w700,

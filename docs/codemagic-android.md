@@ -77,3 +77,11 @@ References: [Codemagic monorepo configuration](https://docs.codemagic.io/getting
 [YAML configuration and artifact paths](https://docs.codemagic.io/yaml-basic-configuration/yaml-getting-started/).
 
 Google Maps configuration and signing-fingerprint steps: [Google Maps setup](google-maps-setup.md).
+
+## Shared demo purchases
+
+Both existing workflows include **Try shared demo**. The design preview APK can
+join a demo session without build-time Clerk or bank keys. Enter the reachable
+HTTPS backend and the private session key from the connected admin on each phone.
+See [the demo walkthrough](demo-purchases.md). Never put the demo key into
+Codemagic variables, source code or a committed configuration file.

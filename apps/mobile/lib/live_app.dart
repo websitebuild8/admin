@@ -9,8 +9,10 @@ import 'main.dart' show CanvasPage, Glass, AddressPage, muted;
 import 'models.dart';
 import 'mobile_api.dart';
 import 'browse_widgets.dart';
+import 'delivery_widgets.dart';
 import 'places_lookup.dart';
 import 'entrance_map.dart';
+import 'demo_app.dart';
 
 const apiBase = String.fromEnvironment('IGO_API_BASE_URL');
 
@@ -24,13 +26,33 @@ class LiveGate extends StatelessWidget {
           padding: const EdgeInsets.all(20),
           children: [
             const SizedBox(height: 24),
-            const Text(
-              'Welcome to iGO',
-              style: TextStyle(fontSize: 30, fontWeight: FontWeight.w800),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(18),
+                child: Image.asset(
+                  'assets/brand/igo-logo.jpg',
+                  width: 68,
+                  height: 68,
+                ),
+              ),
+            ),
+            const SizedBox(height: 28),
+            const WorkspaceHeading(
+              eyebrow: 'You order. I go.',
+              title: 'Good to see you.',
             ),
             const Text('Sign in or create your account to continue.'),
             const SizedBox(height: 24),
             const ClerkAuthentication(),
+            TextButton.icon(
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const DemoJoinPage()),
+              ),
+              icon: const Icon(Icons.science_outlined),
+              label: const Text('Try shared demo'),
+            ),
           ],
         ),
       ),
@@ -224,21 +246,26 @@ class PolicyLinks extends StatelessWidget {
   final MobileApi api;
   const PolicyLinks({super.key, required this.api});
   @override
-  Widget build(BuildContext context) => Wrap(
-    children: [
-      for (final p in {
-        'terms': 'Terms',
-        'privacy': 'Privacy',
-        'refunds': 'Order problems',
-        'partners': 'Partner terms',
-      }.entries)
-        TextButton(
-          onPressed: () =>
-              openLink(context, api.base.resolve('/legal/${p.key}')),
-          child: Text(p.value),
-        ),
-    ],
-  );
+  Widget build(BuildContext context) => api.isDemo
+      ? const Text(
+          'Fictional demo only. No purchase agreement, real payment or delivery.',
+          style: TextStyle(color: muted, fontSize: 12),
+        )
+      : Wrap(
+          children: [
+            for (final p in {
+              'terms': 'Terms',
+              'privacy': 'Privacy',
+              'refunds': 'Order problems',
+              'partners': 'Partner terms',
+            }.entries)
+              TextButton(
+                onPressed: () =>
+                    openLink(context, api.base.resolve('/legal/${p.key}')),
+                child: Text(p.value),
+              ),
+          ],
+        );
 }
 
 class RegistrationPage extends StatefulWidget {
@@ -523,6 +550,13 @@ Future<void> editAddress(
   bool pickup = false,
   required Future<void> Function() after,
 }) async {
+  if (api.isDemo) {
+    message(
+      context,
+      'This demo uses fixed fictional entrances. No personal address is needed.',
+    );
+    return;
+  }
   final restaurant = account['restaurant'] as Map?;
   final record = pickup
       ? (restaurant?['pendingPickup'] ?? restaurant?['pickup'])
@@ -582,7 +616,8 @@ class _LiveWorkspaceState extends State<LiveWorkspace>
   int tab = 0, page = 1, catalogPage = 1;
   Timer? timer, filterTimer;
   bool refreshAgain = false;
-  String query = '', cuisine = 'All';
+  String query = '', cuisine = 'All', menuFilter = 'All';
+  final orderFeed = ValueNotifier<List<Map<String, dynamic>>>([]);
   int catalogRevision = 0;
   String get role => widget.account['access']['role'];
   @override
@@ -590,7 +625,7 @@ class _LiveWorkspaceState extends State<LiveWorkspace>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     refresh();
-    timer = Timer.periodic(const Duration(seconds: 20), (_) {
+    timer = Timer.periodic(Duration(seconds: widget.api.isDemo ? 5 : 20), (_) {
       if (foreground) refresh(checkAccount: true);
     });
   }
@@ -599,6 +634,7 @@ class _LiveWorkspaceState extends State<LiveWorkspace>
   void dispose() {
     timer?.cancel();
     filterTimer?.cancel();
+    orderFeed.dispose();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -618,7 +654,8 @@ class _LiveWorkspaceState extends State<LiveWorkspace>
     final revision = catalogRevision,
         listPage = catalogPage,
         currentQuery = query,
-        currentCuisine = cuisine;
+        currentCuisine = cuisine,
+        currentStock = menuFilter;
     try {
       if (checkAccount) await widget.refreshAccount();
       final result = await widget.api.request(
@@ -633,7 +670,11 @@ class _LiveWorkspaceState extends State<LiveWorkspace>
               query: {'q': currentQuery, 'cuisine': currentCuisine},
             )
           : role == 'restaurant'
-          ? await widget.api.request('menu', page: catalogPage)
+          ? await widget.api.request(
+              'menu',
+              page: listPage,
+              query: {'q': currentQuery, 'stock': currentStock},
+            )
           : null;
       if (mounted) {
         setState(() {
@@ -652,6 +693,9 @@ class _LiveWorkspaceState extends State<LiveWorkspace>
             });
           }
           data = result;
+          orderFeed.value = [
+            for (final o in result['orders']) Map<String, dynamic>.from(o),
+          ];
           if (revision == catalogRevision && listPage == catalogPage) {
             catalog = list;
           }
@@ -695,14 +739,16 @@ class _LiveWorkspaceState extends State<LiveWorkspace>
     }
   }
 
+  int get accountTab => role == 'rider' ? 2 : 3;
+  int get ordersTab => role == 'rider' ? 1 : 2;
   @override
   Widget build(BuildContext context) => CanvasPage(
     child: FloatingWorkspace(
       labels: role == 'customer'
-          ? const ['Explore', 'Orders', 'Account']
+          ? const ['Home', 'Search', 'Orders', 'Account']
           : role == 'restaurant'
-          ? const ['Kitchen', 'Orders', 'Account']
-          : const ['Requests', 'Deliveries', 'Account'],
+          ? const ['Kitchen', 'Menu', 'Orders', 'Account']
+          : const ['Map', 'Deliveries', 'Account'],
       selected: tab,
       onSelected: (v) => setState(() => tab = v),
       header: Padding(
@@ -714,7 +760,11 @@ class _LiveWorkspaceState extends State<LiveWorkspace>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Hi, ${widget.account['name']}',
+                    role == 'restaurant'
+                        ? widget.account['restaurant']['name']
+                        : role == 'rider'
+                        ? 'iGO Delivery'
+                        : 'iGO',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
@@ -724,11 +774,13 @@ class _LiveWorkspaceState extends State<LiveWorkspace>
                     ),
                   ),
                   Text(
-                    {
-                      'customer': 'Your everyday, delivered.',
-                      'restaurant': 'Your restaurant workspace.',
-                      'rider': 'Your next delivery.',
-                    }[role]!,
+                    widget.api.isDemo
+                        ? 'DEMO · FICTIONAL DATA · NO CHARGES'
+                        : {
+                            'customer': 'Your everyday, delivered.',
+                            'restaurant': 'Your restaurant workspace.',
+                            'rider': 'Your next delivery.',
+                          }[role]!,
                     style: const TextStyle(color: muted, fontSize: 12),
                   ),
                 ],
@@ -772,36 +824,38 @@ class _LiveWorkspaceState extends State<LiveWorkspace>
           ],
         ),
       ),
-      body: RefreshIndicator(
-        onRefresh: () => refresh(checkAccount: true),
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(24, 18, 24, 118),
-          children: [
-            if (error != null)
-              Glass(
-                child: Column(
-                  children: [
-                    Text(error!),
-                    TextButton(
-                      onPressed: () => refresh(checkAccount: true),
-                      child: const Text('Try again'),
+      body: role == 'rider' && tab == 0
+          ? riderMap()
+          : RefreshIndicator(
+              onRefresh: () => refresh(checkAccount: true),
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(24, 18, 24, 118),
+                children: [
+                  if (error != null)
+                    Glass(
+                      child: Column(
+                        children: [
+                          Text(error!),
+                          TextButton(
+                            onPressed: () => refresh(checkAccount: true),
+                            child: const Text('Try again'),
+                          ),
+                        ],
+                      ),
                     ),
-                  ],
-                ),
+                  if (tab == accountTab)
+                    profile()
+                  else if (tab == ordersTab)
+                    orders()
+                  else if (role == 'customer')
+                    restaurants()
+                  else if (role == 'restaurant')
+                    (tab == 1 ? restaurantMenu() : restaurantHome())
+                  else
+                    riderHome(),
+                ],
               ),
-            if (tab == 2)
-              profile()
-            else if (tab == 1)
-              orders()
-            else if (role == 'customer')
-              restaurants()
-            else if (role == 'restaurant')
-              restaurantHome()
-            else
-              riderHome(),
-          ],
-        ),
-      ),
+            ),
     ),
   );
   Widget profile() => Column(
@@ -874,7 +928,20 @@ class _LiveWorkspaceState extends State<LiveWorkspace>
         'Order problems and valid payment remedies can be raised from the order’s Help button.',
         style: TextStyle(color: muted),
       ),
-      TextButton(onPressed: widget.signOut, child: const Text('Sign out')),
+      if (!widget.api.isDemo)
+        TextButton(
+          onPressed: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const DemoJoinPage()),
+          ),
+          child: const Text('Try shared demo'),
+        ),
+      TextButton(
+        onPressed: widget.signOut,
+        child: Text(
+          widget.api.isDemo ? 'Change demo role / leave session' : 'Sign out',
+        ),
+      ),
     ],
   );
   Future<void> setAvailability(bool online, {String? area}) async {
@@ -901,62 +968,22 @@ class _LiveWorkspaceState extends State<LiveWorkspace>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Glass(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Row(
-            children: [
-              const Icon(Icons.place_outlined, size: 22),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'DELIVER TO',
-                      style: TextStyle(
-                        fontSize: 9,
-                        letterSpacing: 1.3,
-                        color: muted,
-                      ),
-                    ),
-                    Text(
-                      address?.label ?? 'Choose your building entrance',
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              TextButton(
-                onPressed: () => editAddress(
-                  context,
-                  widget.api,
-                  widget.account,
-                  after: widget.refreshAccount,
-                ),
-                child: const Text(
-                  'Change entrance',
-                  style: TextStyle(fontSize: 11),
-                ),
-              ),
-            ],
+        DeliveryAddressHeader(
+          address: address?.building ?? 'Choose your address',
+          area: address?.area ?? 'Malé / Hulhumalé',
+          onTap: () => editAddress(
+            context,
+            widget.api,
+            widget.account,
+            after: widget.refreshAccount,
           ),
         ),
-        const SizedBox(height: 24),
-        Text(
-          'Your next favourite.\nJust a tap away.',
-          style: Theme.of(context).textTheme.headlineLarge,
-        ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 18),
         TextField(
           key: const ValueKey('catalog-search'),
           onChanged: (v) => filterCatalog(query: v),
           decoration: const InputDecoration(
-            hintText: 'Search restaurants or food',
+            hintText: 'Food, restaurants, and little cravings',
             prefixIcon: Icon(Icons.search),
           ),
         ),
@@ -965,22 +992,27 @@ class _LiveWorkspaceState extends State<LiveWorkspace>
           selected: cuisine,
           onSelected: (v) => filterCatalog(category: v),
         ),
-        const SizedBox(height: 24),
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                'Find your flavour',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-            ),
-            Text(
-              '${catalog!['total']} places',
-              style: const TextStyle(fontSize: 11, color: muted),
-            ),
-          ],
+        if (tab == 0 &&
+            query.isEmpty &&
+            cuisine == 'All' &&
+            (catalog!['items'] as List).isNotEmpty) ...[
+          const SectionHeading(
+            title: 'A taste of your islands',
+            subtitle: 'Explore the kitchens on this page',
+          ),
+          RestaurantRail(
+            cards: [
+              for (final r in (catalog!['items'] as List).take(5))
+                restaurantCard(Map<String, dynamic>.from(r), compact: true),
+            ],
+          ),
+        ],
+        SectionHeading(
+          title: tab == 1
+              ? 'Find your next favourite'
+              : 'Good food, right here',
+          subtitle: '${catalog!['total']} restaurants',
         ),
-        const SizedBox(height: 14),
         if ((catalog!['items'] as List).isEmpty)
           Glass(
             child: Text(
@@ -990,24 +1022,7 @@ class _LiveWorkspaceState extends State<LiveWorkspace>
             ),
           ),
         for (final r in catalog!['items'])
-          RestaurantCard(
-            name: r['name'],
-            subtitle: '${r['cuisine']} · ${r['area']}',
-            detail: r['acceptingOrders'] == true
-                ? '${r['prepTime']} min preparation · Delivery estimate at checkout'
-                : 'Currently closed',
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => LiveMenu(
-                  api: widget.api,
-                  restaurant: Map<String, dynamic>.from(r),
-                  account: widget.account,
-                  refreshAccount: widget.refreshAccount,
-                ),
-              ),
-            ),
-          ),
+          restaurantCard(Map<String, dynamic>.from(r)),
         pagination(catalog!, catalogPage, (p) {
           setState(() => catalogPage = p);
           refresh();
@@ -1016,180 +1031,409 @@ class _LiveWorkspaceState extends State<LiveWorkspace>
     );
   }
 
+  Widget restaurantCard(Map<String, dynamic> r, {bool compact = false}) =>
+      RestaurantCard(
+        name: r['name'],
+        subtitle: '${r['cuisine']} · ${r['area']}',
+        compact: compact,
+        detail: r['acceptingOrders'] == true
+            ? '${r['prepTime']} min preparation'
+            : 'Currently closed',
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => LiveMenu(
+              api: widget.api,
+              restaurant: r,
+              account: widget.account,
+              refreshAccount: widget.refreshAccount,
+              onOrderPlaced: () {
+                setState(() => tab = ordersTab);
+                refresh();
+              },
+            ),
+          ),
+        ),
+      );
+
   Widget restaurantHome() {
     final online = widget.account['restaurant']['acceptingOrders'] == true;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        WorkspaceHeading(
+          eyebrow: 'Kitchen workspace',
+          title: 'Let’s serve something good.',
+          trailing: StatusPill(online ? 'OPEN' : 'CLOSED'),
+        ),
+        const SizedBox(height: 20),
         Glass(
+          padding: const EdgeInsets.all(14),
           child: SwitchListTile(
             contentPadding: EdgeInsets.zero,
             value: online,
             onChanged: busy ? null : setAvailability,
-            title: const Text('Accepting orders'),
+            title: const Text(
+              'Accepting orders',
+              style: TextStyle(fontWeight: FontWeight.w800),
+            ),
             subtitle: Text(
-              online ? 'Your kitchen is open.' : 'Your kitchen is closed.',
+              online
+                  ? 'Your kitchen is open.'
+                  : 'Open when your kitchen is ready.',
             ),
           ),
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 16),
         Row(
           children: [
-            const Expanded(
-              child: Text(
-                'Your menu',
-                style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
-              ),
-            ),
-            TextButton.icon(
-              onPressed: () => editMenu(),
-              icon: const Icon(Icons.add),
-              label: const Text('Add item'),
-            ),
-          ],
-        ),
-        if (catalog == null)
-          const Center(child: CircularProgressIndicator())
-        else ...[
-          if ((catalog!['items'] as List).isEmpty)
-            const Glass(
-              child: Text('Add your first menu item, then open your kitchen.'),
-            ),
-          for (final item in catalog!['items'])
-            Padding(
-              padding: const EdgeInsets.only(bottom: 12),
+            Expanded(
               child: Glass(
-                child: ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(item['name']),
-                  subtitle: Text(
-                    '${price(item['price'])} · ${item['available'] == true ? 'Available' : 'Unavailable'}',
-                  ),
-                  trailing: const Icon(Icons.edit_outlined),
-                  onTap: () => editMenu(Map<String, dynamic>.from(item)),
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${catalog?['itemCount'] ?? '—'}',
+                      style: const TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const Text(
+                      'Menu items',
+                      style: TextStyle(fontSize: 11, color: muted),
+                    ),
+                  ],
                 ),
               ),
             ),
-          pagination(catalog!, catalogPage, (p) {
-            setState(() => catalogPage = p);
-            refresh();
-          }),
-        ],
-        const SizedBox(height: 20),
-        orders(),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Glass(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${catalog?['availableCount'] ?? '—'}',
+                      style: const TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const Text(
+                      'Available',
+                      style: TextStyle(fontSize: 11, color: muted),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        OutlinedButton.icon(
+          onPressed: () => setState(() => tab = 1),
+          icon: const Icon(Icons.restaurant_menu),
+          label: const Text('Manage your menu'),
+        ),
+        const SectionHeading(
+          title: 'Kitchen queue',
+          subtitle: 'Confirm · prepare · hand over',
+        ),
+        orders(showHeading: false),
       ],
     );
   }
 
-  Future<void> editMenu([Map<String, dynamic>? item]) async {
-    final name = TextEditingController(text: item?['name'] ?? ''),
-        description = TextEditingController(text: item?['description'] ?? ''),
-        amount = TextEditingController(
-          text: item == null
-              ? ''
-              : ((item['price'] as int) / 100).toStringAsFixed(2),
-        );
-    bool available = item?['available'] ?? true;
-    String? error;
-    bool saving = false;
-    final form = GlobalKey<FormState>();
-    final route = DialogRoute<void>(
-      context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialog) => AlertDialog(
-          title: Text(item == null ? 'Add menu item' : 'Edit menu item'),
-          content: SingleChildScrollView(
-            child: Form(
-              key: form,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextFormField(
-                    controller: name,
-                    maxLength: 100,
-                    decoration: const InputDecoration(labelText: 'Name'),
-                    validator: (v) => (v?.trim().length ?? 0) < 2
-                        ? 'Enter an item name.'
-                        : null,
-                  ),
-                  TextFormField(
-                    controller: description,
-                    maxLength: 300,
-                    decoration: const InputDecoration(
-                      labelText: 'Description / allergen information',
+  Widget restaurantMenu() => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      WorkspaceHeading(
+        eyebrow: 'Your restaurant',
+        title: 'Your menu.',
+        trailing: IconButton.filledTonal(
+          tooltip: 'Add menu item',
+          onPressed: busy ? null : () => editMenu(),
+          icon: const Icon(Icons.add),
+        ),
+      ),
+      const SizedBox(height: 18),
+      TextField(
+        key: const ValueKey('menu-search'),
+        onChanged: (v) => filterCatalog(query: v),
+        decoration: const InputDecoration(
+          hintText: 'Find a menu item',
+          prefixIcon: Icon(Icons.search),
+        ),
+      ),
+      const SizedBox(height: 14),
+      Wrap(
+        spacing: 8,
+        children: [
+          for (final f in ['All', 'Available', 'Out of stock'])
+            ChoiceChip(
+              label: Text(f),
+              selected: menuFilter == f,
+              onSelected: (_) {
+                setState(() {
+                  menuFilter = f;
+                  catalogPage = 1;
+                  catalogRevision++;
+                });
+                refresh();
+              },
+            ),
+        ],
+      ),
+      const SizedBox(height: 18),
+      if (catalog == null)
+        const Center(child: CircularProgressIndicator())
+      else ...[
+        if ((catalog!['items'] as List).isEmpty)
+          const Glass(
+            child: Text('No items here. Add an item or choose another filter.'),
+          ),
+        for (final item in catalog!['items'])
+          MenuItemTile(
+            name: item['name'],
+            description: item['description'],
+            amount: price(item['price']),
+            category: item['category'] ?? 'General',
+            available: item['available'],
+            onTap: busy
+                ? null
+                : () => editMenu(Map<String, dynamic>.from(item)),
+            controls: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    item['available'] == true ? 'Available' : 'Out of stock',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
-                  TextFormField(
-                    controller: amount,
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
-                    ),
-                    decoration: const InputDecoration(labelText: 'Price (MVR)'),
-                    validator: (v) =>
-                        RegExp(r'^\d+(\.\d{1,2})?$').hasMatch(v ?? '') &&
-                            (double.tryParse(v ?? '') ?? 0) >= 1 &&
-                            (double.tryParse(v ?? '') ?? 0) <= 10000
-                        ? null
-                        : 'Use MVR 1–10,000 with up to two decimals.',
-                  ),
-                  SwitchListTile(
-                    title: const Text('Available'),
-                    value: available,
-                    onChanged: saving
-                        ? null
-                        : (v) => setDialog(() => available = v),
-                  ),
-                  if (error != null)
-                    Text(error!, style: const TextStyle(color: Colors.red)),
-                ],
-              ),
+                ),
+                Switch(
+                  value: item['available'],
+                  onChanged: busy ? null : (v) => updateStock(item['id'], v),
+                ),
+                IconButton(
+                  tooltip: 'Edit ${item['name']}',
+                  onPressed: busy
+                      ? null
+                      : () => editMenu(Map<String, dynamic>.from(item)),
+                  icon: const Icon(Icons.edit_outlined, size: 20),
+                ),
+              ],
             ),
           ),
-          actions: [
-            TextButton(
-              onPressed: saving ? null : () => Navigator.pop(dialogContext),
-              child: const Text('Close'),
-            ),
-            FilledButton(
-              onPressed: saving
-                  ? null
-                  : () async {
-                      if (!form.currentState!.validate()) return;
-                      setDialog(() => saving = true);
-                      try {
-                        await widget.api.request(
-                          'menu',
-                          data: {
-                            if (item != null) 'id': item['id'],
-                            'name': name.text.trim(),
-                            'description': description.text.trim(),
-                            'price': (double.parse(amount.text) * 100).round(),
-                            'available': available,
-                          },
-                        );
-                        if (dialogContext.mounted) Navigator.pop(dialogContext);
-                        await refresh();
-                      } catch (e) {
-                        if (dialogContext.mounted) {
-                          setDialog(() => error = e.toString());
-                        }
-                      } finally {
-                        if (dialogContext.mounted) {
-                          setDialog(() => saving = false);
-                        }
-                      }
-                    },
-              child: Text(saving ? 'Saving…' : 'Save'),
-            ),
-          ],
+        pagination(catalog!, catalogPage, (p) {
+          setState(() {
+            catalogPage = p;
+            catalogRevision++;
+          });
+          refresh();
+        }),
+      ],
+    ],
+  );
+  Future<void> updateStock(String id, bool available) async {
+    if (busy) return;
+    setState(() => busy = true);
+    try {
+      await widget.api.request(
+        'menu-stock',
+        data: {'id': id, 'available': available},
+      );
+      if (mounted) setState(() => catalogRevision++);
+      await refresh();
+    } catch (e) {
+      if (mounted) message(context, e.toString());
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
+  Future<void> editMenu([Map<String, dynamic>? item]) async {
+    final changed = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => MenuEditorPage(
+          item: item,
+          onSave: (value) async {
+            await widget.api.request('menu', data: value);
+          },
+          onDelete: item == null
+              ? null
+              : () async {
+                  await widget.api.request(
+                    'menu-delete',
+                    data: {'id': item['id']},
+                  );
+                },
         ),
       ),
     );
-    await Navigator.of(context).push(route);
-    await route.completed;
-    name.dispose();
-    description.dispose();
-    amount.dispose();
+    if (changed == true && mounted) {
+      setState(() {
+        catalogPage = 1;
+        catalogRevision++;
+      });
+      await refresh();
+    }
+  }
+
+  Widget riderMap() {
+    final jobs = (data?['orders'] as List? ?? [])
+        .where((o) => o['delivery'] != 'Delivery complete')
+        .toList();
+    final job = jobs.firstOrNull;
+    final pickup = job?['job']?['pickup'],
+        destination = job?['job']?['destination'];
+    final online = widget.account['rider']['online'] == true;
+    final next = {
+      'Order assigned': 'Arrived at restaurant',
+      'Arrived at restaurant': 'Order picked up',
+      'Order picked up': 'Arrived at customer',
+      'Arrived at customer': 'Delivery complete',
+    }[job?['delivery']];
+    final point =
+        job?['delivery'] == 'Order picked up' ||
+            job?['delivery'] == 'Arrived at customer'
+        ? destination
+        : pickup;
+    return RiderMapWorkspace(
+      area: widget.account['rider']['area'],
+      online: online,
+      pickup: pickup == null
+          ? null
+          : GeoPoint(
+              (pickup['lat'] as num).toDouble(),
+              (pickup['lng'] as num).toDouble(),
+            ),
+      destination: destination == null
+          ? null
+          : GeoPoint(
+              (destination['lat'] as num).toDouble(),
+              (destination['lng'] as num).toDouble(),
+            ),
+      onAvailability: busy || job != null
+          ? null
+          : () => setAvailability(!online),
+      panel: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (error != null) ...[
+            Text(error!),
+            TextButton(onPressed: refresh, child: const Text('Try again')),
+          ],
+          if (job != null) ...[
+            Text(
+              job['restaurant'] ?? 'Your delivery',
+              style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800),
+            ),
+            Text(
+              '${job['publicId']} · ${job['items']}',
+              style: const TextStyle(fontSize: 12, color: muted),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              job['delivery'],
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+            Text(
+              point == pickup
+                  ? (job['job']?['pickupLabel'] ?? '')
+                  : (job['job']?['address'] ?? ''),
+              style: const TextStyle(fontSize: 12),
+            ),
+            if (point != null)
+              TextButton.icon(
+                onPressed: () => openLink(
+                  context,
+                  directions(
+                    (point['lat'] as num).toDouble(),
+                    (point['lng'] as num).toDouble(),
+                  ),
+                ),
+                icon: const Icon(Icons.navigation_outlined, size: 18),
+                label: const Text('Open Google Maps directions'),
+              ),
+            if (next != null)
+              FilledButton(
+                onPressed:
+                    busy ||
+                        (next == 'Order picked up' &&
+                            job['preparation'] != 'Ready for pickup')
+                    ? null
+                    : () => action({
+                        'type': 'delivery',
+                        'id': job['id'],
+                        'status': next,
+                      }),
+                child: Text(next),
+              ),
+            if (next == 'Order picked up' &&
+                job['preparation'] != 'Ready for pickup')
+              const Text(
+                'Waiting for the kitchen to mark the food ready.',
+                style: TextStyle(fontSize: 11, color: muted),
+              ),
+          ] else if (data == null)
+            const LinearProgressIndicator()
+          else ...[
+            if ((data!['offers'] as List).isEmpty)
+              Text(
+                online
+                    ? 'Waiting for requests in your service area.'
+                    : 'Go online when you’re ready to deliver.',
+                style: const TextStyle(fontSize: 13, color: muted),
+              ),
+            for (final offer in data!['offers']) ...[
+              const SizedBox(height: 12),
+              Text(
+                offer['restaurant'] ?? 'Restaurant',
+                style: const TextStyle(
+                  fontSize: 19,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              Text(
+                '${offer['items']} · ${offer['area']}',
+                style: const TextStyle(fontSize: 12),
+              ),
+              Text(
+                'Respond by ${DateTime.parse(offer['expiresAt']).toLocal().toString().substring(11, 19)}',
+                style: const TextStyle(fontSize: 11, color: muted),
+              ),
+              const SizedBox(height: 12),
+              FilledButton(
+                onPressed:
+                    busy ||
+                        DateTime.parse(offer['expiresAt'])
+                            .isBefore(DateTime.now())
+                    ? null
+                    : () => action({
+                        'type': 'accept-offer',
+                        'id': offer['orderId'],
+                      }),
+                child: const Text('Accept delivery'),
+              ),
+            ],
+            if (!online) ...[
+              const SizedBox(height: 16),
+              FilledButton(
+                onPressed: busy ? null : () => setAvailability(true),
+                child: const Text('Go online'),
+              ),
+            ],
+          ],
+        ],
+      ),
+    );
   }
 
   Widget riderHome() => Column(
@@ -1257,15 +1501,16 @@ class _LiveWorkspaceState extends State<LiveWorkspace>
       orders(),
     ],
   );
-  Widget orders() {
+  Widget orders({bool showHeading = true}) {
     if (data == null) return const Center(child: CircularProgressIndicator());
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Text(
-          'Orders',
-          style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
-        ),
+        if (showHeading)
+          const Text(
+            'Orders',
+            style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
+          ),
         const SizedBox(height: 16),
         if ((data!['orders'] as List).isEmpty)
           const Glass(
@@ -1299,25 +1544,114 @@ class _LiveWorkspaceState extends State<LiveWorkspace>
       'Order picked up': 'Arrived at customer',
       'Arrived at customer': 'Delivery complete',
     }[delivery];
+    if (role == 'customer') {
+      return Glass(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                StatusPill(order['status'] ?? preparation),
+                const Spacer(),
+                const Icon(Icons.shopping_bag_outlined, size: 22),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              order['restaurant'] ?? 'Your restaurant',
+              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
+            ),
+            Text(
+              order['items'] ?? '',
+              style: const TextStyle(fontSize: 12, color: muted),
+            ),
+            const SizedBox(height: 20),
+            OrderProgress(
+              stage: deliveryStage(
+                preparation,
+                delivery,
+                order['rider'] != null,
+              ),
+            ),
+            const SizedBox(height: 14),
+            Text(
+              order['estimatedDelivery'] ?? '',
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 14),
+            FilledButton(
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => OrderDetailPage(
+                    order: order,
+                    feed: orderFeed,
+                    onHelp: () => help(order['id']),
+                  ),
+                ),
+              ),
+              child: const Text('View order progress'),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              order['publicId'] ?? order['id'],
+              style: const TextStyle(fontSize: 10, color: muted),
+            ),
+          ],
+        ),
+      );
+    }
     return Glass(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          Row(
+            children: [
+              StatusPill(preparation),
+              const Spacer(),
+              const Icon(Icons.receipt_long_outlined, size: 22),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Text(
+            order['restaurant'] ?? 'Kitchen order',
+            style: const TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -.5,
+            ),
+          ),
+          const SizedBox(height: 4),
           Text(
             order['publicId'] ?? order['id'],
-            style: const TextStyle(fontWeight: FontWeight.w800),
+            style: const TextStyle(color: muted, fontSize: 11),
           ),
-          Text(order['restaurant'] ?? ''),
-          const SizedBox(height: 8),
+          const SizedBox(height: 14),
           Text(order['items'] ?? ''),
-          Text(price(order['amount'])),
-          const Divider(),
-          Text('$preparation\n$delivery'),
-          if (order['rider'] != null) Text('Rider: ${order['rider']}'),
-          Text(
-            order['estimatedDelivery'] ?? '',
-            style: const TextStyle(fontWeight: FontWeight.w600),
+          const Divider(height: 28),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  price(order['amount']),
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              StatusPill(delivery),
+            ],
           ),
+          if (order['rider'] != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 10),
+              child: Text(
+                'Rider · ${order['rider']}',
+                style: const TextStyle(fontSize: 12, color: muted),
+              ),
+            ),
+          const SizedBox(height: 12),
           if (role == 'restaurant' && nextPreparation != null)
             FilledButton(
               onPressed:
@@ -1330,7 +1664,13 @@ class _LiveWorkspaceState extends State<LiveWorkspace>
                       'id': order['id'],
                       'status': nextPreparation,
                     }),
-              child: Text(nextPreparation),
+              child: Text(
+                {
+                  'Order confirmed': 'Confirm order',
+                  'Ready for pickup': 'Mark ready for pickup',
+                  'Order picked up': 'Confirm handover',
+                }[nextPreparation]!,
+              ),
             ),
           if (role == 'rider') ...[
             if (delivery != 'Delivery complete' &&
@@ -1503,18 +1843,22 @@ class LiveMenu extends StatefulWidget {
   final MobileApi api;
   final Map<String, dynamic> restaurant, account;
   final Future<void> Function() refreshAccount;
+  final VoidCallback? onOrderPlaced;
   const LiveMenu({
     super.key,
     required this.api,
     required this.restaurant,
     required this.account,
     required this.refreshAccount,
+    this.onOrderPlaced,
   });
   @override
   State<LiveMenu> createState() => _LiveMenuState();
 }
 
 class _LiveMenuState extends State<LiveMenu> {
+  String category = 'All';
+  int revision = 0;
   Map<String, dynamic>? data;
   String? error;
   int page = 1;
@@ -1527,20 +1871,24 @@ class _LiveMenuState extends State<LiveMenu> {
   }
 
   Future<void> refresh() async {
+    final requestRevision = ++revision;
     try {
       final result = await widget.api.request(
         'catalog',
         page: page,
         restaurantId: widget.restaurant['id'],
+        query: {'category': category},
       );
-      if (mounted) {
+      if (mounted && revision == requestRevision) {
         setState(() {
           data = result;
           error = null;
         });
       }
     } catch (e) {
-      if (mounted) setState(() => error = e.toString());
+      if (mounted && requestRevision == revision) {
+        setState(() => error = e.toString());
+      }
     }
   }
 
@@ -1562,7 +1910,7 @@ class _LiveMenuState extends State<LiveMenu> {
 
   Future<void> checkout() async {
     if (cart.isEmpty) return;
-    await Navigator.push<void>(
+    final placed = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
         builder: (_) => LiveCheckout(
@@ -1573,6 +1921,12 @@ class _LiveMenuState extends State<LiveMenu> {
         ),
       ),
     );
+    if (placed == true && mounted) {
+      cart.clear();
+      widget.onOrderPlaced?.call();
+      Navigator.pop(context);
+      message(context, 'Demo order submitted. No charge was made.');
+    }
   }
 
   @override
@@ -1650,56 +2004,53 @@ class _LiveMenuState extends State<LiveMenu> {
                   const Glass(
                     child: Text('The menu is being prepared. Check back soon.'),
                   ),
-                for (final item in data!['items'])
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 14),
-                    child: Glass(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            item['name'],
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          Text(
-                            item['description'],
-                            style: const TextStyle(color: muted),
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  price(item['price']),
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ),
-                              IconButton(
-                                tooltip: 'Remove ${item['name']}',
-                                onPressed: () => quantity(
-                                  Map<String, dynamic>.from(item),
-                                  -1,
-                                ),
-                                icon: const Icon(Icons.remove),
-                              ),
-                              Text('${cart[item['id']]?['quantity'] ?? 0}'),
-                              IconButton.filledTonal(
-                                tooltip: 'Add ${item['name']}',
-                                onPressed: () => quantity(
-                                  Map<String, dynamic>.from(item),
-                                  1,
-                                ),
-                                icon: const Icon(Icons.add),
-                              ),
-                            ],
-                          ),
-                        ],
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    for (final c in [
+                      'All',
+                      ...(data!['categories'] as List? ?? []),
+                    ])
+                      ChoiceChip(
+                        label: Text(c),
+                        selected: category == c,
+                        onSelected: (_) {
+                          setState(() {
+                            category = c;
+                            page = 1;
+                          });
+                          refresh();
+                        },
                       ),
+                  ],
+                ),
+                const SizedBox(height: 18),
+                for (final item in data!['items'])
+                  MenuItemTile(
+                    name: item['name'],
+                    description: item['description'],
+                    amount: price(item['price']),
+                    category: item['category'] ?? 'General',
+                    controls: Row(
+                      children: [
+                        const Spacer(),
+                        IconButton(
+                          tooltip: 'Remove ${item['name']}',
+                          onPressed: () =>
+                              quantity(Map<String, dynamic>.from(item), -1),
+                          icon: const Icon(Icons.remove),
+                        ),
+                        Text('${cart[item['id']]?['quantity'] ?? 0}'),
+                        IconButton.filledTonal(
+                          tooltip: 'Add ${item['name']}',
+                          onPressed:
+                              data!['restaurant']['acceptingOrders'] == true
+                              ? () =>
+                                    quantity(Map<String, dynamic>.from(item), 1)
+                              : null,
+                          icon: const Icon(Icons.add),
+                        ),
+                      ],
                     ),
                   ),
                 pagination(data!, page, (p) {
@@ -1801,6 +2152,46 @@ class _LiveCheckoutState extends State<LiveCheckout> {
     }
   }
 
+  Future<void> payDemo() async {
+    if (busy ||
+        quote == null ||
+        !widget.api.isDemo ||
+        account?['demoCheckoutEnabled'] != true ||
+        quote?['demo'] != true) {
+      return;
+    }
+    setState(() {
+      busy = true;
+      error = null;
+    });
+    try {
+      final attempt = await widget.api.request(
+        'checkout',
+        data: {'quoteId': quote!['id']},
+      );
+      if (!mounted) return;
+      if (attempt['demo'] != true) {
+        throw const ApiFailure('Unexpected demo checkout response.');
+      }
+      final result = await Navigator.push<Map<String, dynamic>>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => DemoBankPage(api: widget.api, attempt: attempt),
+        ),
+      );
+      if (!mounted) return;
+      if (result?['status'] == 'Approved') {
+        Navigator.pop(context, true);
+      } else if (result != null) {
+        setState(() => quote = null);
+      }
+    } catch (e) {
+      if (mounted) setState(() => error = e.toString());
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) => CanvasPage(
     child: ListView(
@@ -1813,7 +2204,10 @@ class _LiveCheckoutState extends State<LiveCheckout> {
             icon: const Icon(Icons.arrow_back),
           ),
         ),
-        Text('Your cart', style: Theme.of(context).textTheme.headlineLarge),
+        Text(
+          widget.api.isDemo ? 'Your demo cart' : 'Your cart',
+          style: Theme.of(context).textTheme.headlineLarge,
+        ),
         const SizedBox(height: 20),
         Glass(
           child: Column(
@@ -1849,7 +2243,7 @@ class _LiveCheckoutState extends State<LiveCheckout> {
                           'Choose your building entrance',
               ),
               TextButton(
-                onPressed: account == null || busy
+                onPressed: account == null || busy || widget.api.isDemo
                     ? null
                     : () async {
                         await editAddress(
@@ -1863,7 +2257,11 @@ class _LiveCheckoutState extends State<LiveCheckout> {
                         );
                         if (mounted) setState(() => quote = null);
                       },
-                child: const Text('Change entrance'),
+                child: Text(
+                  widget.api.isDemo
+                      ? 'Fictional demo entrance'
+                      : 'Change entrance',
+                ),
               ),
             ],
           ),
@@ -1907,25 +2305,52 @@ class _LiveCheckoutState extends State<LiveCheckout> {
           ),
         ],
         const SizedBox(height: 20),
-        const Glass(
-          child: Column(
-            children: [
-              Icon(Icons.credit_card),
-              Text(
-                'BML card checkout is being prepared.',
-                style: TextStyle(fontWeight: FontWeight.w700),
+        widget.api.isDemo
+            ? const Glass(
+                child: Column(
+                  children: [
+                    Icon(Icons.science_outlined),
+                    Text(
+                      'iGO Demo Bank',
+                      style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    Text(
+                      'Simulate approval, decline or cancellation. No card details and no real charge. A demo order is submitted only after simulated approval.',
+                    ),
+                  ],
+                ),
+              )
+            : const Glass(
+                child: Column(
+                  children: [
+                    Icon(Icons.credit_card),
+                    Text(
+                      'BML card checkout is being prepared.',
+                      style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    Text(
+                      'Payment collection is disabled. No order will be submitted from this screen yet.',
+                    ),
+                  ],
+                ),
               ),
-              Text(
-                'Payment collection is disabled. No order will be submitted from this screen yet.',
-              ),
-            ],
-          ),
-        ),
         const SizedBox(height: 16),
-        const FilledButton(
-          onPressed: null,
-          child: Text('Pay by card & submit order'),
-        ),
+        widget.api.isDemo
+            ? FilledButton(
+                onPressed:
+                    busy ||
+                        quote == null ||
+                        account?['demoCheckoutEnabled'] != true
+                    ? null
+                    : payDemo,
+                child: Text(
+                  busy ? 'Opening demo bank…' : 'Continue to demo bank',
+                ),
+              )
+            : const FilledButton(
+                onPressed: null,
+                child: Text('Pay by card & submit order'),
+              ),
         const SizedBox(height: 12),
         const Text(
           'After verified payment and order confirmation, change-of-mind cancellation is unavailable. Help remains available for order or payment problems.',

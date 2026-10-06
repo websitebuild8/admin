@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'dart:async';
 
 import 'browse_widgets.dart';
+import 'delivery_widgets.dart';
 import 'places_lookup.dart';
 
 import 'package:flutter/material.dart';
@@ -10,6 +11,7 @@ import 'package:clerk_flutter/clerk_flutter.dart';
 
 import 'live_app.dart';
 import 'secure_session_store.dart';
+import 'demo_app.dart';
 
 import 'package:url_launcher/url_launcher.dart';
 
@@ -41,7 +43,7 @@ class IgoApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,
-        scaffoldBackgroundColor: const Color(0xFFF8F8F2),
+        scaffoldBackgroundColor: const Color(0xFFFAFAF7),
         colorScheme: ColorScheme.fromSeed(
           seedColor: yellow,
           primary: ink,
@@ -76,7 +78,8 @@ class IgoApp extends StatelessWidget {
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(20),
             ),
-            textStyle: const TextStyle(
+            textStyle: TextStyle(
+              fontFamily: ThemeData().textTheme.labelLarge?.fontFamily,
               fontWeight: FontWeight.w700,
               fontSize: 15,
             ),
@@ -91,7 +94,9 @@ class IgoApp extends StatelessWidget {
           ),
         ),
       ),
-      home: configured ? const LiveGate() : Welcome(preview: preview),
+      home: SplashPage(
+        next: configured ? const LiveGate() : Welcome(preview: preview),
+      ),
     );
     return configured
         ? ClerkAuth(
@@ -151,7 +156,7 @@ class CanvasPage extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFFFFF9DF), Color(0xFFFAFAF6), Color(0xFFFFF5CC)],
+          colors: [Color(0xFFFFFFFF), Color(0xFFFAFAF7), Color(0xFFFFF9E2)],
         ),
       ),
       child: SafeArea(
@@ -166,62 +171,149 @@ class CanvasPage extends StatelessWidget {
   );
 }
 
+class SplashPage extends StatefulWidget {
+  final Widget next;
+  const SplashPage({super.key, required this.next});
+  @override
+  State<SplashPage> createState() => _SplashPageState();
+}
+
+class _SplashPageState extends State<SplashPage> {
+  Timer? timer;
+  @override
+  void initState() {
+    super.initState();
+    timer = Timer(const Duration(milliseconds: 900), () {
+      if (mounted) {
+        Navigator.of(context).pushReplacement(
+          PageRouteBuilder<void>(
+            pageBuilder: (_, _, _) => widget.next,
+            transitionDuration: MediaQuery.disableAnimationsOf(context)
+                ? Duration.zero
+                : const Duration(milliseconds: 250),
+            transitionsBuilder: (_, animation, _, child) =>
+                FadeTransition(opacity: animation, child: child),
+          ),
+        );
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    body: Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFFFFF8CE), yellow, Color(0xFFFFED83)],
+        ),
+      ),
+      child: SafeArea(
+        child: Stack(
+          children: [
+            Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(38),
+                    child: Image.asset(
+                      'assets/brand/igo-logo.jpg',
+                      width: 160,
+                      height: 160,
+                      semanticLabel: 'iGO. You Order. I Go.',
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  const Text(
+                    'A little closer to good.',
+                    style: TextStyle(
+                      fontSize: 19,
+                      letterSpacing: -.3,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Positioned(
+              left: 0,
+              right: 0,
+              bottom: 30,
+              child: Text(
+                'MALÉ  +  HULHUMALÉ',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 10,
+                  letterSpacing: 2,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
 class Welcome extends StatelessWidget {
   final bool preview;
   const Welcome({super.key, required this.preview});
   @override
   Widget build(BuildContext context) => CanvasPage(
     child: ListView(
-      padding: const EdgeInsets.all(28),
+      padding: const EdgeInsets.all(24),
       children: [
-        const SizedBox(height: 24),
         Row(
           children: [
-            const Text(
-              'MALÉ + HULHUMALÉ',
-              style: TextStyle(
-                letterSpacing: 2,
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
+            ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: Image.asset(
+                'assets/brand/igo-logo.jpg',
+                width: 56,
+                height: 56,
               ),
             ),
             const Spacer(),
-            const Icon(Icons.north_east, size: 20),
+            const StatusPill('YOUR ISLANDS. DELIVERED.'),
           ],
         ),
-        const SizedBox(height: 38),
+        const SizedBox(height: 26),
         ClipRRect(
-          borderRadius: BorderRadius.circular(42),
-          child: Image.asset(
-            'assets/brand/igo-logo.jpg',
-            height: 230,
-            fit: BoxFit.cover,
+          borderRadius: BorderRadius.circular(32),
+          child: Stack(
+            children: [
+              Image.asset(
+                'assets/food/cafe-preview.png',
+                height: 270,
+                width: double.infinity,
+                fit: BoxFit.cover,
+              ),
+              const Positioned(
+                left: 16,
+                bottom: 16,
+                child: StatusPill('GOOD FOOD. GOOD MOOD.', dark: true),
+              ),
+            ],
           ),
         ),
-        const SizedBox(height: 34),
+        const SizedBox(height: 28),
         Text(
           'Your favourites.\nAt your doorstep.',
           style: Theme.of(context).textTheme.headlineLarge,
         ),
         const SizedBox(height: 12),
         const Text(
-          'Coffee mornings. Comfort food. Everyday essentials. A little less waiting, a little more living.',
-          style: TextStyle(color: muted, fontSize: 16, height: 1.6),
-        ),
-        const SizedBox(height: 24),
-        Glass(
-          child: Row(
-            children: [
-              const Icon(Icons.delivery_dining, size: 32),
-              const SizedBox(width: 14),
-              const Expanded(
-                child: Text(
-                  'You order. I go.\nMade for your islands.',
-                  style: TextStyle(fontWeight: FontWeight.w600),
-                ),
-              ),
-            ],
-          ),
+          'Discover your island’s kitchens. A coffee, a comfort meal, a little something good.',
+          style: TextStyle(color: muted, fontSize: 15),
         ),
         const SizedBox(height: 24),
         FilledButton(
@@ -231,13 +323,19 @@ class Welcome extends StatelessWidget {
           ),
           child: Text(preview ? 'Explore the app preview' : 'Get started'),
         ),
-        const SizedBox(height: 16),
+        TextButton.icon(
+          onPressed: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const DemoJoinPage()),
+          ),
+          icon: const Icon(Icons.science_outlined),
+          label: const Text('Try shared demo'),
+        ),
+        const SizedBox(height: 18),
         Text(
-          preview
-              ? 'DESIGN PREVIEW · FICTIONAL DATA'
-              : 'One app. Your everyday, delivered.',
+          preview ? 'DESIGN PREVIEW · FICTIONAL DATA' : 'You order. I go.',
           textAlign: TextAlign.center,
-          style: const TextStyle(fontSize: 11, color: muted, letterSpacing: 1),
+          style: const TextStyle(fontSize: 10, color: muted, letterSpacing: 1),
         ),
       ],
     ),
@@ -343,6 +441,18 @@ class Workspace extends StatefulWidget {
 
 class _WorkspaceState extends State<Workspace> {
   int tab = 0;
+  final List<Map<String, dynamic>> kitchenMenu = [
+    for (int i = 0; i < menu.length; i++)
+      {
+        'id': 'sample-$i',
+        'name': menu[i].name,
+        'description': menu[i].description,
+        'price': menu[i].price,
+        'category': i == 1 ? 'Desserts' : 'Drinks',
+        'available': true,
+      },
+  ];
+  String menuFilter = 'All';
   int preparation = 0;
   int delivery = 0;
   bool online = true;
@@ -361,136 +471,121 @@ class _WorkspaceState extends State<Workspace> {
     if (mounted) setState(() {});
   }
 
+  int get accountTab => widget.role == AppRole.customer
+      ? 3
+      : widget.role == AppRole.restaurant
+      ? 3
+      : 2;
   @override
   Widget build(BuildContext context) => CanvasPage(
     child: FloatingWorkspace(
       labels: widget.role == AppRole.customer
-          ? const ['Explore', 'Orders', 'Account']
+          ? const ['Home', 'Search', 'Orders', 'Account']
           : widget.role == AppRole.restaurant
-          ? const ['Kitchen', 'Orders', 'Account']
-          : const ['Requests', 'Deliveries', 'Account'],
+          ? const ['Kitchen', 'Menu', 'Orders', 'Account']
+          : const ['Map', 'Deliveries', 'Account'],
       selected: tab,
       onSelected: (v) => setState(() => tab = v),
       header: Padding(
-        padding: const EdgeInsets.fromLTRB(24, 6, 16, 0),
+        padding: const EdgeInsets.fromLTRB(20, 6, 8, 0),
         child: Row(
           children: [
-            const Text(
-              'PREVIEW',
-              style: TextStyle(
-                fontSize: 10,
-                letterSpacing: 1.6,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
+            const StatusPill('PREVIEW'),
             const Spacer(),
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Change experience'),
+              child: const Text(
+                'Change experience',
+                style: TextStyle(fontSize: 11),
+              ),
             ),
           ],
         ),
       ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(24, 10, 24, 118),
-        children: tab == 2
-            ? profile()
-            : widget.role == AppRole.customer
-            ? (tab == 0 ? customer() : customerOrders())
-            : widget.role == AppRole.restaurant
-            ? restaurant()
-            : rider(),
-      ),
+      body: widget.role == AppRole.rider && tab == 0
+          ? riderMap()
+          : ListView(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 118),
+              children: tab == accountTab
+                  ? profile()
+                  : widget.role == AppRole.customer
+                  ? (tab == 2 ? customerOrders() : customer())
+                  : widget.role == AppRole.restaurant
+                  ? (tab == 1 ? restaurantMenu() : restaurant())
+                  : rider(),
+            ),
     ),
   );
-  List<Widget> customer() => [
-    Row(
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'DELIVER TO',
-                style: TextStyle(
-                  fontSize: 10,
-                  letterSpacing: 1.5,
-                  color: muted,
-                ),
-              ),
-              TextButton.icon(
-                onPressed: address,
-                icon: const Icon(Icons.location_on_outlined, size: 18),
-                label: Text(
-                  '${cart.deliveryAddress?.building ?? 'Choose address'} · ${cart.deliveryAddress?.area ?? area}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ),
-        ),
-        const CircleAvatar(
-          backgroundColor: Colors.white,
-          child: Icon(Icons.notifications_none),
-        ),
-      ],
-    ),
-    const SizedBox(height: 16),
-    Text(
-      'Your next favourite.\nJust a tap away.',
-      style: Theme.of(context).textTheme.headlineLarge,
-    ),
-    const SizedBox(height: 20),
-    TextField(
-      onChanged: (v) => setState(() => query = v),
-      decoration: const InputDecoration(
-        hintText: 'Search restaurants or cuisines',
-        prefixIcon: Icon(Icons.search),
-      ),
-    ),
-    const SizedBox(height: 14),
-    CuisineFilters(
-      selected: cuisine,
-      onSelected: (v) => setState(() => cuisine = v),
-    ),
-    const SizedBox(height: 20),
-    CafeFeature(onTap: menuPage),
-    const SizedBox(height: 26),
-    Row(
-      children: [
-        Expanded(
-          child: Text(
-            'Find your flavour',
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
-        ),
-        const Text(
-          '3 sample places',
-          style: TextStyle(color: muted, fontSize: 11),
-        ),
-      ],
-    ),
-    const SizedBox(height: 14),
-    for (final shop in [
+  List<Widget> customer() {
+    final shops = [
       ('The Cafe', 'Coffee • Snacks', '25–35'),
       ('Island Bites', 'Maldivian • Local favourites', '30–40'),
       ('Pizza Wave', 'Pizza • Italian', '25–40'),
-    ])
-      if ('${shop.$1} ${shop.$2}'.toLowerCase().contains(query.toLowerCase()) &&
-          (cuisine == 'All' || shop.$2.contains(cuisine)))
+    ];
+    final matches = shops
+        .where(
+          (shop) =>
+              '${shop.$1} ${shop.$2}'.toLowerCase().contains(
+                query.toLowerCase(),
+              ) &&
+              (cuisine == 'All' || shop.$2.contains(cuisine)),
+        )
+        .toList();
+    Widget card((String, String, String) shop, {bool compact = false}) =>
         RestaurantCard(
           name: shop.$1,
           subtitle: '${shop.$2} · $area',
           detail: 'Sample estimate · ${shop.$3} min',
+          compact: compact,
           imageAsset: shop.$1 == 'The Cafe'
               ? 'assets/food/cafe-preview.png'
               : null,
           onTap: shop.$1 == 'The Cafe'
               ? menuPage
-              : () => toast('This sample menu is coming next.'),
+              : () => toast('This fictional restaurant has no sample menu.'),
+        );
+    return [
+      DeliveryAddressHeader(
+        address: cart.deliveryAddress?.building ?? 'Choose your address',
+        area: cart.deliveryAddress?.area ?? area,
+        onTap: address,
+      ),
+      const SizedBox(height: 16),
+      TextField(
+        onChanged: (v) => setState(() => query = v),
+        decoration: const InputDecoration(
+          hintText: 'Food, restaurants, and little cravings',
+          prefixIcon: Icon(Icons.search),
         ),
-  ];
+      ),
+      const SizedBox(height: 20),
+      CuisineFilters(
+        selected: cuisine,
+        onSelected: (v) => setState(() => cuisine = v),
+      ),
+      if (tab == 0 && query.isEmpty && cuisine == 'All') ...[
+        const SizedBox(height: 10),
+        CafeFeature(onTap: menuPage),
+        const SectionHeading(
+          title: 'A taste of your island',
+          subtitle: 'Sample kitchens, ready to explore',
+        ),
+        RestaurantRail(
+          cards: [for (final shop in shops) card(shop, compact: true)],
+        ),
+      ],
+      SectionHeading(
+        title: tab == 1 ? 'Find your next favourite' : 'Good food, right here',
+        subtitle: '${matches.length} sample restaurants',
+      ),
+      for (final shop in matches) card(shop),
+      if (matches.isEmpty)
+        const Glass(
+          child: Text('No matches. Try another cuisine or restaurant.'),
+        ),
+    ];
+  }
+
   void address() async {
     final isPickup = widget.role == AppRole.restaurant;
     final initial = isPickup ? pickupAddress : cart.deliveryAddress;
@@ -516,45 +611,187 @@ class _WorkspaceState extends State<Workspace> {
     }
   }
 
+  Map<String, dynamic> get sampleOrder => {
+    'id': 'sample-order',
+    'publicId': 'SAMPLE-001',
+    'restaurant': 'The Cafe',
+    'items': '1 × Iced latte · 1 × Chocolate cake',
+    'amount': 13000,
+    'preparation': 'Order confirmed',
+    'delivery': 'Order assigned',
+    'rider': 'Ahmed · sample rider',
+    'estimatedDelivery': 'Sample estimate · 25–35 minutes',
+    'entrances': {
+      'pickup': {'lat': 4.1755, 'lng': 73.5093},
+      'destination': {'lat': 4.172, 'lng': 73.515},
+    },
+    'events': [
+      {'text': 'Restaurant confirmed', 'at': '2026-10-07T07:00:00Z'},
+      {'text': 'Rider assigned', 'at': '2026-10-07T07:02:00Z'},
+    ],
+  };
   List<Widget> customerOrders() => [
-    Text('Your orders', style: Theme.of(context).textTheme.headlineLarge),
-    const SizedBox(height: 20),
-    const Glass(
+    const WorkspaceHeading(eyebrow: 'Your deliveries', title: 'Orders.'),
+    const SectionHeading(title: 'In progress'),
+    Glass(
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            'The Cafe · SAMPLE-001',
-            style: TextStyle(fontWeight: FontWeight.w800),
+          const Row(
+            children: [
+              StatusPill('PREPARING'),
+              Spacer(),
+              Text('SAMPLE-001', style: TextStyle(fontSize: 11)),
+            ],
           ),
-          SizedBox(height: 8),
-          Text('Iced latte + Chocolate cake'),
-          SizedBox(height: 18),
-          Text(
-            'Restaurant confirmed',
-            style: TextStyle(fontWeight: FontWeight.w700),
+          const SizedBox(height: 16),
+          const Text(
+            'The Cafe',
+            style: TextStyle(fontSize: 23, fontWeight: FontWeight.w800),
           ),
-          Text('Rider assigned → Rider arrived → On the way'),
-          SizedBox(height: 16),
-          Text(
-            'Estimated arrival: 25–35 minutes',
-            style: TextStyle(color: muted),
+          const Text(
+            'Iced latte + Chocolate cake',
+            style: TextStyle(color: muted, fontSize: 12),
           ),
-          Text('Sample estimate, not a live delivery.'),
+          const SizedBox(height: 22),
+          const OrderProgress(stage: 1),
+          const SizedBox(height: 20),
+          FilledButton(
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => OrderDetailPage(
+                  order: sampleOrder,
+                  preview: true,
+                  onHelp: () => toast(
+                    'Sample order. Support will be connected before launch.',
+                  ),
+                ),
+              ),
+            ),
+            child: const Text('View order progress'),
+          ),
         ],
       ),
     ),
-    const SizedBox(height: 16),
-    OutlinedButton(
-      onPressed: () => toast('Support will be connected before launch.'),
-      child: const Text('Get help with an order'),
+    const SizedBox(height: 18),
+    const Text(
+      'A sample order for design review. Nothing has been charged.',
+      style: TextStyle(fontSize: 12, color: muted),
+    ),
+  ];
+  Future<void> editSampleMenu([Map<String, dynamic>? item]) async {
+    final changed = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => MenuEditorPage(
+          item: item,
+          onSave: (value) async {
+            setState(() {
+              final index = kitchenMenu.indexWhere(
+                (i) => i['id'] == value['id'],
+              );
+              if (index < 0) {
+                kitchenMenu.add({
+                  ...value,
+                  'id': 'sample-${DateTime.now().microsecondsSinceEpoch}',
+                });
+              } else {
+                kitchenMenu[index] = value;
+              }
+            });
+          },
+          onDelete: item == null
+              ? null
+              : () async {
+                  setState(
+                    () => kitchenMenu.removeWhere((i) => i['id'] == item['id']),
+                  );
+                },
+        ),
+      ),
+    );
+    if (changed == true && mounted) {
+      toast('Sample menu updated on this device.');
+    }
+  }
+
+  List<Widget> restaurantMenu() => [
+    WorkspaceHeading(
+      eyebrow: 'The Cafe',
+      title: 'Your menu.',
+      trailing: IconButton.filledTonal(
+        tooltip: 'Add menu item',
+        onPressed: () => editSampleMenu(),
+        icon: const Icon(Icons.add),
+      ),
+    ),
+    const SizedBox(height: 12),
+    const Text(
+      'Make it delicious. Keep it up to date.',
+      style: TextStyle(color: muted),
+    ),
+    const SizedBox(height: 18),
+    Wrap(
+      spacing: 8,
+      children: [
+        for (final f in ['All', 'Available', 'Out of stock'])
+          ChoiceChip(
+            label: Text(f),
+            selected: menuFilter == f,
+            onSelected: (_) => setState(() => menuFilter = f),
+          ),
+      ],
+    ),
+    const SizedBox(height: 20),
+    for (final item in kitchenMenu.where(
+      (i) =>
+          menuFilter == 'All' ||
+          (i['available'] == true) == (menuFilter == 'Available'),
+    ))
+      MenuItemTile(
+        name: item['name'],
+        description: item['description'],
+        category: item['category'],
+        amount: money(item['price']),
+        available: item['available'],
+        onTap: () => editSampleMenu(item),
+        controls: Row(
+          children: [
+            Expanded(
+              child: Text(
+                item['available'] ? 'Available' : 'Out of stock',
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            Switch(
+              value: item['available'],
+              onChanged: (v) => setState(() => item['available'] = v),
+            ),
+            IconButton(
+              tooltip: 'Edit ${item['name']}',
+              onPressed: () => editSampleMenu(item),
+              icon: const Icon(Icons.edit_outlined, size: 20),
+            ),
+          ],
+        ),
+      ),
+    if (kitchenMenu.isEmpty)
+      const Glass(child: Text('Your menu starts here. Add your first item.')),
+    const SizedBox(height: 12),
+    const Text(
+      'Sample menu changes stay on this device.',
+      style: TextStyle(fontSize: 11, color: muted),
     ),
   ];
   List<Widget> restaurant() => [
-    Text('Hello, The Cafe.', style: Theme.of(context).textTheme.headlineMedium),
-    const Text(
-      'A good day starts in your kitchen.',
-      style: TextStyle(color: muted),
+    WorkspaceHeading(
+      eyebrow: 'Restaurant workspace',
+      title: tab == 2 ? 'Orders.' : 'The Cafe.',
+      trailing: StatusPill(online ? 'OPEN' : 'CLOSED'),
     ),
     const SizedBox(height: 24),
     Glass(
@@ -571,7 +808,10 @@ class _WorkspaceState extends State<Workspace> {
       ),
     ),
     const SizedBox(height: 24),
-    Text('Kitchen orders', style: Theme.of(context).textTheme.titleLarge),
+    const SectionHeading(
+      title: 'Kitchen orders',
+      subtitle: 'Confirm · prepare · hand over',
+    ),
     const SizedBox(height: 14),
     Glass(
       child: Column(
@@ -585,7 +825,7 @@ class _WorkspaceState extends State<Workspace> {
           const Text('1 × Iced latte\n1 × Chocolate cake'),
           const Divider(height: 32),
           const Text(
-            'MVR 105 · Sample paid order',
+            'MVR 130 · Sample paid order',
             style: TextStyle(fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 12),
@@ -634,116 +874,106 @@ class _WorkspaceState extends State<Workspace> {
         ),
       ),
   ];
-  List<Widget> rider() => [
-    Text(
-      'Let’s get moving.',
-      style: Theme.of(context).textTheme.headlineMedium,
-    ),
-    const Text(
-      'Your next delivery is around the corner.',
-      style: TextStyle(color: muted),
-    ),
-    const SizedBox(height: 20),
-    Glass(
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  online ? 'You’re available' : 'You’re offline',
-                  style: const TextStyle(fontWeight: FontWeight.w700),
+  Widget riderMap() => RiderMapWorkspace(
+    area: area,
+    online: online,
+    illustrated: true,
+    pickup: delivery > 0 ? const GeoPoint(4.1755, 73.5093) : null,
+    destination: delivery > 0 ? const GeoPoint(4.172, 73.515) : null,
+    onAvailability: () => setState(() => online = !online),
+    panel: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        DropdownButton<String>(
+          value: area,
+          underline: const SizedBox(),
+          items: ['Malé', 'Hulhumalé']
+              .map(
+                (a) => DropdownMenuItem(
+                  value: a,
+                  child: Text(a, style: const TextStyle(fontSize: 12)),
                 ),
-                DropdownButton<String>(
-                  value: area,
-                  underline: const SizedBox(),
-                  items: ['Malé', 'Hulhumalé']
-                      .map((a) => DropdownMenuItem(value: a, child: Text(a)))
-                      .toList(),
-                  onChanged: (v) => setState(() => area = v!),
-                ),
-              ],
+              )
+              .toList(),
+          onChanged: delivery == 0 ? (v) => setState(() => area = v!) : null,
+        ),
+        if (area == 'Malé' || delivery > 0) ...[
+          Text(
+            delivery == 0
+                ? 'A new delivery request'
+                : 'SAMPLE-001 · Your delivery',
+            style: const TextStyle(fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 8),
+          const Text('The Cafe · 2 items', style: TextStyle(fontSize: 14)),
+          const SizedBox(height: 4),
+          Text(
+            delivery < 3
+                ? 'Pickup · sample restaurant entrance'
+                : 'Drop-off · sample customer entrance',
+            style: const TextStyle(fontSize: 12, color: muted),
+          ),
+          if (delivery > 0 && delivery < 5)
+            TextButton.icon(
+              onPressed: () => delivery < 3
+                  ? navigate(4.1755, 73.5093)
+                  : navigate(4.172, 73.515),
+              icon: const Icon(Icons.navigation_outlined, size: 18),
+              label: const Text('Open Google Maps directions'),
+            ),
+          const SizedBox(height: 10),
+          FilledButton(
+            onPressed: delivery < 5 && (online || delivery > 0)
+                ? () => setState(() => delivery++)
+                : null,
+            child: Text(
+              [
+                'Accept sample delivery',
+                'Arrived at restaurant',
+                'Order picked up',
+                'Arrived at customer',
+                'Complete delivery',
+                'Delivery complete',
+              ][delivery],
             ),
           ),
-          Switch(value: online, onChanged: (v) => setState(() => online = v)),
+        ] else
+          const Text('No sample requests in Hulhumalé.'),
+      ],
+    ),
+  );
+  List<Widget> rider() => [
+    const WorkspaceHeading(eyebrow: 'Your work', title: 'Deliveries.'),
+    const SectionHeading(title: 'Current delivery'),
+    Glass(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text(
+            'SAMPLE-001 · The Cafe',
+            style: TextStyle(fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            delivery == 0
+                ? 'No sample delivery accepted yet.'
+                : [
+                    'Request',
+                    'Order assigned',
+                    'Arrived at restaurant',
+                    'Order picked up',
+                    'Arrived at customer',
+                    'Delivery complete',
+                  ][delivery],
+          ),
+          const SizedBox(height: 16),
+          FilledButton(
+            onPressed: () => setState(() => tab = 0),
+            child: const Text('Open delivery map'),
+          ),
         ],
       ),
     ),
-    const SizedBox(height: 24),
-    Text(
-      delivery == 0 ? 'Available in $area' : 'Your delivery',
-      style: Theme.of(context).textTheme.titleLarge,
-    ),
-    const SizedBox(height: 14),
-    if (area == 'Malé' || delivery > 0)
-      Glass(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'SAMPLE-001 · 2 items',
-              style: TextStyle(fontWeight: FontWeight.w800),
-            ),
-            const SizedBox(height: 18),
-            const ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: Icon(Icons.storefront),
-              title: Text('The Cafe'),
-              subtitle: Text('Malé · sample pickup entrance'),
-            ),
-            if (delivery > 0) ...[
-              const JobMap(
-                pickup: GeoPoint(4.1755, 73.5093),
-                destination: GeoPoint(4.172, 73.515),
-              ),
-              OutlinedButton.icon(
-                onPressed: () => navigate(4.1755, 73.5093),
-                icon: const Icon(Icons.near_me_outlined),
-                label: const Text('Navigate to restaurant'),
-              ),
-              const ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: Icon(Icons.home_outlined),
-                title: Text('Customer delivery'),
-                subtitle: Text('Sample destination · Malé'),
-              ),
-              OutlinedButton.icon(
-                onPressed: () => navigate(4.172, 73.515),
-                icon: const Icon(Icons.near_me_outlined),
-                label: const Text('Navigate to customer'),
-              ),
-            ],
-            const SizedBox(height: 18),
-            FilledButton(
-              onPressed: delivery < 5 && (online || delivery > 0)
-                  ? () => setState(() => delivery++)
-                  : null,
-              child: Text(
-                [
-                  'Accept sample delivery',
-                  'Arrived at restaurant',
-                  'Order picked up',
-                  'Arrived at customer',
-                  'Complete delivery',
-                  'Delivery complete',
-                ][delivery],
-              ),
-            ),
-            const SizedBox(height: 12),
-            const Text(
-              'Directions open in Google Maps. iGO does not collect your live location.',
-              style: TextStyle(color: muted, fontSize: 12),
-            ),
-          ],
-        ),
-      )
-    else
-      const Glass(
-        child: Text(
-          'No sample jobs in this area. Choose Malé to explore a delivery.',
-        ),
-      ),
   ];
   Future<void> navigate(double lat, double lng) async {
     try {
@@ -852,64 +1082,49 @@ class _MenuPageState extends State<MenuPage> {
                 'The Cafe',
                 style: Theme.of(context).textTheme.headlineLarge,
               ),
-              const Text(
-                '★ 4.8  ·  Coffee, snacks & little joys',
-                style: TextStyle(color: muted),
+              const Row(
+                children: [
+                  Icon(Icons.star_rounded, size: 16),
+                  SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      '4.8 · Coffee, snacks & little joys',
+                      style: TextStyle(color: muted),
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 12),
               const Text('25–35 min  •  Delivery MVR 25  •  Sample menu'),
               const SizedBox(height: 24),
               Text(
-                'Made for your mood',
+                'On the menu',
                 style: Theme.of(context).textTheme.titleLarge,
               ),
               const SizedBox(height: 16),
               for (int i = 0; i < menu.length; i++)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 16),
-                  child: Glass(
-                    child: Row(
-                      children: [
-                        Text(
-                          menu[i].emoji,
-                          style: const TextStyle(fontSize: 40),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                menu[i].name,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                              Text(
-                                menu[i].description,
-                                style: const TextStyle(
-                                  color: muted,
-                                  fontSize: 12,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                money(menu[i].price),
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        IconButton.filledTonal(
-                          tooltip: 'Add ${menu[i].name}',
-                          onPressed: () =>
-                              setState(() => widget.cart.change(i, 1)),
-                          icon: const Icon(Icons.add),
-                        ),
-                      ],
-                    ),
+                MenuItemTile(
+                  name: menu[i].name,
+                  description: menu[i].description,
+                  amount: money(menu[i].price),
+                  category: i == 1 ? 'Desserts' : 'Drinks',
+                  controls: Row(
+                    children: [
+                      const Spacer(),
+                      IconButton(
+                        tooltip: 'Remove ${menu[i].name}',
+                        onPressed: () =>
+                            setState(() => widget.cart.change(i, -1)),
+                        icon: const Icon(Icons.remove),
+                      ),
+                      Text('${widget.cart.quantities[i] ?? 0}'),
+                      IconButton.filledTonal(
+                        tooltip: 'Add ${menu[i].name}',
+                        onPressed: () =>
+                            setState(() => widget.cart.change(i, 1)),
+                        icon: const Icon(Icons.add),
+                      ),
+                    ],
                   ),
                 ),
             ],
@@ -1333,9 +1548,7 @@ class _AddressPageState extends State<AddressPage> {
             ),
           ),
           Text(
-            widget.pickup
-                ? 'Meet us at\nthe entrance.'
-                : 'Right to your\ndoorstep.',
+            widget.pickup ? 'Pickup entrance.' : 'Delivery address.',
             style: Theme.of(context).textTheme.headlineLarge,
           ),
           const SizedBox(height: 8),

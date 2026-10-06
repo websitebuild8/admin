@@ -25,7 +25,7 @@ export function Overview() {
   const bars = Array.from({ length: 12 }, (_, i) => orders.filter(o => Math.floor(Number(new Intl.DateTimeFormat('en-GB', { hour: '2-digit', hourCycle: 'h23', timeZone: 'Indian/Maldives' }).format(new Date(o.time))) / 2) === i).length);
   const max = Math.max(...bars, 1);
   const metrics = [
-    { label: 'Order value', value: money(total), icon: CreditCard, meta: `${orders.filter(o => o.paid).length} verified card payments`, yellow: true },
+    { label: 'Order value', value: money(total), icon: CreditCard, meta: `${orders.filter(o => o.paid).length} ${demo ? 'simulated payments' : 'verified card payments'}`, yellow: true },
     { label: 'Total orders', value: String(orders.length).padStart(2, '0'), icon: ShoppingBag, meta: `${orders.filter(o => o.status === 'Delivered').length} successfully delivered` },
     { label: 'Active deliveries', value: String(active.length).padStart(2, '0'), icon: Bike, meta: `${active.filter(o => !o.riderId).length} awaiting rider assignment` },
     { label: 'Riders online', value: String(state.riders.filter(r => r.online && r.status === 'Active').length).padStart(2, '0'), icon: UsersIcon, meta: `Across Malé & Hulhumalé` },

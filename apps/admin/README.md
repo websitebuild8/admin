@@ -1,5 +1,11 @@
 # iGO Admin
 
+**Shared demo** in the top bar connects fictional mobile purchases to all admin
+workspace pages. An allowlisted Clerk admin creates an isolated, expiring session;
+phones join it with a private key and choose a fictional role. Real checkout stays
+disabled. See [demo setup and the full order flow](../../docs/demo-purchases.md).
+
+
 Next.js App Router, React, TypeScript, Tailwind CSS, shadcn/ui, Clerk, Supabase PostgreSQL and Prisma 7. Zod validates form inputs and API commands. One repository also reserves the future role-based Flutter application.
 
 ## Local preview

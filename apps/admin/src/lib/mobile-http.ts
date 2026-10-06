@@ -14,7 +14,7 @@ function headers(request:NextRequest) {
     'Cache-Control':'no-store', 'Vary':'Origin',
     ...(origin && allowedMobileOrigins().includes(origin) ? {'Access-Control-Allow-Origin':origin} : {}),
     'Access-Control-Allow-Methods':'GET,POST,OPTIONS',
-    'Access-Control-Allow-Headers':'Authorization,Content-Type',
+    'Access-Control-Allow-Headers':'Authorization,Content-Type,X-iGO-Demo-Role',
   };
 }
 export function mobileOptions(request:NextRequest) {

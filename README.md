@@ -3,6 +3,7 @@
 Status: admin and connected role-based Flutter app under development, updated 5 October 2026. The Next.js admin lives in `apps/admin`; the role-based Flutter application lives in `apps/mobile`. Clerk is the identity provider and Supabase/PostgreSQL is the database. BML collection is disabled; legal drafts retain business placeholders. These files do not certify legal compliance.
 
 - [Admin setup and capabilities](apps/admin/README.md)
+- [Shared demo purchases and simulated bank gateway](docs/demo-purchases.md)
 - [Current architecture and implementation limits](docs/architecture.md)
 
 - [Product and checkout specification](docs/product-and-checkout.md)

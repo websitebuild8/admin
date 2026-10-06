@@ -5,7 +5,7 @@ import { database } from './db';
 import { participant } from './participant-auth';
 import { verifiedIdentity } from './mobile-http';
 import { verifyGoogleAddress } from './places-service';
-import { addressInput, registrationInput, menuInput, quoteInput, MobileError, policyVersion, policiesReady, requireCurrentPolicies, approvedPrincipal, addressLabel } from './mobile-contract';
+import { addressInput, registrationInput, menuInput, menuDeleteInput, menuStockInput, quoteInput, MobileError, policyVersion, policiesReady, requireCurrentPolicies, approvedPrincipal, addressLabel } from './mobile-contract';
 
 export function parse<T extends z.ZodType>(schema:T,input:unknown):z.infer<T> {
   const result=schema.safeParse(input);
@@ -78,16 +78,18 @@ export async function saveAddress(userId:string,input:unknown) {
     return tx.savedAddress.upsert({where:{profileId_kind:{profileId:profile.id,kind}},create:{profileId:profile.id,kind,...data},update:data});
   });
 }
-export async function catalog(userId:string,page:number,restaurantId:string|null,q='',cuisine='All') {
+export async function catalog(userId:string,page:number,restaurantId:string|null,q='',cuisine='All',category='All') {
   await participant(userId);const db=database();
+  if(category.length>60) throw new MobileError('Invalid menu category.');
   const filter=parse(z.object({q:z.string().trim().max(100),cuisine:z.enum(['All','Coffee','Maldivian','Pizza'])}),{q,cuisine});
   if(restaurantId) {
     if(!z.uuid().safeParse(restaurantId).success) throw new MobileError('Invalid restaurant.');
     const restaurant=await db.restaurant.findFirst({where:{id:restaurantId,status:'Active',documentsVerified:true}});
     if(!restaurant) throw new MobileError('Restaurant unavailable.',404);
-    const where={restaurantId,available:true};
+    const where={restaurantId,available:true,...(category!=='All'?{category}:{})};
     const [items,total]=await Promise.all([db.menuItem.findMany({where,orderBy:[{name:'asc'},{id:'asc'}],skip:(page-1)*10,take:10}),db.menuItem.count({where})]);
-    return {items,total,page,pageSize:10,restaurant:{id:restaurant.id,name:restaurant.name,acceptingOrders:restaurant.acceptingOrders,area:restaurant.area}};
+    const categories=await db.menuItem.groupBy({by:['category'],where:{restaurantId,available:true},orderBy:{category:'asc'}});
+    return {items,total,page,pageSize:10,categories:categories.map(c=>c.category),restaurant:{id:restaurant.id,name:restaurant.name,acceptingOrders:restaurant.acceptingOrders,area:restaurant.area}};
   }
   const where:Prisma.RestaurantWhereInput={status:'Active',documentsVerified:true,pickupAddress:{not:Prisma.DbNull},
     ...(filter.cuisine==='All'?{}:{cuisine:{contains:filter.cuisine,mode:'insensitive'}}),
@@ -96,11 +98,30 @@ export async function catalog(userId:string,page:number,restaurantId:string|null
   const [items,total]=await Promise.all([db.restaurant.findMany({where,orderBy:[{name:'asc'},{id:'asc'}],skip:(page-1)*10,take:10,select:{id:true,name:true,cuisine:true,area:true,prepTime:true,acceptingOrders:true}}),db.restaurant.count({where})]);
   return {items,total,page,pageSize:10};
 }
-export async function ownMenu(userId:string,page:number) {
+export async function ownMenu(userId:string,page:number,stock='All',q='') {
   const {principal}=await participant(userId); if(principal.role!=='restaurant') throw new MobileError('Restaurant access required.',403);
-  const where={restaurantId:principal.id};const db=database();
-  const [items,total]=await Promise.all([db.menuItem.findMany({where,orderBy:[{name:'asc'},{id:'asc'}],skip:(page-1)*10,take:10}),db.menuItem.count({where})]);
-  return {items,total,page,pageSize:10};
+  if(!['All','Available','Out of stock'].includes(stock) || q.length>100) throw new MobileError('Invalid menu filter.');
+  const where={restaurantId:principal.id,...(stock==='All'?{}:{available:stock==='Available'}),...(q.trim()?{name:{contains:q.trim(),mode:'insensitive' as const}}:{})};const db=database();
+  const [items,total,availableCount,itemCount]=await Promise.all([
+    db.menuItem.findMany({where,orderBy:[{category:'asc'},{name:'asc'},{id:'asc'}],skip:(page-1)*10,take:10}),db.menuItem.count({where}),
+    db.menuItem.count({where:{restaurantId:principal.id,available:true}}),db.menuItem.count({where:{restaurantId:principal.id}})]);
+  return {items,total,page,pageSize:10,availableCount,itemCount};
+}
+export async function deleteMenu(userId:string,input:unknown) {
+  const {id}=parse(menuDeleteInput,input),{principal}=await participant(userId);
+  if(principal.role!=='restaurant') throw new MobileError('Restaurant access required.',403);
+  // Orders and quotes retain their existing JSON snapshots. Checkout must recheck
+  // menu availability before any future gateway capture is implemented.
+  const result=await database().menuItem.deleteMany({where:{id,restaurantId:principal.id}});
+  if(!result.count) throw new MobileError('Menu item not found.',404);
+  return {ok:true};
+}
+export async function menuStock(userId:string,input:unknown) {
+  const {id,available}=parse(menuStockInput,input),{principal}=await participant(userId);
+  if(principal.role!=='restaurant') throw new MobileError('Restaurant access required.',403);
+  const result=await database().menuItem.updateMany({where:{id,restaurantId:principal.id},data:{available}});
+  if(!result.count) throw new MobileError('Menu item not found.',404);
+  return {ok:true};
 }
 export async function saveMenu(userId:string,input:unknown) {
   const v=parse(menuInput,input);const {principal}=await participant(userId);

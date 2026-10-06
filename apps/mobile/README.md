@@ -1,5 +1,15 @@
 # iGO mobile
 
+## Integrated demo purchases
+
+Use **Try shared demo** on the welcome/sign-in/account screen. Join a session
+created in the connected admin's **Shared demo** page, then test customer,
+restaurant and rider flows with iGO Demo Bank. No real payments or card details.
+The existing preview Codemagic workflow supports this entry without Clerk keys;
+enter a reachable HTTPS backend and the session key on each phone. See
+[the complete demo walkthrough](../../docs/demo-purchases.md).
+
+
 ## Build an Android APK with Codemagic
 
 Use the repository-root `codemagic.yaml`, which sets the Flutter project directory
@@ -14,7 +24,8 @@ release signing and Play Store publishing are separate setup steps.
 One Flutter application for customers, restaurants and riders. Android, iOS and web
 preview runners are included. Bundle identifiers are `mv.igo.igo_mobile` on Android and `mv.igo.igoMobile`
 on iOS and must be confirmed before store registration. Native launcher icons
-still need platform-sized brand assets before distribution.
+still need platform-sized brand assets before distribution. Launch screens now
+use the supplied logo; native cold-start behavior needs device checks.
 
 ## Run the design preview
 
@@ -38,7 +49,10 @@ keys in this app.
 ## First implementation
 
 - Original iGO logo, yellow/white surfaces, black typography, rounded glass panels
-  and floating translucent navigation inspired by the supplied mockup.
+  and floating translucent navigation inspired by the supplied customer/driver references.
+- Customer Home/Search/Orders/Account, restaurant Kitchen/Menu/Orders/Account,
+  and rider Map/Deliveries/Account. Full-screen order progress and restaurant menu
+  editing, categories, stock controls and deletion are included.
 - Floating translucent yellow navigation. iOS 26+ uses native Liquid Glass;
   older iOS uses native blur, and Android uses Flutter glass. Reduced transparency
   and motion settings use accessible fallbacks. Native device verification is pending.
@@ -107,3 +121,6 @@ flutter build web --no-wasm-dry-run --dart-define=IGO_PREVIEW=true
 
 iOS compilation and device testing require macOS/Xcode or the future Codemagic CI
 setup. No iOS binary, signed Android release, or store submission is provided yet.
+
+See [the redesign review gallery](../../docs/previews/mobile-redesign.html) and
+[design/reference notes](../../docs/mobile-design.md) for the current three-role layouts.

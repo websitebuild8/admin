@@ -119,3 +119,66 @@ The local backend signing secret was generated without printing or committing it
 Device validation of Google map rendering, Android/iOS key restrictions and Liquid
 Glass remains pending. Legal texts retain placeholders, BML collection is disabled,
 and no public deployment or legal sign-off is claimed.
+
+## Three-role mobile redesign — 7 October 2026
+
+Redesigned discovery/search, restaurant menus, kitchen orders, customer order
+progress, map-led rider work, authentication branding, welcome and splash screens.
+The reference/decision notes are in mobile-design.md. Ten actual Flutter render
+captures with loaded fonts/icons and sample photography are in docs/previews;
+mobile-redesign.html provides a filterable review gallery. The temporary capture
+harness was removed. The illustrative preview map is original, identified as an
+illustration, and never represented as real Google navigation or rider GPS.
+
+All 26 sequential mobile tests pass, including adding an item, exact price
+validation, changing stock, deleting with confirmation, narrow role layouts,
+role restrictions, disabled payment submission, address safety and an open
+customer status page receiving updated milestones. All 32 backend tests pass.
+TypeScript, ESLint and the production Next.js build passed using one build worker.
+Native launch XML/storyboard files parse. Final Flutter analysis found no issues.
+
+Supabase migration six, 20261007000000_menu_categories, was applied successfully.
+A rollback transaction exercised the actual menu service create/edit/stock/delete
+functions and category filtering. Another approved restaurant received 404 for
+foreign item mutations; customer and pending accounts received 403. Sold-out
+items disappeared from the customer catalog, and old order line snapshots remained
+unchanged after editing/deletion. Every verification fixture was rolled back.
+The test database client emitted a pg serial-query deprecation warning inside the
+transaction; the checks completed successfully.
+
+Real Google credentials/provider rendering, Android/iOS cold-start and SDK key
+restrictions, iOS compilation/Liquid Glass and native Clerk sessions still need
+CI/device checks. No local APK was compiled, no iOS binary was produced, and BML
+collection remains disabled. Item photography/upload and modifiers are unfinished.
+No Git commit or push was made for this redesign, per the user's manual-push preference.
+
+## Shared demo bank and integrated orders — 7 October 2026
+
+Added isolated, persistent demo sessions managed by allowlisted Clerk admins.
+Phones join with an expiring private key and a fictional customer/restaurant/rider
+role. The admin's existing pages switch to this session and label its payments as
+simulated. Live BML checkout and real account approval rules remain unchanged.
+
+Migration seven, `20261007010000_shared_demo_gateway`, was applied to the configured
+Supabase project. The table has RLS and no public/anon/authenticated grants. The
+actual database verification exercised simultaneous checkout and approval retries,
+one rider acceptance, every delivery milestone, all role views, owner isolation,
+key rotation/expiry and rejection of demo keys by real mobile authentication.
+It found one order, one completed delivery and unchanged real table counts. All
+verification sessions were deleted. No real users, orders or payment attempts were
+created, and no bank was contacted.
+
+All 39 backend tests and 31 sequential Flutter tests passed. Coverage includes
+server-owned totals, approval-only submission, decline/cancel without an order,
+idempotent replay, expired quotes, menu changes before approval, scoped actions,
+ten-item pagination, no card inputs and failed-session UI. The existing real
+checkout test still proves submission disabled after a valid quote. Flutter
+analysis found no issues; ESLint, TypeScript and the production Next.js build
+passed, using one build worker.
+
+The demo walkthrough is `docs/demo-purchases.md`. To test on separate phones,
+deploy/reach the backend and rebuild the APK through Codemagic; no APK or iOS
+binary was built locally. Native-device bank-screen interactions, native Clerk
+sessions and Google SDK rendering remain device checks. Browser UI review of a
+signed-in shared admin session was not performed. No Git commit, push or public
+deployment was performed, following the user's manual-push preference.
