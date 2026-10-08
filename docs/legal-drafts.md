@@ -1,6 +1,6 @@
 # Draft policies for review — not ready for publication
 
-Prepared 29 September 2026. Proposed wording only. Replace all placeholders and reconcile these statements with actual software and operational practices before publishing. A Maldives-qualified legal adviser should review consumer terms, privacy obligations, partner contracts, and the payment structure; an accountant should confirm tax treatment. This is not a determination of all applicable law.
+Prepared 29 September 2026; revised 8 October 2026 for menu-photo storage. Proposed wording only. Replace all placeholders and reconcile these statements with actual software and operational practices before publishing. A Maldives-qualified legal adviser should review consumer terms, privacy obligations, partner contracts, and the payment structure; an accountant should confirm tax treatment. This is not a determination of all applicable law.
 
 ## Business details
 
@@ -69,6 +69,8 @@ This draft describes the intended minimum data practices. Final publication requ
 
 We use account details and contact information to provide sign-in and support; addresses and order details to fulfil deliveries; payment references, amounts, and statuses to verify payments and resolve billing; and necessary technical/security records to keep the service working and investigate misuse.
 
+Restaurant menu photos are public food content stored in Supabase Storage and shown in customer and restaurant menus. Photos are cropped, resized and re-encoded before publication; original image metadata, including GPS/EXIF, is removed. Replaced, removed and abandoned photos are queued for deletion; public copies may remain in device or delivery caches for a time. Do not upload private documents or customer details as menu photos.
+
 Restaurant applicants provide business details and verification documents. Rider applicants provide the identity, licence, vehicle, and payment information required for the approved onboarding process. The exact required documents are listed before collection. These documents are accessible only to staff who need them for verification or administration.
 
 Customers and restaurants can search for a building/address, select a Google Maps suggestion, review the entrance, and add their own building/unit and access instructions. Search text and selected place identifiers are sent through iGO to Google Maps Platform for suggestions and location resolution. Google receives ordinary map/network requests while maps are displayed. Do not include unit numbers, contact details or private delivery instructions in the location-search field. Those details are entered separately for iGO delivery operations.
@@ -102,6 +104,8 @@ We publish material changes with their effective date and notify users where app
 ## Restaurant and rider terms — draft
 
 Partner access requires administrator approval. Restaurant operators must provide accurate business details, verify the approved pickup entrance, maintain menu prices/availability, and observe the applicable food, licensing, and business requirements. Riders must provide the identity, vehicle, and licence information required by the approved onboarding process, keep their service area and availability accurate, and record delivery milestones honestly.
+
+Restaurant operators may upload, crop, replace or remove one food photo per menu item. Upload only images you own or have permission to use and authorize iGO to process, store and display them for the menu. Photos should represent the advertised dish accurately. Report an image-rights complaint through {{SUPPORT_EMAIL}}; the final commercial agreement must confirm the licence terms and complaint process before launch.
 
 The commercial agreement must specify {{PARTNER_FEES}}, {{SETTLEMENT_SCHEDULE}}, {{PAYMENT_RESPONSIBILITIES}}, {{INSURANCE_REQUIREMENTS}}, {{PARTNER_CLASSIFICATION}}, and {{DISPUTE_PROCESS}} before real service begins. These placeholders do not establish an employment classification or settlement entitlement. Partner approval in the pilot does not replace a signed commercial agreement or required business/vehicle approvals.
 

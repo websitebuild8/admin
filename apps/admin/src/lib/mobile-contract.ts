@@ -40,6 +40,8 @@ export const registrationInput = z.object({
 });
 export const menuInput = z.object({
   id: z.uuid().optional(), name: z.string().trim().min(2).max(100),
+  draftId: z.uuid().optional(),
+  imageId: z.uuid().nullable().optional(),
   description: z.string().trim().max(300), price: z.number().int().min(100).max(1000000),
   category: z.string().trim().min(1).max(60).default('General'),
   available: z.boolean(),
@@ -61,7 +63,7 @@ export function approvedPrincipal(profile: {id:string; primaryRole:string|null; 
   if (!entity || entity.status !== 'Active' || !entity.documentsVerified) return null;
   return {role:role as 'restaurant'|'rider',id:entity.id};
 }
-export function policyVersion() { return process.env.IGO_POLICY_VERSION ?? 'draft-2026-10-05'; }
+export function policyVersion() { return process.env.IGO_POLICY_VERSION ?? 'draft-2026-10-08'; }
 export function policiesReady() { return process.env.IGO_POLICIES_APPROVED === 'true' && !policyVersion().startsWith('draft'); }
 export function requireCurrentPolicies(version:string) {
   if (version !== policyVersion()) throw new MobileError('Policies changed. Refresh and review them again.',409);

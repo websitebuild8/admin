@@ -6,7 +6,7 @@ The repository is a monorepo: `apps/admin` contains Next.js, while
 
 `Failed to install dependencies ... /Users/builder/clone. Directory was not found`
 means the selected build configuration is looking for Flutter at the clone root.
-The root `codemagic.yaml` sets `working_directory: apps/mobile` for both workflows.
+The root `codemagic.yaml` sets `working_directory: apps/mobile` for all three workflows.
 After compilation, **Prepare APK download** verifies the APK exists and copies it
 to `/tmp/igo-android-artifacts/app-debug.apk`. The `artifacts` section uses this
 absolute path, avoiding ambiguity between the clone and working directories.
@@ -61,9 +61,25 @@ applications stay pending until admin approval. Only allowlisted admin IDs can a
 BML collection remains disabled. Production registration remains gated until
 the placeholder policies are finalized and approved.
 
+## Google Maps demo APK
+
+Use **iGO Android APK - Google Maps demo** to check actual Google Maps while
+keeping fictional role workspaces and the shared demo purchase entry. This
+workflow imports **igo_mobile** and requires its Android **GOOGLE_MAPS_API_KEY**.
+It does not require Clerk credentials or activate bank payments. The backend URL
+is optional; a reachable backend and a private session key are still needed to
+join the integrated shared demo on a phone. Automatic Places search belongs to
+the authenticated connected app.
+
+Restrict the key to **mv.igo.igo_mobile**, the APK's actual signing SHA-1 and
+**Maps SDK for Android**. Both Maps-enabled workflows restore the optional stable
+debug keystore and print the SHA-1 in **Show Maps signing fingerprint**. Follow
+[Google Maps setup](google-maps-setup.md#quick-android-activation) before building.
+The keyless design-preview workflow deliberately stays available separately.
+
 ## Build environment and verification limits
 
-Both workflows use Flutter 3.47.2, matching the local SDK, and Java 21. Dependency
+All workflows use Flutter 3.47.2, matching the local SDK, and Java 21. Dependency
 installation, analysis, tests and Android compilation run sequentially. Gradle
 is limited to one worker and a 2 GB Java heap. No build triggers or store publishing
 are configured; start each run manually.
@@ -80,7 +96,7 @@ Google Maps configuration and signing-fingerprint steps: [Google Maps setup](goo
 
 ## Shared demo purchases
 
-Both existing workflows include **Try shared demo**. The design preview APK can
+All workflows include **Try shared demo**. The design preview APK can
 join a demo session without build-time Clerk or bank keys. Enter the reachable
 HTTPS backend and the private session key from the connected admin on each phone.
 See [the demo walkthrough](demo-purchases.md). Never put the demo key into

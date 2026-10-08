@@ -12,6 +12,8 @@ import 'package:clerk_flutter/clerk_flutter.dart';
 import 'live_app.dart';
 import 'secure_session_store.dart';
 import 'demo_app.dart';
+import 'splash.dart';
+import 'food_photo.dart';
 
 import 'package:url_launcher/url_launcher.dart';
 
@@ -25,6 +27,7 @@ const previewEnabled = bool.fromEnvironment('IGO_PREVIEW', defaultValue: false);
 const clerkPublishableKey = String.fromEnvironment('CLERK_PUBLISHABLE_KEY');
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+  unawaited(FoodPhotoPicker.recover());
   runApp(const IgoApp());
 }
 
@@ -206,62 +209,8 @@ class _SplashPageState extends State<SplashPage> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    body: Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFFFFF8CE), yellow, Color(0xFFFFED83)],
-        ),
-      ),
-      child: SafeArea(
-        child: Stack(
-          children: [
-            Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(38),
-                    child: Image.asset(
-                      'assets/brand/igo-logo.jpg',
-                      width: 160,
-                      height: 160,
-                      semanticLabel: 'iGO. You Order. I Go.',
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  const Text(
-                    'A little closer to good.',
-                    style: TextStyle(
-                      fontSize: 19,
-                      letterSpacing: -.3,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const Positioned(
-              left: 0,
-              right: 0,
-              bottom: 30,
-              child: Text(
-                'MALÉ  +  HULHUMALÉ',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 10,
-                  letterSpacing: 2,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    ),
-  );
+  Widget build(BuildContext context) =>
+      const Scaffold(body: IgoSplashArtwork());
 }
 
 class Welcome extends StatelessWidget {
@@ -686,6 +635,7 @@ class _WorkspaceState extends State<Workspace> {
       MaterialPageRoute(
         builder: (_) => MenuEditorPage(
           item: item,
+          localPhotos: true,
           onSave: (value) async {
             setState(() {
               final index = kitchenMenu.indexWhere(
@@ -751,6 +701,7 @@ class _WorkspaceState extends State<Workspace> {
     ))
       MenuItemTile(
         name: item['name'],
+        photoBytes: item['localPhoto'],
         description: item['description'],
         category: item['category'],
         amount: money(item['price']),

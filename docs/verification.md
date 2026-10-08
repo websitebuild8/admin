@@ -182,3 +182,103 @@ binary was built locally. Native-device bank-screen interactions, native Clerk
 sessions and Google SDK rendering remain device checks. Browser UI review of a
 signed-in shared admin session was not performed. No Git commit, push or public
 deployment was performed, following the user's manual-push preference.
+
+## Softer splash and native Google Maps demo — 7 October 2026
+
+Replaced the full yellow splash with pearl/ivory, static pale-yellow reflections
+and a frosted frame around the unchanged logo. Android light/dark startup
+backgrounds and system bars, including Android 12+, use the same pearl color;
+iOS launch background matches. A 390 × 844 Flutter capture with loaded Roboto
+fonts and production shadow effects was visually inspected and saved as
+`docs/previews/soft-glass-splash.png`. The temporary capture harness was removed
+and the review gallery points to this new image.
+
+Added **iGO Android APK - Google Maps demo** to Codemagic, retaining the keyless
+preview and connected account workflows. It imports `igo_mobile`, requires the
+restricted Android Maps key, accepts an optional HTTPS backend URL, and embeds
+only public settings. Clerk/bank credentials are not needed for this demo build.
+All three workflows retain the verified absolute APK download path. The existing
+optional stable debug certificate and fingerprint output are included.
+
+Saved-endpoint maps now fit single/same-point/cross-island jobs, limit camera
+browsing to the two-island region and offer a fit control. The rider panel reserves
+padding for attribution and controls. Invalid/out-of-area endpoints are not plotted.
+No rider marker, GPS collection or in-app navigation route was added. Default Google
+landmark labels remain; authenticated automatic address search is still the separate
+backend Places flow, while shared demo orders retain fictional fixed entrances.
+
+Final Flutter analysis found no issues; all **39 mobile tests** passed sequentially.
+New coverage checks cross-island/same-point/invalid endpoint fitting, area overviews,
+rider map padding, splash navigation/timer disposal and enlarged accessibility text.
+All workflow shell/Python scripts parse; simulated CI settings tests reject missing
+keys and insecure URLs and confirm public-only configuration. Native launch XML and
+storyboard files parse, and removed Android GPS permissions were checked.
+
+No Google Maps/Places key is configured in local settings, no provider request was
+made, and native tile authorization/rendering remains unverified. No APK or iOS
+binary was built locally; cold-start, key restrictions and platform composition
+require the Codemagic build and device check described in `google-maps-setup.md`.
+No backend schema or service changed. No Git commit or push was made; the user will
+commit and push these changes manually.
+
+
+## Supabase menu food photos — 8 October 2026
+
+Approved restaurants can choose gallery images, crop/pinch/pan, rotate, replace and
+remove one cover photo per item. Changes apply only after saving. Customer and
+restaurant menu cards share consistently fitted thumbnails; failed loads have a
+placeholder. Failed uploads do not submit the menu edit, save retries reuse a
+staged image, and cancelling discards only newly staged, unattached files. Stable
+new-item draft IDs prevent duplicate item creation on retry. The standalone design
+preview keeps its photo changes local; admin-created shared demos use their own
+Storage ownership and shared customer menus. Shared demo catalog responses now
+include the restaurant's open/closed status required by the customer cart UI.
+
+Migration eight, `20261007020000_menu_images`, was applied successfully to the current
+Supabase development project. MenuImage has RLS/no anon/authenticated grants. The
+public igo-menu-images bucket accepts only WebP with a 2 MiB object limit;
+restrictive policies deny direct client operations on both bucket and objects.
+All writes pass through approved Clerk restaurant or isolated demo-session APIs.
+The private backend supports new sb_secret_ keys and legacy service-role JWTs.
+Mobile bundles contain neither. The two public derivatives are square WebP at up
+to 1024/256 pixels, with EXIF/GPS stripped; oversized, small, vector, malformed and
+unsupported files are rejected. Processing/quota/pending-upload limits are bounded.
+
+All **45 backend tests** and **45 sequential Flutter tests** passed. Photo tests
+cover geometry/rotation, validation, binary uploads, staged save retries, cancelled
+edits, delayed removal, upload failure, role isolation and shared demo menus.
+`photos:verify` passed against the real Supabase database using rolled-back fixtures
+and mocked Storage HTTP. It exercised actual shared demo route handlers, restaurant
+upload/customer read/remove, approval checks, cross-owner and real/demo isolation,
+atomic photo replacements, item removal, quotas, stale/orphan collection and bucket
+security. No real Storage objects, accounts or menu changes were retained.
+
+Flutter analysis found no issues; backend ESLint and TypeScript passed. The Next.js
+production build passed with one build worker. One sandbox build could not parse
+TypeScript configuration; the unsandboxed build succeeded. Gallery picker native
+behavior, iOS photo permission and actual Storage authorization remain device/key
+checks. No APK or iOS binary was built locally, and no Google/BML call was made.
+
+Three 390 × 844 Flutter captures with loaded fonts/images and production shadow
+settings were visually inspected: menu-photo-editor.png, menu-photo-crop.png and
+menu-photo-tile.png. The final captures use the IgoApp theme. Temporary rendering
+scripts were removed; the gallery includes the updated photo controls.
+
+SUPABASE_URL and the new SUPABASE_SECRET_KEY are now configured in the ignored
+backend environment. `photos:verify-storage` passed against real Supabase Storage
+through the actual shared-demo backend handlers: three generated uploads, public
+1024/480-pixel square covers and 256-pixel thumbnails, WebP output, EXIF removal,
+customer menu visibility, replacement/removal and menu deletion. Storage metadata
+confirmed that old files were removed. Its isolated 30-minute demo session, all
+photo records and all test objects were cleaned up; real accounts/orders/menus
+were not changed. The repeatable verification script logs no keys or project
+URLs. TypeScript and the script's ESLint check passed.
+
+Deployed cron authorization and native gallery selection are still pending.
+CRON_SECRET is not configured locally; configure and verify the deployed cleanup
+schedule when deploying the backend. No deployed/native integration is claimed
+by the direct-handler test. docs/menu-images-setup.md gives the exact key steps,
+public-content scope, cleanup schedule and checks. Legal drafts now describe public
+menu photos and image rights; the default draft policy version is draft-2026-10-08.
+Business placeholders and publication gates remain. No Git commit, push or public
+deployment was performed; the user will commit and push through VS Code.

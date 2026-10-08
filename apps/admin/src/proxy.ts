@@ -11,7 +11,7 @@ export default function proxy(request: NextRequest, event: NextFetchEvent) {
   // A demo key grants access only to an isolated fictional DemoSession. It is
   // never accepted by real mobile or administrator APIs.
   if (request.nextUrl.pathname.startsWith('/api/demo/mobile/')) return NextResponse.next();
-  if (request.nextUrl.pathname === '/api/dispatch/tick') return NextResponse.next();
+  if (['/api/dispatch/tick','/api/maintenance/menu-images'].includes(request.nextUrl.pathname)) return NextResponse.next();
   if (!hasClerkKeys()) {
     if (request.nextUrl.pathname.startsWith('/api/')) return NextResponse.json({ error: 'Authentication is not configured.' }, { status: 503 });
     return request.nextUrl.pathname === '/setup' ? NextResponse.next() : NextResponse.redirect(new URL('/setup', request.url));

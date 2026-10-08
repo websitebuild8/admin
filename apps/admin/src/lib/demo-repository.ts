@@ -23,26 +23,27 @@ export async function createDemoSession(owner:string) {
     return {id:session.id,key,expiresAt};
   },{isolationLevel:Prisma.TransactionIsolationLevel.Serializable});
 }
+export type DemoContext={id:string;tx:Prisma.TransactionClient};
 type Change<T>={sandbox?:Sandbox;result:T};
 // Row locks serialize gateway decisions, menu edits and dispatch acceptance on
 // one demo session. Only this single sandbox row can be read or written here.
-async function withSession<T>(id:string,authorized:(s:{ownerClerkId:string;keyHash:string})=>boolean,work:(s:Sandbox)=>Change<T>|Promise<Change<T>>) {
+async function withSession<T>(id:string,authorized:(s:{ownerClerkId:string;keyHash:string})=>boolean,work:(s:Sandbox,context:DemoContext)=>Change<T>|Promise<Change<T>>) {
   return database().$transaction(async tx=>{
     await tx.$queryRaw`SELECT "id" FROM "DemoSession" WHERE "id" = ${id} FOR UPDATE`;
     const row=await tx.demoSession.findUnique({where:{id}});
     if(!row||!authorized(row)||row.expiresAt.getTime()<=Date.now()) throw new MobileError('Demo session expired or access was removed. Ask your admin for a new session.',401);
-    const {sandbox,result}=await work(sandboxSchema.parse(row.payload));
+    const {sandbox,result}=await work(sandboxSchema.parse(row.payload),{id,tx});
     if(sandbox) await tx.demoSession.update({where:{id},data:{payload:json(sandbox)}});
     return result;
   },{timeout:15000});
 }
-export async function withDemoKey<T>(key:string,work:(s:Sandbox)=>Change<T>|Promise<Change<T>>) {
+export async function withDemoKey<T>(key:string,work:(s:Sandbox,context:DemoContext)=>Change<T>|Promise<Change<T>>) {
   if(!/^igo_demo_[a-f0-9]{64}$/.test(key)) throw new MobileError('A valid demo session key is required.',401);
   const hash=hashDemoKey(key),row=await database().demoSession.findUnique({where:{keyHash:hash},select:{id:true}});
   if(!row) throw new MobileError('Demo session expired or access was removed.',401);
   return withSession(row.id,s=>s.keyHash===hash,work);
 }
-export async function withDemoOwner<T>(id:string,owner:string,work:(s:Sandbox)=>Change<T>|Promise<Change<T>>) {
+export async function withDemoOwner<T>(id:string,owner:string,work:(s:Sandbox,context:DemoContext)=>Change<T>|Promise<Change<T>>) {
   return withSession(id,s=>s.ownerClerkId===owner,work);
 }
 export async function rotateDemoKey(id:string,owner:string) {

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { menuImageViewSchema, type MenuImageView } from './menu-image-contract';
 import { applyCommand, commandSchema, orderSchema, stateSchema, WorkflowError, type State } from './domain';
 import { initialWorkflow, type Principal } from './fulfilment';
 import { addressInput, addressLabel, island, menuInput, menuDeleteInput, menuStockInput, mobileRole, MobileError, quoteInput } from './mobile-contract';
@@ -20,7 +21,7 @@ const quoteSchema = z.object({
   snapshot:z.object({customer:z.string(),restaurant:z.string(),pickup:addressInput,destination:addressInput,address:z.string(),lineItems:z.array(lineSchema),note:z.string(),subtotal:z.number().int(),deliveryFee:z.number().int()}),
 });
 const attemptSchema = z.object({id:z.uuid(),quoteId:z.uuid(),status:z.enum(['Pending','Approved','Declined','Cancelled']),orderId:z.string().nullable(),createdAt:z.iso.datetime(),completedAt:z.iso.datetime().nullable()});
-export const sandboxSchema = z.object({state:stateSchema,menu:z.array(menuInput.extend({id:z.uuid()})),quotes:z.array(quoteSchema),attempts:z.array(attemptSchema)});
+export const sandboxSchema = z.object({state:stateSchema,menu:z.array(menuInput.omit({draftId:true,imageId:true}).extend({id:z.uuid(),image:menuImageViewSchema.nullable().optional()})),quotes:z.array(quoteSchema),attempts:z.array(attemptSchema)});
 export type Sandbox = z.infer<typeof sandboxSchema>;
 
 export function createSandbox(): Sandbox {
@@ -74,7 +75,7 @@ export function demoRead(s:Sandbox,role:DemoRole,resource:string,query:Record<st
       if(query.restaurantId!==r.id) throw new MobileError('Demo restaurant not found.',404);
       const available=s.menu.filter(m=>m.available);
       const items=available.filter(m=>(!search||`${m.name} ${m.description}`.toLowerCase().includes(search))&&(!query.category||query.category==='All'||m.category===query.category));
-      return {...paged(items,page),categories:[...new Set(available.map(m=>m.category))]};
+      return {...paged(items,page),categories:[...new Set(available.map(m=>m.category))],restaurant:{id:r.id,name:r.name,area:r.area,acceptingOrders:r.status==='Active'&&r.documentsVerified&&r.acceptingOrders}};
     }
     const visible=r.status==='Active'&&r.documentsVerified&&s.menu.some(m=>m.available)&&(!search||`${r.name} ${r.cuisine}`.toLowerCase().includes(search))&&(!query.cuisine||query.cuisine==='All'||r.cuisine.toLowerCase().includes(query.cuisine.toLowerCase()));
     return paged(visible?[{id:r.id,name:r.name,cuisine:r.cuisine,area:r.area,prepTime:r.prepTime,acceptingOrders:r.acceptingOrders,pickup:r.pickupAddress}]:[],page);
@@ -106,7 +107,7 @@ function ownedQuote(s:Sandbox,id:string,now:string) {
   if(Date.parse(q.expiresAt)<=Date.parse(now)) throw new MobileError('Demo quote expired. Review your total again.',409);
   return q;
 }
-export function demoWrite(input:Sandbox,role:DemoRole,resource:string,raw:unknown,now=new Date().toISOString()) {
+export function demoWrite(input:Sandbox,role:DemoRole,resource:string,raw:unknown,now=new Date().toISOString(),photo?:{image:MenuImageView|null}) {
   const s=sandboxSchema.parse(structuredClone(input));active(role,s);
   let result:unknown={ok:true,demo:true};
   if(resource==='quote') {
@@ -162,9 +163,15 @@ export function demoWrite(input:Sandbox,role:DemoRole,resource:string,raw:unknow
   } else if(['menu','menu-delete','menu-stock'].includes(resource)) {
     requireRole(role,'restaurant');
     if(resource==='menu') {
-      const v=parse(menuInput,raw);
-      if(v.id) {const idx=s.menu.findIndex(m=>m.id===v.id);if(idx<0) throw new MobileError('Demo menu item not found.',404);s.menu[idx]={...v,id:v.id};}
-      else {if(s.menu.length>=100) throw new MobileError('Demo menu limit reached.',409);s.menu.push({...v,id:crypto.randomUUID()});}
+      const {id,draftId,imageId,...fields}=parse(menuInput,raw);
+      const target=id??draftId??crypto.randomUUID(),idx=s.menu.findIndex(m=>m.id===target);
+      if(id&&idx<0)throw new MobileError('Demo menu item not found.',404);
+      if(imageId && (!photo || photo.image?.id!==imageId))throw new MobileError('Upload a food photo before saving it.',409);
+      const image=imageId===undefined?s.menu[idx]?.image??null:imageId===null?null:photo!.image;
+      const item={...fields,id:target,image};
+      if(idx>=0)s.menu[idx]=item;
+      else {if(s.menu.length>=100)throw new MobileError('Demo menu limit reached.',409);s.menu.push(item);}
+      result=item;
     } else {
       const v=resource==='menu-delete'?parse(menuDeleteInput,raw):parse(menuStockInput,raw);
       const item=s.menu.find(m=>m.id===v.id);if(!item) throw new MobileError('Demo menu item not found.',404);

@@ -125,8 +125,30 @@ model MenuItem {
   category     String @default("General")
   price        Int
   available    Boolean @default(true)
+  imageId      String? @unique
+  imageAsset   MenuImage? @relation(fields: [imageId], references: [id])
   updatedAt    DateTime @updatedAt
   @@index([restaurantId, available])
+}
+
+// Only the authenticated backend can manage image records or Storage objects.
+// Ownership is an approved restaurant ID or an isolated shared-demo session ID.
+model MenuImage {
+  id           String @id @default(uuid())
+  ownerKind    String
+  ownerId      String
+  state        String @default("Uploading")
+  path         String @unique
+  thumbnailPath String @unique
+  width        Int @default(0)
+  height       Int @default(0)
+  bytes        Int @default(0)
+  menuItem     MenuItem?
+  attachedTo   String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  @@index([ownerKind, ownerId, createdAt])
+  @@index([state, updatedAt])
 }
 
 model PolicyAcceptance {

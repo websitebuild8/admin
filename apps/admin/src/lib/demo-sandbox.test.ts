@@ -82,3 +82,18 @@ test('menu changes are shared, preserve purchased descriptions and paginate at t
   const second=demoRead(s,'customer','catalog',{restaurantId:demoIds.restaurant,page:'2'}) as typeof first;
   assert.equal(first.items.length,10);assert.equal(second.items.length,3);assert.equal(first.total,13);
 });
+
+test('demo photos appear in customer menus, survive ordinary edits and remove explicitly',()=>{
+  let s=createSandbox();const item=s.menu[0];
+  const image={id:crypto.randomUUID(),url:'https://test.supabase.co/cover.webp',thumbnailUrl:'https://test.supabase.co/thumb.webp',width:1024,height:1024};
+  const fields={id:item.id,name:item.name,description:item.description,category:item.category,price:item.price,available:true};
+  assert.throws(()=>write(s,'restaurant','menu',{...fields,imageId:image.id}),/Upload a food photo/);
+  s=demoWrite(s,'restaurant','menu',{...fields,imageId:image.id},now,{image}).sandbox;
+  const viewed=demoRead(s,'customer','catalog',{restaurantId:demoIds.restaurant}) as {items:typeof s.menu};
+  assert.deepEqual(viewed.items[0].image,image);
+  s=write(s,'restaurant','menu',{...fields,name:'Changed title'}).sandbox;assert.deepEqual(s.menu[0].image,image);
+  s=write(s,'restaurant','menu',{...fields,imageId:null}).sandbox;assert.equal(s.menu[0].image,null);
+  const draftId=crypto.randomUUID(),create={...fields,id:undefined,draftId};
+  s=write(s,'restaurant','menu',create).sandbox;s=write(s,'restaurant','menu',create).sandbox;
+  assert.equal(s.menu.filter(m=>m.id===draftId).length,1);
+});

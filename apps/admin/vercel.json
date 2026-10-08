@@ -1,1 +1,12 @@
-{"crons":[{"path":"/api/dispatch/tick","schedule":"* * * * *"}]}
+{
+  "crons": [
+    {
+      "path": "/api/dispatch/tick",
+      "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/maintenance/menu-images",
+      "schedule": "0 0 * * *"
+    }
+  ]
+}

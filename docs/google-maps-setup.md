@@ -106,16 +106,56 @@ References: [Google Places policies](https://developers.google.com/maps/document
 ## 4. Codemagic and local device builds
 
 In the existing **igo_mobile** group add the restricted Android
-`GOOGLE_MAPS_API_KEY`. Choose **iGO Android APK - connected app**. Its generated
-configuration contains only the public Clerk key, backend URL and Android Maps key.
-Google Places remains server-side. The design-preview workflow still works without
-Google keys; its location search is disabled and it contains explicitly fictional
-restaurant/jobs. Real search requires signing into the connected app.
+`GOOGLE_MAPS_API_KEY`. Choose the workflow appropriate to the test:
+
+| Codemagic workflow | What it displays | Required settings |
+| --- | --- | --- |
+| **iGO Android APK - design preview** | Fictional layouts with an explicitly illustrated map. | None. This workflow does not import `igo_mobile`. |
+| **iGO Android APK - Google Maps demo** | Real Google basemap and fixed fictional entrances, plus access to shared demo purchases. | Android `GOOGLE_MAPS_API_KEY` in `igo_mobile`; backend URL optional because a demo session can be joined on the phone. No Clerk/bank keys required. |
+| **iGO Android APK - connected app** | Approved accounts, saved entrances and authenticated address search. | Clerk public key, deployed HTTPS backend URL; Android Maps key for tiles and separate backend Places configuration for search. |
+
+The Maps demo build fails early if its key is missing. It uses the native SDK on
+Android, not a downloaded map image or a simulated rider marker. Sample pins stay
+fictional and identified as sample data. The native map retains Google's default
+landmark labels and attribution. Job cameras fit both endpoints, including
+cross-island deliveries; the fit control restores them after panning. The rider
+panel reserves map padding for attribution and controls. Map browsing bounds do
+not extend server-approved coverage, and no device GPS permission is requested.
+
+The build configuration contains only public mobile settings. Google Places
+remains server-side. Address search still requires a connected, signed-in account;
+the Maps demo does not call Places or enable real payments. Shared demo sessions
+continue using their fixed sample entrances.
 
 Google's Android restriction needs the actual APK signing SHA-1. Codemagic's
 **Show Maps signing fingerprint** step prints it after the build. Add that SHA-1 to
 the Android key's application restrictions. Also add the Play App Signing
 certificate when preparing a store release; it differs from the upload certificate.
+
+### Quick Android activation
+
+1. Enable billing and **Maps SDK for Android** in your Google Cloud project.
+2. Create an Android application key, restrict it to package
+   **mv.igo.igo_mobile**, and restrict its API to **Maps SDK for Android**.
+   Add the SHA-1 of your stable testing certificate (create/list it below before
+   the first Maps build). Do not use a web-referrer
+   restriction, an iOS key or your server Places key here.
+3. Save it as **GOOGLE_MAPS_API_KEY** in Codemagic's **igo_mobile** group. Do not
+   paste it into chat, Git or a source file. Push the source changes manually,
+   rescan `codemagic.yaml`, then start **iGO Android APK - Google Maps demo**.
+4. Read **Show Maps signing fingerprint** in that build and ensure its SHA-1 is
+   present on the Android key. Download **app-debug.apk** under **Artifacts**,
+   install it, and use an internet connection to open the rider Map screen.
+   Check Malé and Hulhumalé, pinch/pan, restore the area with the fit button, and
+   open an assigned sample job to confirm both entrance markers are visible.
+5. For real customer/restaurant automatic address lookup, separately configure
+   the backend **GOOGLE_PLACES_API_KEY** and use the **connected app** workflow.
+
+If a map is blank with only Google's logo, check the exact package/SHA-1 pair,
+enabled SDK, billing and the key's API restriction. A successful Flutter test or
+native view creation does not verify Google tile authorization. Updating a key's
+restrictions does not change the APK's embedded key; changing the key value itself
+requires a new APK. Do not remove restrictions to work around a mismatch.
 
 For a stable testing fingerprint, create a standard debug keystore once, privately:
 
@@ -123,6 +163,8 @@ For a stable testing fingerprint, create a standard debug keystore once, private
 keytool -genkeypair -v -keystore igo-debug.keystore -alias androiddebugkey \
   -keyalg RSA -keysize 2048 -validity 10000 -storepass android -keypass android \
   -dname "CN=Android Debug,O=Android,C=US"
+keytool -list -v -keystore igo-debug.keystore -alias androiddebugkey \
+  -storepass android -keypass android
 base64 -w 0 igo-debug.keystore
 ```
 

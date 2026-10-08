@@ -1198,6 +1198,9 @@ class _LiveWorkspaceState extends State<LiveWorkspace>
         for (final item in catalog!['items'])
           MenuItemTile(
             name: item['name'],
+            image: item['image'] == null
+                ? null
+                : Map<String, dynamic>.from(item['image']),
             description: item['description'],
             amount: price(item['price']),
             category: item['category'] ?? 'General',
@@ -1263,6 +1266,9 @@ class _LiveWorkspaceState extends State<LiveWorkspace>
       MaterialPageRoute(
         builder: (_) => MenuEditorPage(
           item: item,
+          photoUploadsEnabled: widget.account['photoUploadsEnabled'] == true,
+          onUpload: widget.api.uploadMenuImage,
+          onDiscard: widget.api.discardMenuImage,
           onSave: (value) async {
             await widget.api.request('menu', data: value);
           },
@@ -2028,6 +2034,9 @@ class _LiveMenuState extends State<LiveMenu> {
                 for (final item in data!['items'])
                   MenuItemTile(
                     name: item['name'],
+                    image: item['image'] == null
+                        ? null
+                        : Map<String, dynamic>.from(item['image']),
                     description: item['description'],
                     amount: price(item['price']),
                     category: item['category'] ?? 'General',

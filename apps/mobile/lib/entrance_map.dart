@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import 'models.dart';
@@ -9,12 +10,79 @@ import 'dart:math' as math;
 
 const googleMapsKey = String.fromEnvironment('GOOGLE_MAPS_API_KEY');
 
+LatLng _latLng(GeoPoint point) => LatLng(point.latitude, point.longitude);
+
+LatLngBounds _areaBounds(ServiceArea area) => LatLngBounds(
+  southwest: _latLng(area.southWest),
+  northeast: _latLng(area.northEast),
+);
+
+// Camera browsing includes the bridge between the islands. This does not extend
+// the backend's delivery coverage beyond its independently validated areas.
+final deliveryMapBounds = LatLngBounds(
+  southwest: _latLng(ServiceArea.values.first.southWest),
+  northeast: _latLng(ServiceArea.values.last.northEast),
+);
+
+/// Fits both islands for a cross-island job, or just the selected service area
+/// when waiting for a job. Invalid/out-of-area endpoints are never plotted.
+class JobMapViewport {
+  final GeoPoint? pickup, destination;
+  final CameraPosition camera;
+  final LatLngBounds? fitBounds;
+  const JobMapViewport._(
+    this.pickup,
+    this.destination,
+    this.camera,
+    this.fitBounds,
+  );
+
+  factory JobMapViewport.forJob({
+    GeoPoint? pickup,
+    GeoPoint? destination,
+    String area = 'Malé',
+  }) {
+    GeoPoint? valid(GeoPoint? point) =>
+        point != null && ServiceArea.values.any((a) => a.contains(point))
+        ? point
+        : null;
+    final start = valid(pickup), end = valid(destination);
+    final island = ServiceArea.named(area);
+    final center = start ?? end ?? island.center;
+    LatLngBounds? bounds;
+    if (start == null && end == null) {
+      bounds = _areaBounds(island);
+    } else if (start != null &&
+        end != null &&
+        (start.latitude - end.latitude).abs() +
+                (start.longitude - end.longitude).abs() >
+            .000001) {
+      bounds = LatLngBounds(
+        southwest: LatLng(
+          math.min(start.latitude, end.latitude) - .0001,
+          math.min(start.longitude, end.longitude) - .0001,
+        ),
+        northeast: LatLng(
+          math.max(start.latitude, end.latitude) + .0001,
+          math.max(start.longitude, end.longitude) + .0001,
+        ),
+      );
+    }
+    return JobMapViewport._(
+      start,
+      end,
+      CameraPosition(target: _latLng(center), zoom: bounds == null ? 17 : 14),
+      bounds,
+    );
+  }
+}
+
 /// Area overview or saved endpoints. No rider position, simulated movement or
 /// in-app route geometry; Google Maps supplies navigation outside iGO.
-class JobMap extends StatelessWidget {
+class JobMap extends StatefulWidget {
   final GeoPoint? pickup, destination;
   final String area;
-  final double height, radius, bottomInset;
+  final double height, radius, bottomInset, topInset;
   final bool illustrated;
   const JobMap({
     super.key,
@@ -24,31 +92,95 @@ class JobMap extends StatelessWidget {
     this.height = 220,
     this.radius = 22,
     this.bottomInset = 0,
+    this.topInset = 0,
     this.illustrated = false,
   });
   @override
+  State<JobMap> createState() => _JobMapState();
+}
+
+class _JobMapState extends State<JobMap> {
+  GoogleMapController? controller;
+  int fitRevision = 0;
+
+  JobMapViewport get viewport => JobMapViewport.forJob(
+    pickup: widget.pickup,
+    destination: widget.destination,
+    area: widget.area,
+  );
+
+  @override
+  void didUpdateWidget(JobMap oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.pickup?.label != widget.pickup?.label ||
+        oldWidget.destination?.label != widget.destination?.label ||
+        oldWidget.area != widget.area ||
+        oldWidget.bottomInset != widget.bottomInset ||
+        oldWidget.topInset != widget.topInset ||
+        oldWidget.height != widget.height) {
+      scheduleFit();
+    }
+  }
+
+  void scheduleFit() {
+    final revision = ++fitRevision;
+    // Bounds fitting requires a laid-out native view. Read the newest endpoints
+    // so a replaced/expired order cannot leave stale markers.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && revision == fitRevision) fit();
+    });
+  }
+
+  Future<void> fit({bool animate = false}) async {
+    final active = controller;
+    if (active == null) return;
+    final view = viewport;
+    final update = view.fitBounds == null
+        ? CameraUpdate.newCameraPosition(view.camera)
+        : CameraUpdate.newLatLngBounds(view.fitBounds!, 36);
+    try {
+      if (animate && !MediaQuery.disableAnimationsOf(context)) {
+        await active.animateCamera(update);
+      } else {
+        await active.moveCamera(update);
+      }
+    } on PlatformException {
+      // A native view can be removed during a camera call. The visible fit
+      // button also allows retrying if its first layout was not ready yet.
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final center = pickup ?? destination ?? ServiceArea.named(area).center;
+    final view = viewport;
     Widget map;
     if (kIsWeb || googleMapsKey.isEmpty) {
-      map = illustrated
-          ? _IllustratedMap(docked: bottomInset > 0, bottomInset: bottomInset)
+      map = widget.illustrated
+          ? _IllustratedMap(
+              docked: widget.bottomInset > 0,
+              bottomInset: widget.bottomInset,
+            )
           : Container(
               color: const Color(0xFFEFF2EA),
-              alignment: Alignment.topCenter,
-              padding: EdgeInsets.fromLTRB(24, 92, 24, bottomInset + 16),
+              alignment: Alignment.center,
+              padding: EdgeInsets.fromLTRB(
+                20,
+                widget.topInset + 16,
+                20,
+                widget.bottomInset + 16,
+              ),
               child: const Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.map_outlined, size: 38),
+                  Icon(Icons.map_outlined, size: 32),
                   SizedBox(height: 12),
                   Text(
-                    'Map preview unavailable',
+                    'Map unavailable',
                     style: TextStyle(fontWeight: FontWeight.w700),
                   ),
                   SizedBox(height: 6),
                   Text(
-                    'The configured Android or iOS app shows your saved entrances here.',
+                    'Your order details and updates are still available.',
                     textAlign: TextAlign.center,
                     style: TextStyle(fontSize: 12),
                   ),
@@ -56,69 +188,74 @@ class JobMap extends StatelessWidget {
               ),
             );
     } else {
-      map = GoogleMap(
-        key: ValueKey('${pickup?.label}/${destination?.label}/$area'),
-        initialCameraPosition: CameraPosition(
-          target: LatLng(center.latitude, center.longitude),
-          zoom: pickup == null && destination == null ? 14 : 16,
-        ),
-        padding: EdgeInsets.only(bottom: bottomInset, left: 8, right: 8),
-        myLocationEnabled: false,
-        myLocationButtonEnabled: false,
-        mapToolbarEnabled: false,
-        zoomControlsEnabled: false,
-        rotateGesturesEnabled: false,
-        tiltGesturesEnabled: false,
-        markers: {
-          if (pickup != null)
-            Marker(
-              markerId: const MarkerId('pickup'),
-              position: LatLng(pickup!.latitude, pickup!.longitude),
-              infoWindow: const InfoWindow(title: 'Restaurant pickup'),
-              icon: BitmapDescriptor.defaultMarkerWithHue(
-                BitmapDescriptor.hueYellow,
+      map = Stack(
+        fit: StackFit.expand,
+        children: [
+          Semantics(
+            label: view.pickup == null && view.destination == null
+                ? 'Google map of ${widget.area} service area'
+                : 'Google map showing saved pickup and delivery entrances',
+            child: GoogleMap(
+              initialCameraPosition: view.camera,
+              cameraTargetBounds: CameraTargetBounds(deliveryMapBounds),
+              minMaxZoomPreference: const MinMaxZoomPreference(10, 20),
+              padding: EdgeInsets.fromLTRB(
+                8,
+                widget.topInset,
+                8,
+                widget.bottomInset,
               ),
-            ),
-          if (destination != null)
-            Marker(
-              markerId: const MarkerId('delivery'),
-              position: LatLng(destination!.latitude, destination!.longitude),
-              infoWindow: const InfoWindow(title: 'Delivery entrance'),
-            ),
-        },
-        onMapCreated: (controller) {
-          if (pickup == null ||
-              destination == null ||
-              (pickup!.latitude - destination!.latitude).abs() +
-                      (pickup!.longitude - destination!.longitude).abs() <
-                  .000001) {
-            return;
-          }
-          controller
-              .moveCamera(
-                CameraUpdate.newLatLngBounds(
-                  LatLngBounds(
-                    southwest: LatLng(
-                      math.min(pickup!.latitude, destination!.latitude) - .0001,
-                      math.min(pickup!.longitude, destination!.longitude) -
-                          .0001,
-                    ),
-                    northeast: LatLng(
-                      math.max(pickup!.latitude, destination!.latitude) + .0001,
-                      math.max(pickup!.longitude, destination!.longitude) +
-                          .0001,
+              myLocationEnabled: false,
+              myLocationButtonEnabled: false,
+              mapToolbarEnabled: false,
+              zoomControlsEnabled: false,
+              rotateGesturesEnabled: false,
+              tiltGesturesEnabled: false,
+              markers: {
+                if (view.pickup != null)
+                  Marker(
+                    markerId: const MarkerId('pickup'),
+                    position: _latLng(view.pickup!),
+                    infoWindow: const InfoWindow(title: 'Restaurant pickup'),
+                    icon: BitmapDescriptor.defaultMarkerWithHue(
+                      BitmapDescriptor.hueYellow,
                     ),
                   ),
-                  40,
-                ),
-              )
-              .catchError((_) {});
-        },
+                if (view.destination != null)
+                  Marker(
+                    markerId: const MarkerId('delivery'),
+                    position: _latLng(view.destination!),
+                    infoWindow: const InfoWindow(title: 'Delivery entrance'),
+                  ),
+              },
+              onMapCreated: (value) {
+                if (!mounted) return;
+                setState(() => controller = value);
+                scheduleFit();
+              },
+            ),
+          ),
+          Positioned(
+            right: 14,
+            bottom: widget.bottomInset + 16,
+            child: IconButton.filledTonal(
+              tooltip: view.pickup == null && view.destination == null
+                  ? 'Show ${widget.area}'
+                  : 'Show saved entrances',
+              onPressed: controller == null ? null : () => fit(animate: true),
+              style: IconButton.styleFrom(
+                backgroundColor: Colors.white.withValues(alpha: .9),
+                foregroundColor: const Color(0xFF181918),
+              ),
+              icon: const Icon(Icons.center_focus_strong),
+            ),
+          ),
+        ],
       );
     }
     return ClipRRect(
-      borderRadius: BorderRadius.circular(radius),
-      child: SizedBox(height: height, child: map),
+      borderRadius: BorderRadius.circular(widget.radius),
+      child: SizedBox(height: widget.height, child: map),
     );
   }
 }
@@ -305,7 +442,7 @@ class _EntranceMapState extends State<EntranceMap> {
         alignment: Alignment.center,
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: const Color(0xFFFFF7C9),
+          color: const Color(0xFFF3F4EF),
           borderRadius: BorderRadius.circular(22),
         ),
         child: Column(
@@ -315,7 +452,7 @@ class _EntranceMapState extends State<EntranceMap> {
             const SizedBox(height: 12),
             Text(
               widget.initialPoint == null
-                  ? 'Search for your building above. The interactive map will be available in the configured mobile app.'
+                  ? 'Map unavailable. Search for your building above or use entrance coordinates below.'
                   : 'Location selected · ${widget.initialPoint!.label}\nReview your building and entrance details below.',
               textAlign: TextAlign.center,
             ),

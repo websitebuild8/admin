@@ -115,3 +115,82 @@ workflows:
           ls -lh /tmp/igo-android-artifacts/app-debug.apk
     artifacts:
       - /tmp/igo-android-artifacts/app-debug.apk
+
+  igo-android-maps-demo:
+    name: iGO Android APK - Google Maps demo
+    working_directory: apps/mobile
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    environment:
+      flutter: 3.47.2
+      java: 21
+      groups:
+        - igo_mobile
+    cache:
+      cache_paths:
+        - ~/.pub-cache
+        - ~/.gradle/caches
+    scripts:
+      - name: Restore stable debug signing key if supplied
+        script: |
+          set -eu
+          python3 - <<'PY'
+          import base64
+          import os
+          from pathlib import Path
+          value = os.environ.get('IGO_ANDROID_DEBUG_KEYSTORE_BASE64', '').strip()
+          if value:
+              path = Path.home() / '.android' / 'debug.keystore'
+              path.parent.mkdir(parents=True, exist_ok=True)
+              path.write_bytes(base64.b64decode(value, validate=True))
+              path.chmod(0o600)
+              print('Stable debug signing key restored.')
+          PY
+      - name: Validate public Maps demo settings
+        script: |
+          set -eu
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          from urllib.parse import urlparse
+
+          maps = os.environ.get('GOOGLE_MAPS_API_KEY', '').strip()
+          if not maps or maps.startswith(('YOUR_', 'REPLACE_')):
+              raise SystemExit('Add your restricted Android GOOGLE_MAPS_API_KEY to the igo_mobile group. Use the design preview workflow for a keyless APK.')
+          api = os.environ.get('IGO_API_BASE_URL', '').strip()
+          if api:
+              parsed = urlparse(api)
+              if (parsed.scheme != 'https' or not parsed.hostname
+                      or parsed.username or parsed.password or parsed.query or parsed.fragment
+                      or parsed.hostname in ('localhost', '127.0.0.1', '10.0.2.2')):
+                  raise SystemExit('Optional IGO_API_BASE_URL must be a reachable HTTPS backend, without credentials or query parameters.')
+          Path('.env.ci.json').write_text(json.dumps({
+              'GOOGLE_MAPS_API_KEY': maps,
+              'IGO_API_BASE_URL': api,
+          }))
+          print('Maps demo settings validated. No bank or private server keys included.')
+          PY
+      - name: Install Flutter dependencies
+        script: |
+          set -eu
+          test -f pubspec.yaml
+          flutter pub get
+      - name: Check mobile code
+        script: flutter analyze --no-pub
+      - name: Run mobile tests
+        script: flutter test --no-pub --concurrency=1
+      - name: Build Google Maps demo APK
+        script: flutter build apk --debug --no-pub --dart-define=IGO_PREVIEW=true --dart-define-from-file=.env.ci.json
+      - name: Show Maps signing fingerprint
+        script: keytool -list -v -keystore ~/.android/debug.keystore -alias androiddebugkey -storepass android -keypass android
+      - name: Prepare APK download
+        script: |
+          set -eu
+          igo_apk_path="$PWD/build/app/outputs/flutter-apk/app-debug.apk"
+          test -s "$igo_apk_path"
+          mkdir -p /tmp/igo-android-artifacts
+          cp "$igo_apk_path" /tmp/igo-android-artifacts/app-debug.apk
+          ls -lh /tmp/igo-android-artifacts/app-debug.apk
+    artifacts:
+      - /tmp/igo-android-artifacts/app-debug.apk

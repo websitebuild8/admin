@@ -54,7 +54,10 @@ before assignment. Restaurants do not receive customer coordinates or rider GPS.
 ## Brand and native UI
 
 A compact logo splash and photo-led welcome screen introduce the redesigned app.
-Android and iOS launch backgrounds use the unchanged provided logo and yellow.
+The splash uses a soft pearl/ivory backdrop, static pale-yellow reflections and a
+frosted frame around the unchanged logo. Android and iOS startup backgrounds use
+the same pearl tone instead of a full yellow screen. Accessible high-contrast and
+reduced-effects settings use an opaque frame; the splash adds no animation loop.
 Navigation is translucent yellow with black controls and role-specific icons;
 iOS 26+ uses native Liquid Glass, older iOS uses native blur and Android uses
 Flutter glass. Reduced transparency/animation fallbacks remain. Native cold-start,
@@ -66,6 +69,14 @@ Island/query changes invalidate stale selections; manual adjustments remain for
 ambiguous buildings. The approximate Malé/Hulhumalé coverage requires validation
 before paid operations. Google credentials, billing/restrictions and retention
 are documented in [google-maps-setup.md](google-maps-setup.md).
+
+Native Maps demo and connected builds show Google's actual basemap when a
+restricted platform key is supplied. Saved job pins use yellow for restaurant
+pickup and the default red for delivery. The camera fits cross-island endpoints,
+with a fit control after panning; the rider panel reserves padding for Google's
+attribution. An area overview has no fake rider marker. The separate keyless
+preview keeps its explicitly identified illustration, and the browser does not
+embed the native SDK. Credentials and device checks are still outstanding.
 
 ## References and limits
 
@@ -83,3 +94,8 @@ queues, menu changes and map-led rider stages:
 The references inform hierarchy and interaction patterns; iGO's payment, approval,
 coverage and privacy rules govern its functionality. Legal identity placeholders,
 merchant activation, production release signing and store publication are unfinished.
+
+Menu photos use a consistent square crop in the white/glass menu cards. The editor
+previews a larger cover and offers Add/Replace, Edit (pan/pinch/rotate), and Remove.
+Changes apply on Save; failed upload messages sit beside the Save button. Photos
+are shared by customer and restaurant views through Supabase Storage.

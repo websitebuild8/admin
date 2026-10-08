@@ -114,5 +114,58 @@ class MobileApi {
     }
   }
 
+  Future<Map<String, dynamic>> uploadMenuImage(Uint8List bytes) async {
+    if (bytes.isEmpty || bytes.length > 3 * 1024 * 1024) {
+      throw const ApiFailure('Choose a food photo under 3 MB.');
+    }
+    final uri = base.resolve(
+      isDemo ? '/api/demo/mobile/menu-image' : '/api/mobile/v1/menu-image',
+    );
+    try {
+      final jwt = await token();
+      if (jwt.isEmpty) throw const ApiFailure('Sign in again.', 401);
+      final response = await _client
+          .post(
+            uri,
+            headers: {
+              'Authorization': 'Bearer $jwt',
+              if (isDemo) 'X-iGO-Demo-Role': demoRole!,
+              'Content-Type': 'image/jpeg',
+              'Accept': 'application/json',
+            },
+            body: bytes,
+          )
+          .timeout(const Duration(seconds: 35));
+      final decoded = jsonDecode(response.body);
+      if (decoded is! Map<String, dynamic>) {
+        throw const ApiFailure('Could not upload the food photo.');
+      }
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw ApiFailure(
+          decoded['error'] is String
+              ? decoded['error']
+              : 'Could not upload the food photo.',
+          response.statusCode,
+        );
+      }
+      if (decoded['image'] is! Map) {
+        throw const ApiFailure('Could not upload the food photo.');
+      }
+      return Map<String, dynamic>.from(decoded['image']);
+    } on ApiFailure {
+      rethrow;
+    } on TimeoutException {
+      throw const ApiFailure('Photo upload timed out. Please retry.');
+    } catch (_) {
+      throw const ApiFailure(
+        'Could not upload the food photo. Check your connection.',
+      );
+    }
+  }
+
+  Future<void> discardMenuImage(String id) async {
+    await request('image-discard', data: {'id': id});
+  }
+
   void close() => _client.close();
 }

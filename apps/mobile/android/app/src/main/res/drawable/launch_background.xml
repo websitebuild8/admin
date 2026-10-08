@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-  <item><shape><solid android:color="#FFDF35"/></shape></item>
+  <item><shape><solid android:color="#F7F8F5"/></shape></item>
+  <item android:width="208dp" android:height="208dp" android:gravity="center">
+    <shape><solid android:color="#EEFFFFFF"/><corners android:radius="48dp"/><stroke android:width="1dp" android:color="#FFFFFF"/></shape>
+  </item>
   <item android:width="160dp" android:height="160dp" android:gravity="center">
     <bitmap android:src="@drawable/igo_logo" android:gravity="fill"/>
   </item>

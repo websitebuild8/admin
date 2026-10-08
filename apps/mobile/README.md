@@ -18,14 +18,19 @@ to `apps/mobile`. In Codemagic, scan the branch for this configuration and selec
 uses the `igo_mobile` variable group for the Clerk public key and deployed HTTPS
 backend URL. See [the complete setup steps](../../docs/codemagic-android.md).
 
-APK compilation runs on Codemagic. Both workflows produce a debug APK for testing;
+For actual Google Maps in the fictional/demo experience, add the restricted
+Android `GOOGLE_MAPS_API_KEY` to `igo_mobile` and select **iGO Android APK - Google
+Maps demo**. The ordinary design preview remains keyless. Follow
+[Google Maps activation](../../docs/google-maps-setup.md#quick-android-activation).
+
+APK compilation runs on Codemagic. All three workflows produce a debug APK for testing;
 release signing and Play Store publishing are separate setup steps.
 
 One Flutter application for customers, restaurants and riders. Android, iOS and web
 preview runners are included. Bundle identifiers are `mv.igo.igo_mobile` on Android and `mv.igo.igoMobile`
 on iOS and must be confirmed before store registration. Native launcher icons
 still need platform-sized brand assets before distribution. Launch screens now
-use the supplied logo; native cold-start behavior needs device checks.
+use the supplied logo on a soft pearl background; native cold-start behavior needs device checks.
 
 ## Run the design preview
 
@@ -50,6 +55,8 @@ keys in this app.
 
 - Original iGO logo, yellow/white surfaces, black typography, rounded glass panels
   and floating translucent navigation inspired by the supplied customer/driver references.
+- Pearl/ivory splash with subtle pale-yellow reflections and a compact frosted
+  logo frame. Android/iOS startup backgrounds match the softer color.
 - Customer Home/Search/Orders/Account, restaurant Kitchen/Menu/Orders/Account,
   and rider Map/Deliveries/Account. Full-screen order progress and restaurant menu
   editing, categories, stock controls and deletion are included.
@@ -99,6 +106,11 @@ suggestions and coordinates require Google credentials, enabled billing, and a
 connected native account. Design preview contains sample food imagery and fictional
 jobs; Google search is unavailable in that preview. The browser runner is for UI
 review and does not load native Google Maps. It offers the coordinate fallback.
+Native preview/demo builds with the restricted platform Maps key show the real
+basemap, keeping sample entrances clearly fictional. Job cameras fit saved
+endpoints across both islands and provide a fit control; the rider work panel
+leaves Google's attribution above the overlays. Maps key setup and native tile
+authorization still require device verification.
 
 The server independently validates the selected island. These approximate
 rectangles are not surveyed land/service polygons. Real operating coverage must
@@ -124,3 +136,10 @@ setup. No iOS binary, signed Android release, or store submission is provided ye
 
 See [the redesign review gallery](../../docs/previews/mobile-redesign.html) and
 [design/reference notes](../../docs/mobile-design.md) for the current three-role layouts.
+
+Restaurant food photos support gallery selection, square crop/rotation, replacement
+and removal. Customer and restaurant menus use the same cover/thumbnail. Connected
+and shared demo uploads use the backend; standalone preview photos stay local.
+See [Supabase photo setup](../../docs/menu-images-setup.md) for private backend keys,
+public bucket policies, cleanup and native-device checks. No Supabase private key
+belongs in this Flutter app or Codemagic.

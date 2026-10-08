@@ -2,7 +2,8 @@
 
 Supabase PostgreSQL replaces Neon. Clerk remains responsible for identity; the
 Next.js backend uses Prisma and the existing pg driver. No Supabase SDK, Auth
-replacement, public database key, or service-role API key is needed for this phase.
+replacement or public database key is needed. Menu photos now use the Storage API
+with a private backend secret key; see [food photo setup](menu-images-setup.md).
 
 ## Create the development database
 
@@ -60,8 +61,9 @@ Keep the Data API disabled; enabling it later requires a deliberate policy revie
 
 ## Later features
 
-Supabase Storage and Realtime are not connected by changing these URLs. Storage
-needs private document buckets and access policies. Realtime needs authenticated
+Menu-photo Storage is connected separately using a public food-photo bucket and
+server-authorized writes. Private verification-document storage is still a separate
+feature and must use its own private bucket and access policies. Realtime needs authenticated
 private channels and separate admin GPS versus participant status payloads.
 If clients use these services directly, configure Supabase's Clerk third-party
 integration and authorization policies first. The present app retains API polling.

@@ -1,4 +1,7 @@
 import 'server-only';
+import { randomUUID } from 'node:crypto';
+import { attachMenuImage, queuePhotoDelete, flushPhotoDeletes, menuImageView } from './menu-image-service';
+import { photoUploadsReady } from './menu-image-storage';
 import { Prisma } from '@/generated/prisma/client';
 import { z } from 'zod';
 import { database } from './db';
@@ -32,7 +35,7 @@ export async function account(userId:string) {
     restaurant:restaurant ? {id:restaurant.id,name:restaurant.name,area:restaurant.area,acceptingOrders:restaurant.acceptingOrders,pickup:restaurant.pickupAddress,pendingPickup:restaurant.pendingPickupAddress} : null,
     rider:rider ? {id:rider.id,area:rider.area,online:rider.online} : null,
     policy:{version:policyVersion(),published:policiesReady(),accepted:!!profile?.consents.length,links:['/legal/terms','/legal/privacy','/legal/refunds','/legal/partners']},
-    paymentsEnabled:false,
+    paymentsEnabled:false,photoUploadsEnabled:photoUploadsReady(),
   };
 }
 export async function register(userId:string,input:unknown) {
@@ -87,9 +90,9 @@ export async function catalog(userId:string,page:number,restaurantId:string|null
     const restaurant=await db.restaurant.findFirst({where:{id:restaurantId,status:'Active',documentsVerified:true}});
     if(!restaurant) throw new MobileError('Restaurant unavailable.',404);
     const where={restaurantId,available:true,...(category!=='All'?{category}:{})};
-    const [items,total]=await Promise.all([db.menuItem.findMany({where,orderBy:[{name:'asc'},{id:'asc'}],skip:(page-1)*10,take:10}),db.menuItem.count({where})]);
+    const [items,total]=await Promise.all([db.menuItem.findMany({where,orderBy:[{name:'asc'},{id:'asc'}],skip:(page-1)*10,take:10,include:{imageAsset:true}}),db.menuItem.count({where})]);
     const categories=await db.menuItem.groupBy({by:['category'],where:{restaurantId,available:true},orderBy:{category:'asc'}});
-    return {items,total,page,pageSize:10,categories:categories.map(c=>c.category),restaurant:{id:restaurant.id,name:restaurant.name,acceptingOrders:restaurant.acceptingOrders,area:restaurant.area}};
+    return {items:items.map(menuView),total,page,pageSize:10,categories:categories.map(c=>c.category),restaurant:{id:restaurant.id,name:restaurant.name,acceptingOrders:restaurant.acceptingOrders,area:restaurant.area}};
   }
   const where:Prisma.RestaurantWhereInput={status:'Active',documentsVerified:true,pickupAddress:{not:Prisma.DbNull},
     ...(filter.cuisine==='All'?{}:{cuisine:{contains:filter.cuisine,mode:'insensitive'}}),
@@ -98,22 +101,32 @@ export async function catalog(userId:string,page:number,restaurantId:string|null
   const [items,total]=await Promise.all([db.restaurant.findMany({where,orderBy:[{name:'asc'},{id:'asc'}],skip:(page-1)*10,take:10,select:{id:true,name:true,cuisine:true,area:true,prepTime:true,acceptingOrders:true}}),db.restaurant.count({where})]);
   return {items,total,page,pageSize:10};
 }
+function menuView(item:Prisma.MenuItemGetPayload<{include:{imageAsset:true}}>) {
+  return {id:item.id,name:item.name,description:item.description,category:item.category,price:item.price,available:item.available,image:menuImageView(item.imageAsset)};
+}
 export async function ownMenu(userId:string,page:number,stock='All',q='') {
   const {principal}=await participant(userId); if(principal.role!=='restaurant') throw new MobileError('Restaurant access required.',403);
   if(!['All','Available','Out of stock'].includes(stock) || q.length>100) throw new MobileError('Invalid menu filter.');
   const where={restaurantId:principal.id,...(stock==='All'?{}:{available:stock==='Available'}),...(q.trim()?{name:{contains:q.trim(),mode:'insensitive' as const}}:{})};const db=database();
   const [items,total,availableCount,itemCount]=await Promise.all([
-    db.menuItem.findMany({where,orderBy:[{category:'asc'},{name:'asc'},{id:'asc'}],skip:(page-1)*10,take:10}),db.menuItem.count({where}),
+    db.menuItem.findMany({where,orderBy:[{category:'asc'},{name:'asc'},{id:'asc'}],skip:(page-1)*10,take:10,include:{imageAsset:true}}),db.menuItem.count({where}),
     db.menuItem.count({where:{restaurantId:principal.id,available:true}}),db.menuItem.count({where:{restaurantId:principal.id}})]);
-  return {items,total,page,pageSize:10,availableCount,itemCount};
+  return {items:items.map(menuView),total,page,pageSize:10,availableCount,itemCount};
 }
 export async function deleteMenu(userId:string,input:unknown) {
   const {id}=parse(menuDeleteInput,input),{principal}=await participant(userId);
   if(principal.role!=='restaurant') throw new MobileError('Restaurant access required.',403);
   // Orders and quotes retain their existing JSON snapshots. Checkout must recheck
   // menu availability before any future gateway capture is implemented.
-  const result=await database().menuItem.deleteMany({where:{id,restaurantId:principal.id}});
-  if(!result.count) throw new MobileError('Menu item not found.',404);
+  const owner={kind:'restaurant' as const,id:principal.id};
+  await database().$transaction(async tx=>{
+    await tx.$queryRaw`SELECT "id" FROM "Restaurant" WHERE "id"=${principal.id} FOR UPDATE`;
+    const item=await tx.menuItem.findFirst({where:{id,restaurantId:principal.id}});
+    if(!item)throw new MobileError('Menu item not found.',404);
+    await tx.menuItem.delete({where:{id}});
+    if(item.imageId)await queuePhotoDelete(tx,owner,item.imageId);
+  });
+  await flushPhotoDeletes(owner).catch(()=>{});
   return {ok:true};
 }
 export async function menuStock(userId:string,input:unknown) {
@@ -126,11 +139,22 @@ export async function menuStock(userId:string,input:unknown) {
 export async function saveMenu(userId:string,input:unknown) {
   const v=parse(menuInput,input);const {principal}=await participant(userId);
   if(principal.role!=='restaurant') throw new MobileError('Restaurant access required.',403);
-  const {id,...data}=v;const db=database();
-  if(!id) return db.menuItem.create({data:{...data,restaurantId:principal.id}});
-  const result=await db.menuItem.updateMany({where:{id,restaurantId:principal.id},data});
-  if(!result.count) throw new MobileError('Menu item not found.',404);
-  return {ok:true};
+  const {id,draftId,imageId,...data}=v,owner={kind:'restaurant' as const,id:principal.id};
+  const result=await database().$transaction(async tx=>{
+    // Serializes creation retries and changes to this restaurant's menu.
+    await tx.$queryRaw`SELECT "id" FROM "Restaurant" WHERE "id"=${principal.id} FOR UPDATE`;
+    const target=id??draftId??randomUUID();
+    const old=await tx.menuItem.findUnique({where:{id:target}});
+    if(old && old.restaurantId!==principal.id || id && !old)throw new MobileError('Menu item not found.',404);
+    const nextImage=imageId===undefined?old?.imageId??null:imageId;
+    if(imageId!==undefined)await attachMenuImage(tx,owner,target,nextImage,old?.imageId??null);
+    const item=old
+      ? await tx.menuItem.update({where:{id:target},data:{...data,imageId:nextImage},include:{imageAsset:true}})
+      : await tx.menuItem.create({data:{id:target,...data,imageId:nextImage,restaurantId:principal.id},include:{imageAsset:true}});
+    return menuView(item);
+  });
+  await flushPhotoDeletes(owner).catch(()=>{});
+  return result;
 }
 export async function availability(userId:string,input:unknown) {
   const v=parse(z.object({online:z.boolean(),area:z.enum(['Malé','Hulhumalé']).optional()}).strict(),input);

@@ -14,7 +14,7 @@ async function main(){
     await db.$transaction(async tx=>{
       // All service calls in this process share the rollback transaction. No
       // Clerk calls, actual accounts or externally visible records are created.
-      globals.igoPrisma=tx as unknown as PrismaClient;
+      globals.igoPrisma=new Proxy(tx,{get(target,key){if(key==='$transaction')return async (work:(nested:typeof tx)=>unknown)=>work(tx);return Reflect.get(target,key);}}) as unknown as PrismaClient;
       const users=[`${marker}-owner`,`${marker}-other`,`${marker}-customer`,`${marker}-pending`];
       const restaurants:string[]=[];
       for(let i=0;i<users.length;i++){
