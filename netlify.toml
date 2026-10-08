@@ -1,0 +1,16 @@
+# The repository also contains Flutter; install/build only the Next.js backend.
+[build]
+  base = "apps/admin"
+  command = "npm run build"
+  publish = ".next"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+# Public database CA only. Private credentials belong in Netlify's dashboard.
+[functions]
+  included_files = ["certs/supabase-root.crt"]
+
+# Netlify detects Next.js and installs its maintained adapter automatically.
+# Scheduled HTTP calls are configured separately in Supabase Cron; see
+# docs/netlify-deployment.md. vercel.json is not a Netlify schedule.

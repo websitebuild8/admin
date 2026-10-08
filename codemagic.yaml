@@ -1,5 +1,5 @@
 # Keep this file at the repository root. Flutter lives in apps/mobile;
-# apps/admin is the separate Next.js application deployed through Vercel.
+# apps/admin is the separate Next.js backend; see docs/netlify-deployment.md.
 workflows:
   igo-android-preview:
     name: iGO Android APK - design preview

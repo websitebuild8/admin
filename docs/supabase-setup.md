@@ -58,6 +58,8 @@ Before production, verify RLS and concurrent rider acceptance against the databa
 For Vercel, add the corresponding production environment variables and use a
 separate production database. Local `.env.local` is ignored by Git and not deployed.
 Keep the Data API disabled; enabling it later requires a deliberate policy review.
+For the current Netlify demo deployment, follow [Netlify setup](netlify-deployment.md)
+for app directories, private dashboard settings and Supabase-hosted schedules.
 
 ## Later features
 

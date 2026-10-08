@@ -84,6 +84,8 @@ removal; this bucket must not contain private documents or customer details.
 The backend `vercel.json` includes a daily **/api/maintenance/menu-images** cleanup
 endpoint. Set **CRON_SECRET** to a strong private value in the Vercel backend so
 Vercel can authorize it; it shares the existing dispatch scheduler's secret.
+On Netlify, `vercel.json` does not install schedules; use the Supabase Cron/Vault
+steps in [Netlify deployment](netlify-deployment.md) for this same protected endpoint.
 Confirm the deployed cron is active and monitor successful cleanup. On another
 host, invoke the protected endpoint daily using `Authorization: Bearer <CRON_SECRET>`.
 For local maintenance, run `npm run photos:cleanup` from `apps/admin` with the
