@@ -1,20 +1,29 @@
 # Mobile design and location flow
 
-Updated 7 October 2026. One Flutter app for backend-approved customers, restaurants
-and riders; admin remains the Next.js web app. The redesign follows the supplied
-Uber Eats/customer and Uber Driver screenshots and common marketplace patterns,
-while retaining the original iGO logo, white/yellow/black palette and glass panels.
-No Uber branding or downloaded Uber artwork is used.
+Updated 12 October 2026. One Flutter app for backend-approved customers, restaurants
+and riders; admin remains the Next.js web app. Customer discovery follows Swiggy
+marketplace patterns. Restaurant and rider workspaces retain the earlier supplied
+Uber Eats/Driver reference patterns. The original iGO logo, white/yellow/black
+palette and glass panels remain. No reference-app branding or artwork is shipped.
 
 ## Customer
 
-Four destinations: Home, Search, Orders, Account. Address and immediate delivery
-context come first, followed by search, cuisine shortcuts, restaurant collections
-and the catalog. Collections show actual entries from the current page and never
-claim personalized recommendations, ratings, discounts or free delivery without
-data. Search runs before ten-row server pagination. Restaurant menus use compact
-item rows, category filters and a persistent cart action. Checkout keeps card-only,
-server-priced quotes and disabled payment collection pending BML setup.
+Four destinations: Home, Search, Orders, Account. A compact delivery address and
+account control come first, followed by search, 66-pixel circular cuisine
+shortcuts, a pale-yellow discovery panel, horizontal restaurant collections and
+compact image/text catalog rows. The discovery panel opens the sample café in
+preview or applies the actual Coffee filter in connected mode. Search text
+persists across Home/Search and has an explicit clear action.
+
+Collections show actual entries from the current page and never claim
+personalized recommendations, ratings, discounts or free delivery without data.
+Search runs before ten-row server pagination. Restaurant menus use a compact
+information card, category filters, item rows with 104-pixel photo areas and
+ADD/quantity controls, plus a persistent quantity/price cart action. These customer
+controls are shared by preview and connected screens; restaurant stock/edit
+controls keep their existing behavior. Checkout keeps card-only, server-priced
+quotes and disabled real payment collection pending BML setup. Account identity,
+address toolbars and the customer updates inbox use the same compact styling.
 
 Orders lead into a dedicated status screen with a segmented progress bar, saved
 pickup/dropoff map, rider assignment details, help and the timestamped timeline.
@@ -35,7 +44,8 @@ controls update only availability. Ownership and approved restaurant access are
 checked server-side for every mutation; existing order JSON snapshots survive
 menu edits and deletion. Category defaults to General for existing items.
 
-Item photography/upload and modifiers are still future work. Placeholder covers
+Item photos support upload, crop/rotate, replacement and removal through the
+backend and Supabase Storage. Modifiers remain future work. Placeholder covers
 are honest about missing real photographs; sample café photography stays in the
 fictional design preview. No sample restaurant actions update production records.
 
@@ -78,9 +88,38 @@ attribution. An area overview has no fake rider marker. The separate keyless
 preview keeps its explicitly identified illustration, and the browser does not
 embed the native SDK. Credentials and device checks are still outstanding.
 
+## Customer visual system and motion
+
+Customer headings use 19–29-pixel bold system typography, body copy 12–14 pixels,
+22–23-pixel navigation icons and compact quantity controls beside each item. This
+uses the existing Flutter/system fonts and bundled Cupertino icons; it does not
+ship Swiggy's proprietary font or assets. White surfaces, black text and warm
+pale-yellow highlights retain iGO's identity. Native iOS Liquid Glass remains in
+the navigation; the Flutter fallback uses a translucent yellow blur.
+
+Motion is finite: 320 ms entry fade/translation, 220 ms tab crossfade, 180 ms
+cuisine selection, 150 ms quantity transitions and 240 ms order milestone color
+changes. Reduce Motion disables these transitions, and high-contrast settings
+replace navigation blur with an opaque surface. No automatic banner carousel,
+animation loop or rider animation is introduced. Real order milestones and ETA
+still come from the server; preview milestones are explicitly fictional.
+
+The supplied [Mobbin Swiggy reference](https://mobbin.com/apps/swiggy-ios-7fa88b22-91ce-40bd-ac85-7f9b93f01a3d)
+redirected to Mobbin's public landing page during this work. The accessible
+[official Swiggy App Store screenshots](https://apps.apple.com/in/app/swiggy-food-instamart-dineout/id989540920)
+provided the discovery layout reference. Exact gated-screen measurements, font
+files and interaction recordings were unavailable; the implemented timings are
+iGO design choices, not claimed copies of Swiggy's animation timings.
+
+Actual Flutter widget previews are exported to `docs/previews/customer-swiggy-*.png`
+using the optional capture flag on `test/customer_redesign_test.dart`. These show
+the fictional preview rather than production restaurant records. Native iOS
+composition and Android APK rendering still require device/CI verification.
+
 ## References and limits
 
-The three user-supplied screenshots are the primary visual references. The supplied
+The public Swiggy screenshots inform customer discovery; the three earlier
+user-supplied screenshots inform restaurant/rider workflows. The supplied
 [YouTube video](https://www.youtube.com/watch?v=fmriMi2Cjv8) could not be opened by
 our research tool; no claim is made to have watched or reproduced that video.
 Official research supports discovery shortcuts/collections, status-led restaurant

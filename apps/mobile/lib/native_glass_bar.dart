@@ -1,6 +1,7 @@
 import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -128,16 +129,24 @@ class _NativeGlassBarState extends State<NativeGlassBar> {
                                 children: [
                                   Icon(
                                     switch (widget.labels[i]) {
-                                      'Home' => Icons.home_outlined,
-                                      'Search' => Icons.search,
+                                      'Home' =>
+                                        widget.selected == i
+                                            ? CupertinoIcons.house_fill
+                                            : CupertinoIcons.house,
+                                      'Search' => CupertinoIcons.search,
                                       'Kitchen' => Icons.storefront_outlined,
                                       'Menu' => Icons.restaurant_menu,
                                       'Map' => Icons.map_outlined,
-                                      'Account' => Icons.person_outline,
-                                      _ => Icons.receipt_long_outlined,
+                                      'Account' =>
+                                        widget.selected == i
+                                            ? CupertinoIcons.person_fill
+                                            : CupertinoIcons.person,
+                                      _ => CupertinoIcons.bag,
                                     },
                                     size: 23,
-                                    color: const Color(0xFF181918),
+                                    color: widget.selected == i
+                                        ? const Color(0xFF181918)
+                                        : const Color(0xFF62645E),
                                   ),
                                   const SizedBox(height: 4),
                                   Text(

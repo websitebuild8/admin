@@ -51,6 +51,17 @@ follows registration; restaurant/rider access requires approval. No client choic
 grants a real role. Never put Clerk secret keys, database URLs, or Supabase service
 keys in this app.
 
+## Customer redesign — 12 October 2026
+
+Swiggy-inspired discovery now uses compact address/search controls, circular
+cuisine shortcuts, a soft-yellow feature panel, horizontal restaurant collections
+and denser restaurant rows. Menu photos have ADD/quantity controls and a persistent
+cart summary. Checkout and order progress share the updated typography and icons.
+Finite transitions respect Reduce Motion; yellow glass navigation is retained.
+The supplied Mobbin screens were inaccessible, so accessible official app
+screenshots informed the layout. See [design notes](../../docs/mobile-design.md)
+for the reference, dimensions and animation timings.
+
 ## First implementation
 
 - Original iGO logo, yellow/white surfaces, black typography, rounded glass panels

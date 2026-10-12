@@ -9,6 +9,7 @@ import 'main.dart' show CanvasPage, Glass, AddressPage, muted;
 import 'models.dart';
 import 'mobile_api.dart';
 import 'browse_widgets.dart';
+import 'customer_widgets.dart';
 import 'delivery_widgets.dart';
 import 'places_lookup.dart';
 import 'entrance_map.dart';
@@ -750,86 +751,131 @@ class _LiveWorkspaceState extends State<LiveWorkspace>
           ? const ['Kitchen', 'Menu', 'Orders', 'Account']
           : const ['Map', 'Deliveries', 'Account'],
       selected: tab,
+      transitionKey: role == 'customer' ? tab : null,
       onSelected: (v) => setState(() => tab = v),
-      header: Padding(
-        padding: const EdgeInsets.fromLTRB(24, 16, 12, 4),
-        child: Row(
-          children: [
-            Expanded(
+      header: role == 'customer'
+          ? Padding(
+              padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    role == 'restaurant'
-                        ? widget.account['restaurant']['name']
-                        : role == 'rider'
-                        ? 'iGO Delivery'
-                        : 'iGO',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 22,
-                      letterSpacing: -.5,
-                      fontWeight: FontWeight.w800,
+                  DeliveryAddressHeader(
+                    address:
+                        storedAddress(deliveryRecord(widget.account))
+                            ?.building ??
+                        'Choose your address',
+                    area:
+                        storedAddress(deliveryRecord(widget.account))?.area ??
+                        'Malé / Hulhumalé',
+                    onAccount: () => setState(() => tab = accountTab),
+                    onTap: () => editAddress(
+                      context,
+                      widget.api,
+                      widget.account,
+                      after: widget.refreshAccount,
                     ),
                   ),
-                  Text(
-                    widget.api.isDemo
-                        ? 'DEMO · FICTIONAL DATA · NO CHARGES'
-                        : {
-                            'customer': 'Your everyday, delivered.',
-                            'restaurant': 'Your restaurant workspace.',
-                            'rider': 'Your next delivery.',
-                          }[role]!,
-                    style: const TextStyle(color: muted, fontSize: 12),
+                  if (widget.api.isDemo)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 3),
+                      child: Text(
+                        'SHARED DEMO · FICTIONAL DATA · NO CHARGES',
+                        style: TextStyle(
+                          fontSize: 8,
+                          letterSpacing: .6,
+                          color: muted,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            )
+          : Padding(
+              padding: const EdgeInsets.fromLTRB(24, 16, 12, 4),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          role == 'restaurant'
+                              ? widget.account['restaurant']['name']
+                              : role == 'rider'
+                              ? 'iGO Delivery'
+                              : 'iGO',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 22,
+                            letterSpacing: -.5,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        Text(
+                          widget.api.isDemo
+                              ? 'DEMO · FICTIONAL DATA · NO CHARGES'
+                              : {
+                                  'customer': 'Your everyday, delivered.',
+                                  'restaurant': 'Your restaurant workspace.',
+                                  'rider': 'Your next delivery.',
+                                }[role]!,
+                          style: const TextStyle(color: muted, fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => showModalBottomSheet<void>(
+                      context: context,
+                      builder: (context) => SafeArea(
+                        child: ListView(
+                          shrinkWrap: true,
+                          children: [
+                            const ListTile(
+                              title: Text(
+                                'Your updates',
+                                style: TextStyle(fontWeight: FontWeight.w700),
+                              ),
+                            ),
+                            if ((data?['notifications'] as List? ?? []).isEmpty)
+                              const ListTile(title: Text('No updates yet.')),
+                            for (final notice
+                                in data?['notifications'] as List? ?? [])
+                              ListTile(
+                                title: Text(notice['text']),
+                                subtitle: Text(
+                                  DateTime.parse(notice['time'])
+                                      .toLocal()
+                                      .toString(),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    tooltip: 'Updates',
+                    icon: const Icon(Icons.notifications_none),
+                  ),
+                  IconButton(
+                    onPressed: () => refresh(checkAccount: true),
+                    tooltip: 'Refresh',
+                    icon: const Icon(Icons.refresh, size: 21),
                   ),
                 ],
               ),
             ),
-            IconButton(
-              onPressed: () => showModalBottomSheet<void>(
-                context: context,
-                builder: (context) => SafeArea(
-                  child: ListView(
-                    shrinkWrap: true,
-                    children: [
-                      const ListTile(
-                        title: Text(
-                          'Your updates',
-                          style: TextStyle(fontWeight: FontWeight.w700),
-                        ),
-                      ),
-                      if ((data?['notifications'] as List? ?? []).isEmpty)
-                        const ListTile(title: Text('No updates yet.')),
-                      for (final notice
-                          in data?['notifications'] as List? ?? [])
-                        ListTile(
-                          title: Text(notice['text']),
-                          subtitle: Text(
-                            DateTime.parse(notice['time']).toLocal().toString(),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-              tooltip: 'Updates',
-              icon: const Icon(Icons.notifications_none),
-            ),
-            IconButton(
-              onPressed: () => refresh(checkAccount: true),
-              tooltip: 'Refresh',
-              icon: const Icon(Icons.refresh, size: 21),
-            ),
-          ],
-        ),
-      ),
       body: role == 'rider' && tab == 0
           ? riderMap()
           : RefreshIndicator(
               onRefresh: () => refresh(checkAccount: true),
               child: ListView(
-                padding: const EdgeInsets.fromLTRB(24, 18, 24, 118),
+                padding: EdgeInsets.fromLTRB(
+                  role == 'customer' ? 20 : 24,
+                  role == 'customer' ? 4 : 18,
+                  role == 'customer' ? 20 : 24,
+                  118,
+                ),
                 children: [
                   if (error != null)
                     Glass(
@@ -861,15 +907,27 @@ class _LiveWorkspaceState extends State<LiveWorkspace>
   Widget profile() => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
+      if (role == 'customer')
+        const SectionHeading(
+          title: 'Your account',
+          subtitle: 'Everything you need, in one place',
+        ),
       Glass(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              widget.account['name'],
-              style: Theme.of(context).textTheme.headlineMedium,
-            ),
-            Text('${role[0].toUpperCase()}${role.substring(1)} · approved'),
+            if (role == 'customer')
+              CustomerAccountIdentity(
+                name: widget.account['name'],
+                caption: 'Customer · approved',
+              )
+            else
+              Text(
+                widget.account['name'],
+                style: Theme.of(context).textTheme.headlineMedium,
+              ),
+            if (role != 'customer')
+              Text('${role[0].toUpperCase()}${role.substring(1)} · approved'),
             const SizedBox(height: 12),
             if (role == 'customer') ...[
               Text(
@@ -922,6 +980,42 @@ class _LiveWorkspaceState extends State<LiveWorkspace>
           ],
         ),
       ),
+      if (role == 'customer')
+        ListTile(
+          contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+          leading: const Icon(Icons.notifications_none, size: 23),
+          title: const Text(
+            'Your updates',
+            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+          ),
+          trailing: const Icon(Icons.chevron_right, size: 18),
+          onTap: () => showModalBottomSheet<void>(
+            context: context,
+            showDragHandle: true,
+            builder: (_) => SafeArea(
+              child: ListView(
+                shrinkWrap: true,
+                children: [
+                  const ListTile(
+                    title: Text(
+                      'Your updates',
+                      style: TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                  ),
+                  if ((data?['notifications'] as List? ?? []).isEmpty)
+                    const ListTile(title: Text('No updates yet.')),
+                  for (final notice in data?['notifications'] as List? ?? [])
+                    ListTile(
+                      title: Text(notice['text']),
+                      subtitle: Text(
+                        DateTime.parse(notice['time']).toLocal().toString(),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ),
       const SizedBox(height: 16),
       PolicyLinks(api: widget.api),
       const Text(
@@ -964,30 +1058,45 @@ class _LiveWorkspaceState extends State<LiveWorkspace>
     if (catalog == null) {
       return const Center(child: CircularProgressIndicator());
     }
-    final address = storedAddress(deliveryRecord(widget.account));
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        DeliveryAddressHeader(
-          address: address?.building ?? 'Choose your address',
-          area: address?.area ?? 'Malé / Hulhumalé',
-          onTap: () => editAddress(
-            context,
-            widget.api,
-            widget.account,
-            after: widget.refreshAccount,
+        if (tab == 1)
+          const SectionHeading(
+            title: 'Find your next favourite',
+            subtitle: 'Search restaurants and cuisines',
+          )
+        else ...[
+          const Row(
+            children: [
+              Icon(Icons.restaurant_rounded, size: 16),
+              SizedBox(width: 7),
+              Flexible(
+                child: Text(
+                  'Food delivery',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
+                ),
+              ),
+              SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Your islands. Delivered.',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.end,
+                  style: TextStyle(fontSize: 10, color: muted),
+                ),
+              ),
+            ],
           ),
-        ),
-        const SizedBox(height: 18),
-        TextField(
+          const SizedBox(height: 16),
+        ],
+        CustomerSearchField(
           key: const ValueKey('catalog-search'),
+          value: query,
           onChanged: (v) => filterCatalog(query: v),
-          decoration: const InputDecoration(
-            hintText: 'Food, restaurants, and little cravings',
-            prefixIcon: Icon(Icons.search),
-          ),
         ),
-        const SizedBox(height: 14),
+        const SectionHeading(title: 'What are you craving?'),
         CuisineFilters(
           selected: cuisine,
           onSelected: (v) => filterCatalog(category: v),
@@ -996,8 +1105,10 @@ class _LiveWorkspaceState extends State<LiveWorkspace>
             query.isEmpty &&
             cuisine == 'All' &&
             (catalog!['items'] as List).isNotEmpty) ...[
+          const SizedBox(height: 12),
+          IslandDiscoveryBanner(onTap: () => filterCatalog(category: 'Coffee')),
           const SectionHeading(
-            title: 'A taste of your islands',
+            title: 'Discover your next favourite',
             subtitle: 'Explore the kitchens on this page',
           ),
           RestaurantRail(
@@ -1008,9 +1119,7 @@ class _LiveWorkspaceState extends State<LiveWorkspace>
           ),
         ],
         SectionHeading(
-          title: tab == 1
-              ? 'Find your next favourite'
-              : 'Good food, right here',
+          title: 'Restaurants to explore',
           subtitle: '${catalog!['total']} restaurants',
         ),
         if ((catalog!['items'] as List).isEmpty)
@@ -1551,62 +1660,29 @@ class _LiveWorkspaceState extends State<LiveWorkspace>
       'Arrived at customer': 'Delivery complete',
     }[delivery];
     if (role == 'customer') {
-      return Glass(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                StatusPill(order['status'] ?? preparation),
-                const Spacer(),
-                const Icon(Icons.shopping_bag_outlined, size: 22),
-              ],
+      return CustomerOrderCard(
+        restaurant: order['restaurant'] ?? 'Your restaurant',
+        items: order['items'] ?? '',
+        status: order['status'] ?? preparation,
+        reference: order['publicId'] ?? order['id'],
+        estimate: order['estimatedDelivery'] ?? '',
+        amount: price(order['amount']),
+        progress: OrderProgress(
+          stage: deliveryStage(preparation, delivery, order['rider'] != null),
+        ),
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => OrderDetailPage(
+              order: order,
+              feed: orderFeed,
+              onHelp: () => help(order['id']),
             ),
-            const SizedBox(height: 16),
-            Text(
-              order['restaurant'] ?? 'Your restaurant',
-              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
-            ),
-            Text(
-              order['items'] ?? '',
-              style: const TextStyle(fontSize: 12, color: muted),
-            ),
-            const SizedBox(height: 20),
-            OrderProgress(
-              stage: deliveryStage(
-                preparation,
-                delivery,
-                order['rider'] != null,
-              ),
-            ),
-            const SizedBox(height: 14),
-            Text(
-              order['estimatedDelivery'] ?? '',
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 14),
-            FilledButton(
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => OrderDetailPage(
-                    order: order,
-                    feed: orderFeed,
-                    onHelp: () => help(order['id']),
-                  ),
-                ),
-              ),
-              child: const Text('View order progress'),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              order['publicId'] ?? order['id'],
-              style: const TextStyle(fontSize: 10, color: muted),
-            ),
-          ],
+          ),
         ),
       );
     }
+
     return Glass(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1943,58 +2019,24 @@ class _LiveMenuState extends State<LiveMenu> {
           child: ListView(
             padding: const EdgeInsets.all(24),
             children: [
-              Align(
-                alignment: Alignment.centerLeft,
-                child: IconButton(
-                  onPressed: () => Navigator.pop(context),
-                  icon: const Icon(Icons.arrow_back),
-                ),
+              CustomerToolbar(
+                title: widget.restaurant['name'],
+                subtitle: 'Restaurant menu',
               ),
-              Container(
-                height: 165,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(28),
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFFFFEE9F), Color(0xFFF8F4E9)],
-                  ),
-                ),
-                child: const Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.restaurant_menu, size: 48),
-                    SizedBox(height: 10),
-                    Text(
-                      'Fresh from the kitchen.',
-                      style: TextStyle(fontWeight: FontWeight.w700),
-                    ),
-                    Text(
-                      'Restaurant photo coming soon',
-                      style: TextStyle(color: muted, fontSize: 11),
-                    ),
-                  ],
-                ),
+              RestaurantMenuHeader(
+                name: widget.restaurant['name'],
+                subtitle:
+                    '${widget.restaurant['cuisine']} · ${widget.restaurant['area']}',
+                detail: widget.restaurant['acceptingOrders'] == true
+                    ? widget.restaurant['prepTime'] == null
+                          ? 'Preparation estimate pending'
+                          : '${widget.restaurant['prepTime']} min preparation'
+                    : 'Currently closed',
               ),
-              const SizedBox(height: 20),
-              Text(
-                widget.restaurant['name'],
-                style: Theme.of(context).textTheme.headlineLarge,
+              const SectionHeading(
+                title: 'On the menu',
+                subtitle: 'Find something you’ll love',
               ),
-              Text(
-                '${widget.restaurant['cuisine']} · ${widget.restaurant['area']}',
-                style: const TextStyle(color: muted),
-              ),
-              const SizedBox(height: 8),
-              if (widget.restaurant['prepTime'] != null)
-                Text(
-                  '${widget.restaurant['prepTime']} min preparation',
-                  style: const TextStyle(fontSize: 12),
-                ),
-              const SizedBox(height: 24),
-              Text(
-                'On the menu',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: 16),
               if (error != null) ...[
                 Text(error!),
                 TextButton(onPressed: refresh, child: const Text('Try again')),
@@ -2032,35 +2074,19 @@ class _LiveMenuState extends State<LiveMenu> {
                 ),
                 const SizedBox(height: 18),
                 for (final item in data!['items'])
-                  MenuItemTile(
+                  CustomerMenuItem(
                     name: item['name'],
                     image: item['image'] == null
                         ? null
                         : Map<String, dynamic>.from(item['image']),
                     description: item['description'],
                     amount: price(item['price']),
-                    category: item['category'] ?? 'General',
-                    controls: Row(
-                      children: [
-                        const Spacer(),
-                        IconButton(
-                          tooltip: 'Remove ${item['name']}',
-                          onPressed: () =>
-                              quantity(Map<String, dynamic>.from(item), -1),
-                          icon: const Icon(Icons.remove),
-                        ),
-                        Text('${cart[item['id']]?['quantity'] ?? 0}'),
-                        IconButton.filledTonal(
-                          tooltip: 'Add ${item['name']}',
-                          onPressed:
-                              data!['restaurant']['acceptingOrders'] == true
-                              ? () =>
-                                    quantity(Map<String, dynamic>.from(item), 1)
-                              : null,
-                          icon: const Icon(Icons.add),
-                        ),
-                      ],
-                    ),
+                    quantity: cart[item['id']]?['quantity'] ?? 0,
+                    onRemove: () =>
+                        quantity(Map<String, dynamic>.from(item), -1),
+                    onAdd: data!['restaurant']['acceptingOrders'] == true
+                        ? () => quantity(Map<String, dynamic>.from(item), 1)
+                        : null,
                   ),
                 pagination(data!, page, (p) {
                   setState(() => page = p);
@@ -2071,17 +2097,18 @@ class _LiveMenuState extends State<LiveMenu> {
           ),
         ),
         Padding(
-          padding: const EdgeInsets.fromLTRB(18, 0, 18, 12),
-          child: Glass(
-            padding: const EdgeInsets.all(8),
-            child: FilledButton(
-              onPressed:
-                  cart.isNotEmpty &&
-                      data?['restaurant']['acceptingOrders'] == true
-                  ? checkout
-                  : null,
-              child: Text('View cart · ${price(subtotal)}'),
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+          child: CustomerCartBar(
+            count: cart.values.fold<int>(
+              0,
+              (sum, item) => sum + (item['quantity'] as int),
             ),
+            amount: price(subtotal),
+            onTap:
+                cart.isNotEmpty &&
+                    data?['restaurant']['acceptingOrders'] == true
+                ? checkout
+                : null,
           ),
         ),
       ],
@@ -2206,16 +2233,9 @@ class _LiveCheckoutState extends State<LiveCheckout> {
     child: ListView(
       padding: const EdgeInsets.all(24),
       children: [
-        Align(
-          alignment: Alignment.centerLeft,
-          child: IconButton(
-            onPressed: () => Navigator.pop(context),
-            icon: const Icon(Icons.arrow_back),
-          ),
-        ),
-        Text(
-          widget.api.isDemo ? 'Your demo cart' : 'Your cart',
-          style: Theme.of(context).textTheme.headlineLarge,
+        CustomerToolbar(
+          title: widget.api.isDemo ? 'Your demo cart' : 'Your cart',
+          subtitle: widget.restaurant['name'],
         ),
         const SizedBox(height: 20),
         Glass(

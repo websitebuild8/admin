@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'dart:async';
 
 import 'browse_widgets.dart';
+import 'customer_widgets.dart';
 import 'delivery_widgets.dart';
 import 'places_lookup.dart';
 
@@ -31,6 +32,58 @@ void main() {
   runApp(const IgoApp());
 }
 
+ThemeData igoTheme() => ThemeData(
+  useMaterial3: true,
+  scaffoldBackgroundColor: const Color(0xFFFAFAF7),
+  colorScheme: ColorScheme.fromSeed(
+    seedColor: yellow,
+    primary: ink,
+    secondary: yellow,
+    surface: Colors.white,
+  ),
+  textTheme: const TextTheme(
+    headlineLarge: TextStyle(
+      fontSize: 36,
+      fontWeight: FontWeight.w800,
+      letterSpacing: -1.4,
+      color: ink,
+    ),
+    headlineMedium: TextStyle(
+      fontSize: 28,
+      fontWeight: FontWeight.w800,
+      letterSpacing: -.8,
+      color: ink,
+    ),
+    titleLarge: TextStyle(
+      fontSize: 20,
+      fontWeight: FontWeight.w700,
+      color: ink,
+    ),
+    bodyMedium: TextStyle(fontSize: 14, height: 1.5, color: ink),
+  ),
+  filledButtonTheme: FilledButtonThemeData(
+    style: FilledButton.styleFrom(
+      backgroundColor: yellow,
+      foregroundColor: ink,
+      minimumSize: const Size(double.infinity, 54),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      textStyle: TextStyle(
+        fontFamily: ThemeData().textTheme.labelLarge?.fontFamily,
+        fontWeight: FontWeight.w700,
+        fontSize: 15,
+      ),
+    ),
+  ),
+  inputDecorationTheme: InputDecorationTheme(
+    filled: true,
+    fillColor: Colors.white.withValues(alpha: .8),
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(18),
+      borderSide: BorderSide.none,
+    ),
+  ),
+);
+
 class IgoApp extends StatelessWidget {
   final bool preview;
   const IgoApp({super.key, this.preview = previewEnabled});
@@ -44,59 +97,7 @@ class IgoApp extends StatelessWidget {
     final app = MaterialApp(
       title: 'iGO',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true,
-        scaffoldBackgroundColor: const Color(0xFFFAFAF7),
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: yellow,
-          primary: ink,
-          secondary: yellow,
-          surface: Colors.white,
-        ),
-        textTheme: const TextTheme(
-          headlineLarge: TextStyle(
-            fontSize: 36,
-            fontWeight: FontWeight.w800,
-            letterSpacing: -1.4,
-            color: ink,
-          ),
-          headlineMedium: TextStyle(
-            fontSize: 28,
-            fontWeight: FontWeight.w800,
-            letterSpacing: -.8,
-            color: ink,
-          ),
-          titleLarge: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.w700,
-            color: ink,
-          ),
-          bodyMedium: TextStyle(fontSize: 14, height: 1.5, color: ink),
-        ),
-        filledButtonTheme: FilledButtonThemeData(
-          style: FilledButton.styleFrom(
-            backgroundColor: yellow,
-            foregroundColor: ink,
-            minimumSize: const Size(double.infinity, 54),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-            ),
-            textStyle: TextStyle(
-              fontFamily: ThemeData().textTheme.labelLarge?.fontFamily,
-              fontWeight: FontWeight.w700,
-              fontSize: 15,
-            ),
-          ),
-        ),
-        inputDecorationTheme: InputDecorationTheme(
-          filled: true,
-          fillColor: Colors.white.withValues(alpha: .8),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(18),
-            borderSide: BorderSide.none,
-          ),
-        ),
-      ),
+      theme: igoTheme(),
       home: SplashPage(
         next: configured ? const LiveGate() : Welcome(preview: preview),
       ),
@@ -434,27 +435,39 @@ class _WorkspaceState extends State<Workspace> {
           ? const ['Kitchen', 'Menu', 'Orders', 'Account']
           : const ['Map', 'Deliveries', 'Account'],
       selected: tab,
+      transitionKey: widget.role == AppRole.customer ? tab : null,
       onSelected: (v) => setState(() => tab = v),
-      header: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 6, 8, 0),
-        child: Row(
-          children: [
-            const StatusPill('PREVIEW'),
-            const Spacer(),
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text(
-                'Change experience',
-                style: TextStyle(fontSize: 11),
+      header: widget.role == AppRole.customer
+          ? Padding(
+              padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
+              child: DeliveryAddressHeader(
+                address:
+                    cart.deliveryAddress?.building ?? 'Choose your address',
+                area: '${cart.deliveryAddress?.area ?? area} · Design preview',
+                onTap: address,
+                onAccount: () => setState(() => tab = 3),
+              ),
+            )
+          : Padding(
+              padding: const EdgeInsets.fromLTRB(20, 6, 8, 0),
+              child: Row(
+                children: [
+                  const StatusPill('PREVIEW'),
+                  const Spacer(),
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text(
+                      'Change experience',
+                      style: TextStyle(fontSize: 11),
+                    ),
+                  ),
+                ],
               ),
             ),
-          ],
-        ),
-      ),
       body: widget.role == AppRole.rider && tab == 0
           ? riderMap()
           : ListView(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 118),
+              padding: const EdgeInsets.fromLTRB(20, 4, 20, 118),
               children: tab == accountTab
                   ? profile()
                   : widget.role == AppRole.customer
@@ -494,37 +507,58 @@ class _WorkspaceState extends State<Workspace> {
               : () => toast('This fictional restaurant has no sample menu.'),
         );
     return [
-      DeliveryAddressHeader(
-        address: cart.deliveryAddress?.building ?? 'Choose your address',
-        area: cart.deliveryAddress?.area ?? area,
-        onTap: address,
-      ),
-      const SizedBox(height: 16),
-      TextField(
-        onChanged: (v) => setState(() => query = v),
-        decoration: const InputDecoration(
-          hintText: 'Food, restaurants, and little cravings',
-          prefixIcon: Icon(Icons.search),
+      if (tab == 1) ...[
+        const SectionHeading(
+          title: 'Find your next favourite',
+          subtitle: 'Search the island’s kitchens',
         ),
+      ] else ...[
+        const Row(
+          children: [
+            Icon(Icons.restaurant_rounded, size: 16),
+            SizedBox(width: 7),
+            Flexible(
+              child: Text(
+                'Food delivery',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
+              ),
+            ),
+            SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Your islands. Delivered.',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.end,
+                style: TextStyle(fontSize: 10, color: muted),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+      ],
+      CustomerSearchField(
+        value: query,
+        onChanged: (v) => setState(() => query = v),
       ),
-      const SizedBox(height: 20),
+      const SectionHeading(title: 'What are you craving?'),
       CuisineFilters(
         selected: cuisine,
         onSelected: (v) => setState(() => cuisine = v),
       ),
       if (tab == 0 && query.isEmpty && cuisine == 'All') ...[
-        const SizedBox(height: 10),
-        CafeFeature(onTap: menuPage),
+        const SizedBox(height: 12),
+        IslandDiscoveryBanner(preview: true, onTap: menuPage),
         const SectionHeading(
-          title: 'A taste of your island',
-          subtitle: 'Sample kitchens, ready to explore',
+          title: 'Discover your next favourite',
+          subtitle: 'A little inspiration from our sample kitchens',
         ),
         RestaurantRail(
           cards: [for (final shop in shops) card(shop, compact: true)],
         ),
       ],
       SectionHeading(
-        title: tab == 1 ? 'Find your next favourite' : 'Good food, right here',
+        title: 'Restaurants to explore',
         subtitle: '${matches.length} sample restaurants',
       ),
       for (final shop in matches) card(shop),
@@ -580,47 +614,28 @@ class _WorkspaceState extends State<Workspace> {
     ],
   };
   List<Widget> customerOrders() => [
-    const WorkspaceHeading(eyebrow: 'Your deliveries', title: 'Orders.'),
-    const SectionHeading(title: 'In progress'),
-    Glass(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const Row(
-            children: [
-              StatusPill('PREPARING'),
-              Spacer(),
-              Text('SAMPLE-001', style: TextStyle(fontSize: 11)),
-            ],
+    const SectionHeading(
+      title: 'Your orders',
+      subtitle: 'Good things are on their way',
+    ),
+    CustomerOrderCard(
+      restaurant: 'The Cafe',
+      items: '1 × Iced latte · 1 × Chocolate cake',
+      status: 'Preparing · Sample order',
+      reference: 'SAMPLE-001',
+      estimate: 'Sample estimate · 25–35 minutes',
+      amount: money(13000),
+      progress: const OrderProgress(stage: 1),
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => OrderDetailPage(
+            order: sampleOrder,
+            preview: true,
+            onHelp: () =>
+                toast('Sample order. Support will be connected before launch.'),
           ),
-          const SizedBox(height: 16),
-          const Text(
-            'The Cafe',
-            style: TextStyle(fontSize: 23, fontWeight: FontWeight.w800),
-          ),
-          const Text(
-            'Iced latte + Chocolate cake',
-            style: TextStyle(color: muted, fontSize: 12),
-          ),
-          const SizedBox(height: 22),
-          const OrderProgress(stage: 1),
-          const SizedBox(height: 20),
-          FilledButton(
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => OrderDetailPage(
-                  order: sampleOrder,
-                  preview: true,
-                  onHelp: () => toast(
-                    'Sample order. Support will be connected before launch.',
-                  ),
-                ),
-              ),
-            ),
-            child: const Text('View order progress'),
-          ),
-        ],
+        ),
       ),
     ),
     const SizedBox(height: 18),
@@ -940,16 +955,28 @@ class _WorkspaceState extends State<Workspace> {
   }
 
   List<Widget> profile() => [
-    Text('Your corner.', style: Theme.of(context).textTheme.headlineLarge),
+    if (widget.role == AppRole.customer)
+      const SectionHeading(
+        title: 'Your account',
+        subtitle: 'Make yourself at home',
+      )
+    else
+      Text('Your corner.', style: Theme.of(context).textTheme.headlineLarge),
     const SizedBox(height: 24),
     Glass(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            '${widget.role.name.toUpperCase()} PREVIEW',
-            style: const TextStyle(fontWeight: FontWeight.w800),
-          ),
+          if (widget.role == AppRole.customer)
+            const CustomerAccountIdentity(
+              name: 'Your iGO',
+              caption: 'Customer · Design preview',
+            )
+          else
+            Text(
+              '${widget.role.name.toUpperCase()} PREVIEW',
+              style: const TextStyle(fontWeight: FontWeight.w800),
+            ),
           const SizedBox(height: 12),
           const Text(
             'Fictional account. Nothing here changes your real account, money, or orders.',
@@ -1008,83 +1035,41 @@ class _MenuPageState extends State<MenuPage> {
   Widget build(BuildContext context) => CanvasPage(
     child: Column(
       children: [
+        const CustomerToolbar(title: 'The Cafe', subtitle: 'Sample restaurant'),
         Expanded(
           child: ListView(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.symmetric(horizontal: 20),
             children: [
-              Align(
-                alignment: Alignment.centerLeft,
-                child: IconButton(
-                  onPressed: () => Navigator.pop(context),
-                  icon: const Icon(Icons.arrow_back),
-                ),
+              const RestaurantMenuHeader(
+                name: 'The Cafe',
+                subtitle: 'Coffee, snacks & little joys · Malé',
+                detail: '25–35 min · Sample delivery MVR 25',
+                preview: true,
               ),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(28),
-                child: Image.asset(
-                  'assets/food/cafe-preview.png',
-                  height: 190,
-                  fit: BoxFit.cover,
-                  semanticLabel: 'Sample café food photography',
-                ),
+              const SectionHeading(
+                title: 'On the menu',
+                subtitle: 'Fresh picks for your everyday cravings',
               ),
-              const SizedBox(height: 22),
-              Text(
-                'The Cafe',
-                style: Theme.of(context).textTheme.headlineLarge,
-              ),
-              const Row(
-                children: [
-                  Icon(Icons.star_rounded, size: 16),
-                  SizedBox(width: 4),
-                  Expanded(
-                    child: Text(
-                      '4.8 · Coffee, snacks & little joys',
-                      style: TextStyle(color: muted),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              const Text('25–35 min  •  Delivery MVR 25  •  Sample menu'),
-              const SizedBox(height: 24),
-              Text(
-                'On the menu',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: 16),
               for (int i = 0; i < menu.length; i++)
-                MenuItemTile(
+                CustomerMenuItem(
                   name: menu[i].name,
                   description: menu[i].description,
                   amount: money(menu[i].price),
-                  category: i == 1 ? 'Desserts' : 'Drinks',
-                  controls: Row(
-                    children: [
-                      const Spacer(),
-                      IconButton(
-                        tooltip: 'Remove ${menu[i].name}',
-                        onPressed: () =>
-                            setState(() => widget.cart.change(i, -1)),
-                        icon: const Icon(Icons.remove),
-                      ),
-                      Text('${widget.cart.quantities[i] ?? 0}'),
-                      IconButton.filledTonal(
-                        tooltip: 'Add ${menu[i].name}',
-                        onPressed: () =>
-                            setState(() => widget.cart.change(i, 1)),
-                        icon: const Icon(Icons.add),
-                      ),
-                    ],
-                  ),
+                  sampleAsset: i < 2 ? 'assets/food/cafe-preview.png' : null,
+                  quantity: widget.cart.quantities[i] ?? 0,
+                  onRemove: () => setState(() => widget.cart.change(i, -1)),
+                  onAdd: () => setState(() => widget.cart.change(i, 1)),
                 ),
+              const SizedBox(height: 24),
             ],
           ),
         ),
         Padding(
-          padding: const EdgeInsets.all(20),
-          child: FilledButton(
-            onPressed: widget.cart.count == 0
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+          child: CustomerCartBar(
+            count: widget.cart.count,
+            amount: money(widget.cart.subtotal),
+            onTap: widget.cart.count == 0
                 ? null
                 : () async {
                     await Navigator.push(
@@ -1093,11 +1078,8 @@ class _MenuPageState extends State<MenuPage> {
                         builder: (_) => Checkout(cart: widget.cart),
                       ),
                     );
-                    setState(() {});
+                    if (mounted) setState(() {});
                   },
-            child: Text(
-              'View cart · ${widget.cart.count} items · ${money(widget.cart.subtotal)}',
-            ),
           ),
         ),
       ],
@@ -1120,14 +1102,10 @@ class _CheckoutState extends State<Checkout> {
     child: ListView(
       padding: const EdgeInsets.all(24),
       children: [
-        Align(
-          alignment: Alignment.centerLeft,
-          child: IconButton(
-            onPressed: () => Navigator.pop(context),
-            icon: const Icon(Icons.arrow_back),
-          ),
+        const CustomerToolbar(
+          title: 'Your cart',
+          subtitle: 'The Cafe · Sample checkout',
         ),
-        Text('Your cart', style: Theme.of(context).textTheme.headlineLarge),
         const Text(
           'A little something from The Cafe.',
           style: TextStyle(color: muted),
@@ -1136,9 +1114,11 @@ class _CheckoutState extends State<Checkout> {
         for (final e in widget.cart.quantities.entries.toList())
           ListTile(
             contentPadding: EdgeInsets.zero,
-            leading: Text(
-              menu[e.key].emoji,
-              style: const TextStyle(fontSize: 28),
+            leading: Icon(
+              menu[e.key].name.toLowerCase().contains('cake')
+                  ? Icons.cake_outlined
+                  : Icons.coffee_outlined,
+              size: 25,
             ),
             title: Text(menu[e.key].name),
             subtitle: Text(money(menu[e.key].price * e.value)),
@@ -1491,16 +1471,11 @@ class _AddressPageState extends State<AddressPage> {
       child: ListView(
         padding: const EdgeInsets.all(24),
         children: [
-          Align(
-            alignment: Alignment.centerLeft,
-            child: IconButton(
-              onPressed: () => Navigator.pop(context),
-              icon: const Icon(Icons.arrow_back),
-            ),
-          ),
-          Text(
-            widget.pickup ? 'Pickup entrance.' : 'Delivery address.',
-            style: Theme.of(context).textTheme.headlineLarge,
+          CustomerToolbar(
+            title: widget.pickup ? 'Pickup entrance' : 'Delivery address',
+            subtitle: widget.pickup
+                ? 'Restaurant location'
+                : 'Let’s find your doorstep',
           ),
           const SizedBox(height: 8),
           Text(

@@ -74,8 +74,9 @@ final class IgoGlassNavigation: NSObject, FlutterPlatformView {
       button.tag = index
       var config = UIButton.Configuration.plain()
       config.title = label
-      let symbols = ["Home": "house", "Search": "magnifyingglass", "Kitchen": "building.2", "Menu": "fork.knife", "Map": "map", "Account": "person.crop.circle"]
+      let symbols = ["Home": index == selected ? "house.fill" : "house", "Search": "magnifyingglass", "Kitchen": "building.2", "Menu": "fork.knife", "Map": "map", "Account": index == selected ? "person.fill" : "person", "Orders": "bag"]
       config.image = UIImage(systemName: symbols[label] ?? "list.bullet.rectangle")
+      config.preferredSymbolConfigurationForImage = UIImage.SymbolConfiguration(pointSize: 23, weight: .regular)
       config.imagePlacement = .top
       config.imagePadding = 2
       config.baseForegroundColor = UIColor(red: 0.094, green: 0.098, blue: 0.094, alpha: 1)

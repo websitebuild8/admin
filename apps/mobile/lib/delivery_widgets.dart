@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'browse_widgets.dart';
+import 'customer_widgets.dart';
 import 'food_photo.dart';
 import 'entrance_map.dart';
 import 'main.dart' show CanvasPage, Glass;
@@ -630,10 +631,17 @@ class OrderProgress extends StatelessWidget {
             Expanded(
               child: Padding(
                 padding: EdgeInsets.only(right: i == 4 ? 0 : 5),
-                child: Container(
-                  height: 5,
+                child: AnimatedContainer(
+                  duration: MediaQuery.disableAnimationsOf(context)
+                      ? Duration.zero
+                      : const Duration(milliseconds: 240),
+                  height: 6,
                   decoration: BoxDecoration(
-                    color: i <= stage ? browseInk : const Color(0xFFE5E5DF),
+                    color: i <= stage
+                        ? (MediaQuery.highContrastOf(context)
+                              ? browseInk
+                              : browseYellow)
+                        : const Color(0xFFE5E5DF),
                     borderRadius: BorderRadius.circular(5),
                   ),
                 ),
@@ -645,12 +653,32 @@ class OrderProgress extends StatelessWidget {
       const Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text('Placed', style: TextStyle(fontSize: 10, color: browseMuted)),
-          Text(
-            'On the way',
-            style: TextStyle(fontSize: 10, color: browseMuted),
+          Expanded(
+            child: Text(
+              'Placed',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 10, color: browseMuted),
+            ),
           ),
-          Text('Delivered', style: TextStyle(fontSize: 10, color: browseMuted)),
+          Expanded(
+            child: Text(
+              'On the way',
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 10, color: browseMuted),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              'Delivered',
+              textAlign: TextAlign.end,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 10, color: browseMuted),
+            ),
+          ),
         ],
       ),
     ],
@@ -687,54 +715,85 @@ class OrderDetailPage extends StatelessWidget {
       child: ListView(
         padding: EdgeInsets.zero,
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 8, 14, 0),
-            child: Row(
-              children: [
-                IconButton(
-                  onPressed: () => Navigator.pop(context),
-                  icon: const Icon(Icons.close),
-                ),
-                const Spacer(),
-                TextButton.icon(
-                  onPressed: onHelp,
-                  icon: const Icon(Icons.help_outline, size: 17),
-                  label: const Text('Help'),
-                ),
-              ],
+          CustomerToolbar(
+            title: 'Order status',
+            subtitle: value['publicId'] ?? value['id'],
+            trailing: TextButton.icon(
+              onPressed: onHelp,
+              icon: const Icon(Icons.help_outline, size: 17),
+              label: const Text('Help'),
             ),
           ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(22, 12, 22, 22),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (preview)
-                  const Padding(
-                    padding: EdgeInsets.only(bottom: 12),
-                    child: StatusPill('SAMPLE ORDER'),
+            padding: const EdgeInsets.fromLTRB(22, 0, 22, 24),
+            child: CustomerEntrance(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (preview)
+                    const Padding(
+                      padding: EdgeInsets.only(bottom: 12),
+                      child: StatusPill('SAMPLE ORDER'),
+                    ),
+                  const Text(
+                    'FROM KITCHEN TO DOORSTEP',
+                    style: TextStyle(
+                      fontSize: 9,
+                      letterSpacing: 1.3,
+                      color: browseMuted,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
-                Text(
-                  value['status'] == 'Needs attention'
-                      ? 'Your order needs attention.'
-                      : deliveryHeadline(prep, delivery),
-                  style: const TextStyle(
-                    fontSize: 29,
-                    height: 1.1,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -.8,
+                  const SizedBox(height: 12),
+                  Text(
+                    value['status'] == 'Needs attention'
+                        ? 'Your order needs attention.'
+                        : deliveryHeadline(prep, delivery),
+                    style: const TextStyle(
+                      fontSize: 28,
+                      height: 1.1,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: -.9,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  value['estimatedDelivery'] ?? 'Delivery estimate pending',
-                  style: const TextStyle(fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(height: 20),
-                OrderProgress(
-                  stage: deliveryStage(prep, delivery, value['rider'] != null),
-                ),
-              ],
+                  const SizedBox(height: 14),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 9,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFF4BC),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.schedule_rounded, size: 17),
+                        const SizedBox(width: 7),
+                        Flexible(
+                          child: Text(
+                            value['estimatedDelivery'] ??
+                                'Delivery estimate pending',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 22),
+                  OrderProgress(
+                    stage: deliveryStage(
+                      prep,
+                      delivery,
+                      value['rider'] != null,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
           JobMap(

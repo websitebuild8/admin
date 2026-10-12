@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import 'native_glass_bar.dart';
@@ -11,6 +12,7 @@ class FloatingWorkspace extends StatelessWidget {
   final List<String> labels;
   final int selected;
   final ValueChanged<int> onSelected;
+  final int? transitionKey;
   const FloatingWorkspace({
     super.key,
     required this.header,
@@ -18,6 +20,7 @@ class FloatingWorkspace extends StatelessWidget {
     required this.labels,
     required this.selected,
     required this.onSelected,
+    this.transitionKey,
   });
   @override
   Widget build(BuildContext context) => Stack(
@@ -25,7 +28,21 @@ class FloatingWorkspace extends StatelessWidget {
       Column(
         children: [
           header,
-          Expanded(child: body),
+          Expanded(
+            child: transitionKey == null
+                ? body
+                : AnimatedSwitcher(
+                    duration: MediaQuery.disableAnimationsOf(context)
+                        ? Duration.zero
+                        : const Duration(milliseconds: 220),
+                    switchInCurve: Curves.easeOutCubic,
+                    switchOutCurve: Curves.easeInCubic,
+                    child: KeyedSubtree(
+                      key: ValueKey(transitionKey),
+                      child: body,
+                    ),
+                  ),
+          ),
         ],
       ),
       Positioned(
@@ -55,7 +72,7 @@ class SectionHeading extends StatelessWidget {
   });
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(top: 24, bottom: 14),
+    padding: const EdgeInsets.only(top: 24, bottom: 16),
     child: Row(
       children: [
         Expanded(
@@ -65,10 +82,10 @@ class SectionHeading extends StatelessWidget {
               Text(
                 title,
                 style: const TextStyle(
-                  fontSize: 23,
+                  fontSize: 19,
                   height: 1.15,
                   fontWeight: FontWeight.w800,
-                  letterSpacing: -.6,
+                  letterSpacing: -.5,
                 ),
               ),
               if (subtitle != null) ...[
@@ -94,11 +111,13 @@ class SectionHeading extends StatelessWidget {
 class DeliveryAddressHeader extends StatelessWidget {
   final String address, area;
   final VoidCallback onTap;
+  final VoidCallback? onAccount;
   const DeliveryAddressHeader({
     super.key,
     required this.address,
     required this.area,
     required this.onTap,
+    this.onAccount,
   });
   @override
   Widget build(BuildContext context) => Row(
@@ -113,17 +132,22 @@ class DeliveryAddressHeader extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  'Delivery · Now',
+                  'DELIVER TO',
                   style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
+                    fontSize: 9,
+                    letterSpacing: 1.2,
+                    fontWeight: FontWeight.w800,
                     color: browseMuted,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Row(
                   children: [
-                    const Icon(Icons.place, size: 18),
+                    const Icon(
+                      CupertinoIcons.location_solid,
+                      size: 17,
+                      color: browseInk,
+                    ),
                     const SizedBox(width: 5),
                     Flexible(
                       child: Text(
@@ -131,7 +155,7 @@ class DeliveryAddressHeader extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
-                          fontSize: 17,
+                          fontSize: 18,
                           fontWeight: FontWeight.w800,
                           letterSpacing: -.4,
                         ),
@@ -140,23 +164,27 @@ class DeliveryAddressHeader extends StatelessWidget {
                     const Icon(Icons.expand_more, size: 19),
                   ],
                 ),
+                const SizedBox(height: 3),
+                Text(
+                  area,
+                  style: const TextStyle(fontSize: 11, color: browseMuted),
+                ),
               ],
             ),
           ),
         ),
       ),
-      Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: .8),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: const Color(0xFFE8E8E4)),
+      if (onAccount != null)
+        IconButton.filledTonal(
+          tooltip: 'Your account',
+          onPressed: onAccount,
+          style: IconButton.styleFrom(
+            backgroundColor: browseInk,
+            foregroundColor: Colors.white,
+            minimumSize: const Size(44, 44),
+          ),
+          icon: const Icon(CupertinoIcons.person_fill, size: 21),
         ),
-        child: Text(
-          area,
-          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
-        ),
-      ),
     ],
   );
 }
@@ -172,18 +200,18 @@ class CuisineFilters extends StatelessWidget {
   });
   @override
   Widget build(BuildContext context) => SizedBox(
-    height: 88 + MediaQuery.textScalerOf(context).scale(11) - 11,
+    height: 96 + MediaQuery.textScalerOf(context).scale(12) - 12,
     child: ListView(
       scrollDirection: Axis.horizontal,
       children: [
         for (final item in [
-          (Icons.restaurant, 'All'),
-          (Icons.coffee, 'Coffee'),
-          (Icons.ramen_dining, 'Maldivian'),
-          (Icons.local_pizza, 'Pizza'),
+          (CupertinoIcons.square_grid_2x2, 'All'),
+          (Icons.coffee_rounded, 'Coffee'),
+          (Icons.ramen_dining_rounded, 'Maldivian'),
+          (Icons.local_pizza_rounded, 'Pizza'),
         ])
           Padding(
-            padding: const EdgeInsets.only(right: 16),
+            padding: const EdgeInsets.only(right: 18),
             child: Semantics(
               selected: selected == item.$2,
               button: true,
@@ -191,24 +219,27 @@ class CuisineFilters extends StatelessWidget {
                 onTap: () => onSelected(item.$2),
                 borderRadius: BorderRadius.circular(18),
                 child: SizedBox(
-                  width: 65,
+                  width: 68,
                   child: Column(
                     children: [
-                      Container(
-                        width: 58,
-                        height: 58,
+                      AnimatedContainer(
+                        duration: MediaQuery.disableAnimationsOf(context)
+                            ? Duration.zero
+                            : const Duration(milliseconds: 180),
+                        width: 66,
+                        height: 66,
                         decoration: BoxDecoration(
                           color: selected == item.$2
-                              ? browseYellow.withValues(alpha: .65)
-                              : Colors.white.withValues(alpha: .8),
-                          borderRadius: BorderRadius.circular(20),
+                              ? browseYellow.withValues(alpha: .55)
+                              : const Color(0xFFF6F3E9),
+                          shape: BoxShape.circle,
                           border: Border.all(
                             color: selected == item.$2
                                 ? browseYellow
                                 : const Color(0xFFE8E8E4),
                           ),
                         ),
-                        child: Icon(item.$1, size: 27, color: browseInk),
+                        child: Icon(item.$1, size: 29, color: browseInk),
                       ),
                       const SizedBox(height: 7),
                       Text(
@@ -216,7 +247,7 @@ class CuisineFilters extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
-                          fontSize: 11,
+                          fontSize: 12,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
@@ -298,65 +329,101 @@ class RestaurantCard extends StatelessWidget {
     this.compact = false,
   });
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: EdgeInsets.only(bottom: compact ? 0 : 18),
-    child: Material(
-      color: Colors.white.withValues(alpha: .6),
-      borderRadius: BorderRadius.circular(22),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+  Widget build(BuildContext context) {
+    final cover = ClipRRect(
+      borderRadius: BorderRadius.circular(18),
+      child: FoodCover(
+        name: name,
+        imageAsset: imageAsset,
+        height: compact ? 120 : 110,
+      ),
+    );
+    final information = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          name,
+          maxLines: compact ? 1 : 2,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: compact ? 15 : 17,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -.4,
+          ),
+        ),
+        const SizedBox(height: 5),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(22),
-              child: FoodCover(
-                name: name,
-                imageAsset: imageAsset,
-                height: compact ? 116 : 166,
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 11, 12, 13),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: compact ? 16 : 19,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -.4,
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    subtitle,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 11, color: browseMuted),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    detail,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
+            const Icon(CupertinoIcons.time, size: 13),
+            const SizedBox(width: 4),
+            Expanded(
+              child: Text(
+                detail,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 11,
+                  height: 1.3,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
           ],
         ),
+        const SizedBox(height: 5),
+        Text(
+          subtitle,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            fontSize: 11,
+            height: 1.35,
+            color: browseMuted,
+          ),
+        ),
+      ],
+    );
+    return Padding(
+      padding: EdgeInsets.only(bottom: compact ? 0 : 16),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(18),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: compact
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    cover,
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(2, 10, 2, 0),
+                      child: information,
+                    ),
+                  ],
+                )
+              : Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  child: Row(
+                    children: [
+                      SizedBox(width: 110, child: cover),
+                      const SizedBox(width: 16),
+                      Expanded(child: information),
+                      const SizedBox(width: 5),
+                      const Icon(
+                        CupertinoIcons.chevron_right,
+                        size: 13,
+                        color: browseMuted,
+                      ),
+                    ],
+                  ),
+                ),
+        ),
       ),
-    ),
-  );
+    );
+  }
 }
 
 class RestaurantRail extends StatelessWidget {
@@ -364,12 +431,12 @@ class RestaurantRail extends StatelessWidget {
   const RestaurantRail({super.key, required this.cards});
   @override
   Widget build(BuildContext context) => SizedBox(
-    height: 236 + (MediaQuery.textScalerOf(context).scale(14) - 14) * 8,
+    height: 230 + (MediaQuery.textScalerOf(context).scale(14) - 14) * 8,
     child: ListView.separated(
       scrollDirection: Axis.horizontal,
       itemCount: cards.length,
       separatorBuilder: (_, _) => const SizedBox(width: 12),
-      itemBuilder: (_, index) => SizedBox(width: 225, child: cards[index]),
+      itemBuilder: (_, index) => SizedBox(width: 162, child: cards[index]),
     ),
   );
 }
