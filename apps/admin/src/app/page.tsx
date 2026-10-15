@@ -12,9 +12,10 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { LandingMotion } from "@/components/delivery/landing-motion";
 export default function Page() {
   return (
-    <div className="d-site">
+    <LandingMotion>
       <header className="d-site-header">
         <Link href="/" aria-label="iGO Delivery home">
           <Image
@@ -70,62 +71,68 @@ export default function Page() {
               <ShieldCheck size={17} /> Malé · Hulhumalé · Boat deliveries
             </div>
           </div>
-          <div
-            className="d-hero-art"
-            aria-label="From your business to your customer"
-          >
-            <div className="d-art-brand">
-              <Image
-                src="/brand/igo-delivery.jpg"
-                width={440}
-                height={248}
-                alt="You order. I go."
-                priority
-              />
-            </div>
-            <div className="d-route-card">
-              <div className="d-route-icon">
-                <Package size={26} />
+          <div className="d-hero-visual" data-reveal>
+            <div
+              className="d-hero-art"
+              aria-label="From your business to your customer"
+            >
+              <div className="d-art-brand">
+                <Image
+                  src="/brand/igo-delivery.jpg"
+                  width={440}
+                  height={248}
+                  alt="You order. I go."
+                  priority
+                />
               </div>
-              <div>
-                <small>COLLECT FROM</small>
-                <strong>Your business</strong>
+              <div className="d-route-card">
+                <div className="d-route-icon">
+                  <Package size={26} />
+                </div>
+                <div>
+                  <small>COLLECT FROM</small>
+                  <strong>Your business</strong>
+                </div>
+                <span className="d-mini-badge">STEP 01</span>
               </div>
-              <span className="d-mini-badge">STEP 01</span>
-            </div>
-            <div className="d-route-line">
-              <span />
-              <span />
-              <span />
-              <Truck size={26} />
-              <span />
-              <span />
-            </div>
-            <div className="d-route-card destination">
-              <div className="d-route-icon">
-                <MapPin size={26} />
+              <div className="d-route-line">
+                <span />
+                <span />
+                <span />
+                <Truck size={26} />
+                <span />
+                <span />
               </div>
-              <div>
-                <small>DELIVER TO</small>
-                <strong>A happy customer</strong>
+              <div className="d-route-card destination">
+                <div className="d-route-icon">
+                  <MapPin size={26} />
+                </div>
+                <div>
+                  <small>DELIVER TO</small>
+                  <strong>A happy customer</strong>
+                </div>
+                <div className="d-check-icon">
+                  <Check size={21} />
+                </div>
               </div>
-              <div className="d-check-icon">
-                <Check size={21} />
+              <div className="d-art-caption">
+                <span>Less delivery admin.</span>
+                <strong>More room to grow.</strong>
               </div>
-            </div>
-            <div className="d-art-caption">
-              <span>Less delivery admin.</span>
-              <strong>More room to grow.</strong>
             </div>
           </div>
         </section>
         <section id="how-it-works" className="d-how">
-          <span className="d-eyebrow">SMALL BUSINESS. BIG POSSIBILITIES.</span>
-          <h2>
-            Your next delivery,
-            <br />
-            without the back-and-forth.
-          </h2>
+          <div data-reveal>
+            <span className="d-eyebrow">
+              SMALL BUSINESS. BIG POSSIBILITIES.
+            </span>
+            <h2>
+              Your next delivery,
+              <br />
+              without the back-and-forth.
+            </h2>
+          </div>
           <div className="d-feature-grid">
             {[
               {
@@ -147,7 +154,7 @@ export default function Page() {
                 text: "Daily invoices contain delivered packages only. Bank transfers are credited after verification.",
               },
             ].map(({ icon: Icon, n, title, text }) => (
-              <article key={n}>
+              <article key={n} data-reveal>
                 <div>
                   <Icon size={25} />
                   <span>{n}</span>
@@ -159,7 +166,7 @@ export default function Page() {
           </div>
         </section>
         <section id="delivery-rates" className="d-public-rates">
-          <div>
+          <div data-reveal>
             <span className="d-eyebrow">SIMPLE STARTING RATES</span>
             <h2>
               Small fees.
@@ -180,18 +187,17 @@ export default function Page() {
               ["Hulhumalé Phase 1", "35"],
               ["Hulhumalé Phase 2", "45"],
             ].map(([name, fee]) => (
-              <article key={name}>
-                <MapPin size={19} />
+              <article key={name} data-reveal>
                 <h3>{name}</h3>
-                <strong>
-                  <small>MVR</small> {fee}
-                </strong>
-                <p>per package</p>
+                <p className="d-rate-price">
+                  <span>MVR</span>
+                  <strong>{fee}</strong>
+                </p>
               </article>
             ))}
           </div>
         </section>
-        <section className="d-final-cta">
+        <section className="d-final-cta" data-reveal>
           <div>
             <span className="d-eyebrow">YOUR CUSTOMERS ARE WAITING.</span>
             <h2>Ready when you are.</h2>
@@ -216,6 +222,6 @@ export default function Page() {
           Partner, driver & admin sign in <ArrowRight size={14} />
         </Link>
       </footer>
-    </div>
+    </LandingMotion>
   );
 }
