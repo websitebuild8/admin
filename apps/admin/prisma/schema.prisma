@@ -8,10 +8,10 @@ datasource db {
 }
 
 model Profile {
-  id          String @id @default(uuid())
-  clerkUserId String @unique
+  id          String             @id @default(uuid())
+  clerkUserId String             @unique
   name        String
-  createdAt   DateTime @default(now())
+  createdAt   DateTime           @default(now())
   roles       RoleApplication[]
   primaryRole String?
   phone       String?
@@ -20,185 +20,193 @@ model Profile {
 }
 
 model RoleApplication {
-  id          String @id @default(uuid())
-  profileId   String
-  profile     Profile @relation(fields: [profileId], references: [id])
-  role        String
-  status      String @default("Pending")
-  reviewedBy  String?
-  reviewedAt  DateTime?
-  details     Json?
+  id         String    @id @default(uuid())
+  profileId  String
+  profile    Profile   @relation(fields: [profileId], references: [id])
+  role       String
+  status     String    @default("Pending")
+  reviewedBy String?
+  reviewedAt DateTime?
+  details    Json?
+
   @@unique([profileId, role])
 }
 
 model Restaurant {
-  clerkUserId       String? @unique
-  location          Json?
-  id                String @id @default(uuid())
-  name              String
-  initials          String
-  cuisine           String
-  area              String
-  contact           String
-  status            String @default("Pending")
-  prepTime          Int @default(20)
-  color             String @default("coffee")
-  documentsVerified Boolean @default(false)
-  acceptingOrders   Boolean @default(false)
-  orders            Order[]
-  menu              MenuItem[]
-  pickupAddress     Json?
+  clerkUserId          String?    @unique
+  location             Json?
+  id                   String     @id @default(uuid())
+  name                 String
+  initials             String
+  cuisine              String
+  area                 String
+  contact              String
+  status               String     @default("Pending")
+  prepTime             Int        @default(20)
+  color                String     @default("coffee")
+  documentsVerified    Boolean    @default(false)
+  acceptingOrders      Boolean    @default(false)
+  orders               Order[]
+  menu                 MenuItem[]
+  pickupAddress        Json?
   pendingPickupAddress Json?
 }
 
 model Rider {
   clerkUserId       String? @unique
   location          Json?
-  id                String @id @default(uuid())
+  id                String  @id @default(uuid())
   name              String
   initials          String
   area              String
   phone             String
-  status            String @default("Pending")
+  status            String  @default("Pending")
   online            Boolean @default(false)
-  deliveries        Int @default(0)
+  deliveries        Int     @default(0)
   documentsVerified Boolean @default(false)
   orders            Order[]
 }
 
 model Order {
-  publicId      String? @unique
-  pickupAddress Json?
+  publicId        String?        @unique
+  pickupAddress   Json?
   addressSnapshot Json?
-  lineItems     Json?
-  workflow      Json?
-  destination   Json?
-  id            String @id @default(uuid())
-  customerId    String
-  customer      String
-  restaurantId  String
-  restaurant    Restaurant @relation(fields: [restaurantId], references: [id])
-  items         String
-  amount        Int
-  area          String
-  address       String
-  status        String @default("Awaiting restaurant")
-  riderId       String?
-  rider         Rider? @relation(fields: [riderId], references: [id])
-  time          DateTime @default(now())
-  paid          Boolean @default(false)
-  paymentRef    String @unique
-  refunds       RefundReview[]
-  tickets       SupportCase[]
+  lineItems       Json?
+  workflow        Json?
+  destination     Json?
+  id              String         @id @default(uuid())
+  customerId      String
+  customer        String
+  restaurantId    String
+  restaurant      Restaurant     @relation(fields: [restaurantId], references: [id])
+  items           String
+  amount          Int
+  area            String
+  address         String
+  status          String         @default("Awaiting restaurant")
+  riderId         String?
+  rider           Rider?         @relation(fields: [riderId], references: [id])
+  time            DateTime       @default(now())
+  paid            Boolean        @default(false)
+  paymentRef      String         @unique
+  refunds         RefundReview[]
+  tickets         SupportCase[]
+
   @@index([status, time])
 }
 
 model SavedAddress {
   google       Json?
-  id           String @id @default(uuid())
+  id           String   @id @default(uuid())
   profileId    String
-  profile      Profile @relation(fields: [profileId], references: [id])
+  profile      Profile  @relation(fields: [profileId], references: [id])
   kind         String
   area         String
   building     String
-  unit         String @default("")
-  instructions String @default("")
+  unit         String   @default("")
+  instructions String   @default("")
   latitude     Float
   longitude    Float
   updatedAt    DateTime @updatedAt
+
   @@unique([profileId, kind])
 }
 
 model MapUsageBucket {
-  key       String @id
+  key       String   @id
   count     Int
   expiresAt DateTime
+
   @@index([expiresAt])
 }
 
 model MenuItem {
-  id           String @id @default(uuid())
+  id           String     @id @default(uuid())
   restaurantId String
   restaurant   Restaurant @relation(fields: [restaurantId], references: [id])
   name         String
   description  String
-  category     String @default("General")
+  category     String     @default("General")
   price        Int
-  available    Boolean @default(true)
-  imageId      String? @unique
+  available    Boolean    @default(true)
+  imageId      String?    @unique
   imageAsset   MenuImage? @relation(fields: [imageId], references: [id])
-  updatedAt    DateTime @updatedAt
+  updatedAt    DateTime   @updatedAt
+
   @@index([restaurantId, available])
 }
 
 // Only the authenticated backend can manage image records or Storage objects.
 // Ownership is an approved restaurant ID or an isolated shared-demo session ID.
 model MenuImage {
-  id           String @id @default(uuid())
-  ownerKind    String
-  ownerId      String
-  state        String @default("Uploading")
-  path         String @unique
-  thumbnailPath String @unique
-  width        Int @default(0)
-  height       Int @default(0)
-  bytes        Int @default(0)
-  menuItem     MenuItem?
-  attachedTo   String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id            String    @id @default(uuid())
+  ownerKind     String
+  ownerId       String
+  state         String    @default("Uploading")
+  path          String    @unique
+  thumbnailPath String    @unique
+  width         Int       @default(0)
+  height        Int       @default(0)
+  bytes         Int       @default(0)
+  menuItem      MenuItem?
+  attachedTo    String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
   @@index([ownerKind, ownerId, createdAt])
   @@index([state, updatedAt])
 }
 
 model PolicyAcceptance {
-  id           String @id @default(uuid())
-  profileId    String
-  profile      Profile @relation(fields: [profileId], references: [id])
-  version      String
-  acceptedAt   DateTime @default(now())
+  id         String   @id @default(uuid())
+  profileId  String
+  profile    Profile  @relation(fields: [profileId], references: [id])
+  version    String
+  acceptedAt DateTime @default(now())
+
   @@unique([profileId, version])
 }
 
 model CheckoutQuote {
-  id           String @id @default(uuid())
+  id           String          @id @default(uuid())
   customerId   String
   restaurantId String
   snapshot     Json
   amount       Int
-  currency     String @default("MVR")
+  currency     String          @default("MVR")
   expiresAt    DateTime
-  createdAt    DateTime @default(now())
+  createdAt    DateTime        @default(now())
   attempt      PaymentAttempt?
+
   @@index([customerId, createdAt])
 }
 
 model PaymentAttempt {
-  id           String @id @default(uuid())
-  quoteId      String @unique
-  quote        CheckoutQuote @relation(fields: [quoteId], references: [id])
-  transactionId String? @unique
-  status       String @default("Created")
-  checkoutUrl  String?
-  orderId      String? @unique
-  createdAt    DateTime @default(now())
-  verifiedAt   DateTime?
+  id            String        @id @default(uuid())
+  quoteId       String        @unique
+  quote         CheckoutQuote @relation(fields: [quoteId], references: [id])
+  transactionId String?       @unique
+  status        String        @default("Created")
+  checkoutUrl   String?
+  orderId       String?       @unique
+  createdAt     DateTime      @default(now())
+  verifiedAt    DateTime?
 }
 
 model RefundReview {
-  id       String @id @default(uuid())
-  orderId  String
-  order    Order @relation(fields: [orderId], references: [id])
-  amount   Int
-  reason   String
-  status   String @default("Requested")
-  time     DateTime @default(now())
+  id      String   @id @default(uuid())
+  orderId String
+  order   Order    @relation(fields: [orderId], references: [id])
+  amount  Int
+  reason  String
+  status  String   @default("Requested")
+  time    DateTime @default(now())
 }
 
 model SupportCase {
   id       String @id @default(uuid())
   orderId  String
-  order    Order @relation(fields: [orderId], references: [id])
+  order    Order  @relation(fields: [orderId], references: [id])
   subject  String
   customer String
   priority String @default("Normal")
@@ -206,27 +214,28 @@ model SupportCase {
 }
 
 model AuditEvent {
-  id    String @id @default(uuid())
+  id    String   @id @default(uuid())
   text  String
   actor String
   time  DateTime @default(now())
 }
 
 model ServiceSettings {
-  id               String @id @default("default")
-  businessName     String @default("iGO")
-  supportEmail     String @default("")
-  deliveryFee      Int @default(2500)
+  id               String  @id @default("default")
+  businessName     String  @default("iGO")
+  supportEmail     String  @default("")
+  deliveryFee      Int     @default(2500)
   maleEnabled      Boolean @default(true)
   hulhumaleEnabled Boolean @default(true)
 }
 
 model Notification {
-  id String @id
-  orderId String
+  id        String   @id
+  orderId   String
   recipient String
-  text String
-  time DateTime @default(now())
+  text      String
+  time      DateTime @default(now())
+
   @@index([recipient, time])
 }
 
@@ -238,5 +247,276 @@ model DemoSession {
   payload      Json
   expiresAt    DateTime
   createdAt    DateTime @default(now())
+
   @@index([ownerClerkId, createdAt])
+}
+
+// Phase 1 seller delivery records. Restaurant/mobile records stay independent.
+enum DeliveryRole {
+  PARTNER
+  DRIVER
+}
+
+enum DeliveryReview {
+  PENDING
+  APPROVED
+  REJECTED
+  SUSPENDED
+}
+
+enum ParcelState {
+  REGISTERED
+  PICKED_UP
+  DELIVERED
+  CANCELLED
+}
+
+enum DeliveryZone {
+  BOAT
+  MALE
+  HULHUMALE_1
+  HULHUMALE_2
+}
+
+enum DeliveryPaymentState {
+  PENDING
+  REJECTED
+  PARTIAL
+  CONFIRMED
+}
+
+model DeliveryAccount {
+  id          String                 @id @default(uuid()) @db.Uuid
+  clerkUserId String                 @unique
+  role        DeliveryRole
+  status      DeliveryReview         @default(PENDING)
+  name        String
+  phone       String
+  reviewNote  String                 @default("")
+  reviewedBy  String?
+  reviewedAt  DateTime?              @db.Timestamptz(3)
+  createdAt   DateTime               @default(now()) @db.Timestamptz(3)
+  partner     DeliveryPartner?
+  assigned    DeliveryParcel[]       @relation("AssignedDeliveryDriver")
+  handovers   DeliveryCashHandover[]
+}
+
+model DeliveryPartner {
+  id            String                  @id @default(uuid()) @db.Uuid
+  accountId     String                  @unique @db.Uuid
+  account       DeliveryAccount         @relation(fields: [accountId], references: [id])
+  businessName  String
+  pageUrl       String
+  pickupAddress String
+  pickupArea    String
+  cutoffMinutes Int                     @default(1080)
+  nextInvoiceAt DateTime?               @db.Timestamptz(3)
+  parcels       DeliveryParcel[]
+  invoices      DeliveryInvoice[]
+  payments      DeliveryPayment[]
+  imports       DeliveryImport[]
+  receipts      DeliveryReceipt[]
+  cycles        DeliveryBillingCycle[]
+  remittances   DeliveryCodRemittance[]
+}
+
+model DeliveryRate {
+  zone      DeliveryZone @id
+  fee       Int
+  updatedAt DateTime     @updatedAt @db.Timestamptz(3)
+}
+
+model DeliveryParcel {
+  id                String                 @id @default(uuid()) @db.Uuid
+  publicId          String                 @unique
+  partnerId         String                 @db.Uuid
+  partner           DeliveryPartner        @relation(fields: [partnerId], references: [id])
+  externalReference String
+  recipientName     String
+  recipientPhone    String
+  destination       String
+  zone              DeliveryZone
+  description       String                 @default("")
+  fee               Int
+  codAmount         Int                    @default(0)
+  state             ParcelState            @default(REGISTERED)
+  driverId          String?                @db.Uuid
+  driver            DeliveryAccount?       @relation("AssignedDeliveryDriver", fields: [driverId], references: [id])
+  registeredAt      DateTime               @default(now()) @db.Timestamptz(3)
+  pickedUpAt        DateTime?              @db.Timestamptz(3)
+  pickedUpBy        String?
+  deliveredAt       DateTime?              @db.Timestamptz(3)
+  deliveredBy       String?
+  codCollectedAt    DateTime?              @db.Timestamptz(3)
+  handoverId        String?                @db.Uuid
+  handover          DeliveryCashHandover?  @relation(fields: [handoverId], references: [id])
+  remittanceId      String?                @db.Uuid
+  remittance        DeliveryCodRemittance? @relation(fields: [remittanceId], references: [id])
+  importId          String?                @db.Uuid
+  batch             DeliveryImport?        @relation(fields: [importId], references: [id])
+  invoiceLine       DeliveryInvoiceLine?
+
+  @@unique([partnerId, externalReference])
+  @@index([partnerId, registeredAt])
+  @@index([driverId, state, registeredAt])
+  @@index([partnerId, state, deliveredAt])
+}
+
+model DeliveryImport {
+  id        String           @id @default(uuid()) @db.Uuid
+  partnerId String           @db.Uuid
+  partner   DeliveryPartner  @relation(fields: [partnerId], references: [id])
+  fileHash  String
+  rowCount  Int
+  createdAt DateTime         @default(now()) @db.Timestamptz(3)
+  parcels   DeliveryParcel[]
+
+  @@unique([partnerId, fileHash])
+}
+
+model DeliveryBillingCycle {
+  id          String           @id @default(uuid()) @db.Uuid
+  partnerId   String           @db.Uuid
+  partner     DeliveryPartner  @relation(fields: [partnerId], references: [id])
+  localDate   String
+  cutoffAt    DateTime         @db.Timestamptz(3)
+  processedAt DateTime         @default(now()) @db.Timestamptz(3)
+  invoice     DeliveryInvoice?
+
+  @@unique([partnerId, localDate])
+}
+
+model DeliveryInvoice {
+  id          String                      @id @default(uuid()) @db.Uuid
+  publicId    String                      @unique
+  partnerId   String                      @db.Uuid
+  partner     DeliveryPartner             @relation(fields: [partnerId], references: [id])
+  cycleId     String                      @unique @db.Uuid
+  cycle       DeliveryBillingCycle        @relation(fields: [cycleId], references: [id])
+  total       Int
+  paid        Int                         @default(0)
+  createdAt   DateTime                    @default(now()) @db.Timestamptz(3)
+  lines       DeliveryInvoiceLine[]
+  payments    DeliveryPayment[]
+  allocations DeliveryPaymentAllocation[]
+
+  @@index([partnerId, createdAt])
+}
+
+model DeliveryInvoiceLine {
+  id        String          @id @default(uuid()) @db.Uuid
+  invoiceId String          @db.Uuid
+  invoice   DeliveryInvoice @relation(fields: [invoiceId], references: [id])
+  parcelId  String          @unique @db.Uuid
+  parcel    DeliveryParcel  @relation(fields: [parcelId], references: [id])
+  amount    Int
+}
+
+model DeliveryReceipt {
+  id        String           @id @default(uuid()) @db.Uuid
+  partnerId String           @db.Uuid
+  partner   DeliveryPartner  @relation(fields: [partnerId], references: [id])
+  path      String           @unique
+  sha256    String
+  bytes     Int
+  ready     Boolean          @default(false)
+  createdAt DateTime         @default(now()) @db.Timestamptz(3)
+  payment   DeliveryPayment?
+
+  @@unique([partnerId, sha256])
+}
+
+model DeliveryPayment {
+  id              String                     @id @default(uuid()) @db.Uuid
+  partnerId       String                     @db.Uuid
+  partner         DeliveryPartner            @relation(fields: [partnerId], references: [id])
+  invoiceId       String                     @db.Uuid
+  invoice         DeliveryInvoice            @relation(fields: [invoiceId], references: [id])
+  receiptId       String                     @unique @db.Uuid
+  receipt         DeliveryReceipt            @relation(fields: [receiptId], references: [id])
+  bankReference   String                     @unique
+  amount          Int
+  confirmedAmount Int                        @default(0)
+  status          DeliveryPaymentState       @default(PENDING)
+  reviewNote      String                     @default("")
+  reviewedBy      String?
+  reviewedAt      DateTime?                  @db.Timestamptz(3)
+  createdAt       DateTime                   @default(now()) @db.Timestamptz(3)
+  allocation      DeliveryPaymentAllocation?
+
+  @@index([partnerId, createdAt])
+}
+
+model DeliveryPaymentAllocation {
+  id        String          @id @default(uuid()) @db.Uuid
+  paymentId String          @unique @db.Uuid
+  payment   DeliveryPayment @relation(fields: [paymentId], references: [id])
+  invoiceId String          @db.Uuid
+  invoice   DeliveryInvoice @relation(fields: [invoiceId], references: [id])
+  amount    Int
+}
+
+model DeliveryCashHandover {
+  id         String           @id @default(uuid()) @db.Uuid
+  driverId   String           @db.Uuid
+  driver     DeliveryAccount  @relation(fields: [driverId], references: [id])
+  amount     Int
+  reference  String           @unique
+  verifiedBy String
+  createdAt  DateTime         @default(now()) @db.Timestamptz(3)
+  parcels    DeliveryParcel[]
+}
+
+model DeliveryCodRemittance {
+  id         String           @id @default(uuid()) @db.Uuid
+  partnerId  String           @db.Uuid
+  partner    DeliveryPartner  @relation(fields: [partnerId], references: [id])
+  amount     Int
+  reference  String           @unique
+  verifiedBy String
+  createdAt  DateTime         @default(now()) @db.Timestamptz(3)
+  parcels    DeliveryParcel[]
+}
+
+model DeliveryCommand {
+  id        String   @id
+  hash      String
+  response  Json
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+}
+
+model DeliveryActivity {
+  id        String   @id @default(uuid()) @db.Uuid
+  actor     String
+  role      String
+  kind      String
+  partnerId String?  @db.Uuid
+  entityId  String?
+  detail    Json
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([partnerId, createdAt])
+}
+
+model DeliveryNotification {
+  id        String    @id @default(uuid()) @db.Uuid
+  recipient String
+  title     String
+  message   String
+  readAt    DateTime? @db.Timestamptz(3)
+  createdAt DateTime  @default(now()) @db.Timestamptz(3)
+
+  @@index([recipient, createdAt])
+}
+
+model DeliverySettings {
+  id                 String   @id @default("default")
+  bankName           String   @default("")
+  bankAccount        String   @default("")
+  beneficiary        String   @default("")
+  businessLegalName  String   @default("")
+  registrationNumber String   @default("")
+  supportPhone       String   @default("")
+  supportEmail       String   @default("")
+  updatedAt          DateTime @updatedAt @db.Timestamptz(3)
 }

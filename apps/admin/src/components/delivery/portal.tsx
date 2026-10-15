@@ -1,0 +1,2726 @@
+"use client";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+  type ReactNode,
+} from "react";
+import Link from "next/link";
+import Image from "next/image";
+import { UserButton } from "@clerk/nextjs";
+import { toast } from "sonner";
+import {
+  ArrowUpRight,
+  ArrowRight,
+  Bell,
+  Bike,
+  Boxes,
+  Check,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  ClipboardList,
+  Clock3,
+  Download,
+  FileSpreadsheet,
+  History,
+  LayoutDashboard,
+  Menu,
+  Package,
+  PackageCheck,
+  Plus,
+  ReceiptText,
+  RefreshCw,
+  Search,
+  Settings2,
+  ShieldCheck,
+  Store,
+  Upload,
+  Wallet,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { money, zoneLabels, type Actor } from "@/lib/delivery/domain";
+import { DeliverySkeleton } from "./skeleton";
+
+type Parcel = {
+  id: string;
+  publicId: string;
+  externalReference: string;
+  recipientName: string;
+  recipientPhone: string;
+  destination: string;
+  zone: string;
+  description: string;
+  fee: number;
+  codAmount: number;
+  state: string;
+  partnerId: string;
+  driverId: string | null;
+  pickedUpAt: string | null;
+  deliveredAt: string | null;
+  registeredAt: string;
+  handoverId: string | null;
+  remittanceId: string | null;
+  partner: {
+    businessName: string;
+    pickupAddress: string;
+    pickupArea: string;
+    account: { name: string; phone: string };
+  };
+  driver?: { name: string } | null;
+  invoiceLine?: { invoice: { publicId: string } } | null;
+};
+type Account = {
+  id: string;
+  name: string;
+  phone: string;
+  role: string;
+  status: string;
+  createdAt: string;
+  reviewNote: string;
+  partner?: {
+    id: string;
+    businessName: string;
+    pageUrl: string;
+    pickupAddress: string;
+    pickupArea: string;
+    cutoffMinutes: number;
+    nextInvoiceAt: string | null;
+  } | null;
+};
+type Invoice = {
+  id: string;
+  publicId: string;
+  total: number;
+  paid: number;
+  createdAt: string;
+  partner: { businessName: string; pickupAddress?: string };
+  cycle: { localDate: string; cutoffAt: string };
+  _count?: { lines: number };
+};
+type Payment = {
+  id: string;
+  amount: number;
+  confirmedAmount: number;
+  status: string;
+  bankReference: string;
+  receiptId: string;
+  reviewNote: string;
+  createdAt: string;
+  invoice: { publicId: string; total: number; paid: number };
+  partner: { businessName: string };
+};
+type Notice = {
+  id: string;
+  title: string;
+  message: string;
+  readAt: string | null;
+  createdAt: string;
+};
+type Activity = {
+  id: string;
+  actor: string;
+  role: string;
+  kind: string;
+  detail: unknown;
+  createdAt: string;
+};
+type List<T> = { items: T[]; total: number; page: number; pageSize: number };
+type Summary = {
+  registered: number;
+  pickedUp: number;
+  delivered: number;
+  pendingEstimate: number;
+  awaitingBilling: number;
+  invoiced: number;
+  confirmedPayments: number;
+  outstanding: number;
+  codOwed: number;
+  driverCash: number;
+  companyCash: number;
+  latest: Parcel[];
+  awaitingApproval: number;
+  paymentReview: number;
+};
+type InvoiceDetail = List<{
+  id: string;
+  amount: number;
+  parcel: {
+    publicId: string;
+    externalReference: string;
+    recipientName: string;
+    zone: string;
+    deliveredAt: string;
+  };
+}> & { invoice: Invoice; payments: Payment[] };
+type SettingValues = {
+  bankName: string;
+  bankAccount: string;
+  beneficiary: string;
+  businessLegalName: string;
+  registrationNumber: string;
+  supportPhone: string;
+  supportEmail: string;
+};
+const stamp = (value: string | null) =>
+  value
+    ? new Intl.DateTimeFormat("en-GB", {
+        timeZone: "Indian/Maldives",
+        dateStyle: "medium",
+        timeStyle: "short",
+      }).format(new Date(value))
+    : "—";
+const statusLabels: Record<string, string> = {
+  REGISTERED: "Registered",
+  PICKED_UP: "Picked up",
+  DELIVERED: "Delivered",
+  CANCELLED: "Cancelled",
+  PENDING: "Pending review",
+  APPROVED: "Approved",
+  REJECTED: "Rejected",
+  SUSPENDED: "Suspended",
+  PARTIAL: "Partially verified",
+  CONFIRMED: "Confirmed",
+  PAID: "Paid",
+  UNPAID: "Unpaid",
+};
+function Status({ value }: { value: string }) {
+  return (
+    <span className={`d-status ${value.toLowerCase()}`}>
+      {statusLabels[value] ?? value}
+    </span>
+  );
+}
+function useResource<T>(
+  resource: string,
+  query: string = "",
+  revision = 0,
+  enabled = true,
+) {
+  const key = `${resource}?${query}`;
+  const [state, setState] = useState<{
+    key: string;
+    data: T | null;
+    error: string | null;
+  }>({ key: "", data: null, error: null });
+  useEffect(() => {
+    if (!enabled) return;
+    const controller = new AbortController();
+    fetch(`/api/delivery/${resource}?${query}`, {
+      cache: "no-store",
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        const value = await response.json();
+        if (!response.ok)
+          throw new Error(value.error ?? "Could not load records.");
+        return value as T;
+      })
+      .then((data) => setState({ key, data, error: null }))
+      .catch((e) => {
+        if (!controller.signal.aborted)
+          setState({
+            key,
+            data: null,
+            error: e instanceof Error ? e.message : "Connection failed.",
+          });
+      });
+    return () => controller.abort();
+  }, [resource, query, key, enabled, revision]);
+  return state.key === key ? state : { key, data: null, error: null };
+}
+function Field({
+  name,
+  label,
+  value,
+  required = true,
+  type = "text",
+  full = false,
+  min,
+  step,
+}: {
+  name: string;
+  label: string;
+  value?: string | number;
+  required?: boolean;
+  type?: string;
+  full?: boolean;
+  min?: number;
+  step?: string;
+}) {
+  return (
+    <div className={`d-field ${full ? "full" : ""}`}>
+      <Label htmlFor={`field-${name}`}>{label}</Label>
+      <Input
+        id={`field-${name}`}
+        name={name}
+        defaultValue={value}
+        required={required}
+        type={type}
+        min={min}
+        step={step}
+        maxLength={type === "number" ? undefined : 500}
+      />
+    </div>
+  );
+}
+function Pick({
+  name,
+  label,
+  options,
+  value,
+  onChange,
+}: {
+  name: string;
+  label: string;
+  options: { id: string; name: string }[];
+  value?: string;
+  onChange?: (v: string) => void;
+}) {
+  return (
+    <div className="d-field">
+      <Label htmlFor={`select-${name}`}>{label}</Label>
+      <Select
+        name={name}
+        items={options.map((option) => ({
+          value: option.id,
+          label: option.name,
+        }))}
+        defaultValue={value}
+        onValueChange={(v) => onChange?.(String(v ?? ""))}
+      >
+        <SelectTrigger id={`select-${name}`}>
+          <SelectValue placeholder="Choose an option" />
+        </SelectTrigger>
+        <SelectContent>
+          {options.map((o) => (
+            <SelectItem value={o.id} key={o.id}>
+              {o.name}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
+function Empty({
+  title = "Nothing here yet",
+  text = "Your records will appear here as deliveries move forward.",
+}: {
+  title?: string;
+  text?: string;
+}) {
+  return (
+    <div className="d-empty">
+      <Package />
+      <strong>{title}</strong>
+      <p>{text}</p>
+    </div>
+  );
+}
+function Pager({
+  list,
+  onPage,
+}: {
+  list: { total: number; page: number };
+  onPage: (p: number) => void;
+}) {
+  const pages = Math.max(1, Math.ceil(list.total / 10));
+  return (
+    <div className="d-pagination">
+      <span>
+        {list.total
+          ? `${(list.page - 1) * 10 + 1}–${Math.min(list.page * 10, list.total)} of ${list.total}`
+          : "0 records"}{" "}
+        · 10 per page
+      </span>
+      <div>
+        <Button
+          variant="outline"
+          disabled={list.page <= 1}
+          onClick={() => onPage(list.page - 1)}
+          aria-label="Previous page"
+        >
+          <ChevronLeft size={14} />
+        </Button>
+        <span>
+          {list.page} / {pages}
+        </span>
+        <Button
+          variant="outline"
+          disabled={list.page >= pages}
+          onClick={() => onPage(list.page + 1)}
+          aria-label="Next page"
+        >
+          <ChevronRight size={14} />
+        </Button>
+      </div>
+    </div>
+  );
+}
+function GridTable({
+  headings,
+  rows,
+}: {
+  headings: string[];
+  rows: ReactNode[][];
+}) {
+  return (
+    <div className="d-table-wrap">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            {headings.map((h, i) => (
+              <TableHead key={`${h}-${i}`} scope="col">
+                {h}
+              </TableHead>
+            ))}
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {rows.map((row, i) => (
+            <TableRow key={i}>
+              {row.map((c, j) => (
+                <TableCell key={j}>{c}</TableCell>
+              ))}
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
+  );
+}
+const navItems = [
+  {
+    key: "overview",
+    label: "Overview",
+    icon: LayoutDashboard,
+    roles: ["ADMIN", "PARTNER"],
+  },
+  {
+    key: "packages",
+    label: "Packages",
+    icon: Package,
+    roles: ["ADMIN", "PARTNER"],
+  },
+  { key: "collections", label: "Collections", icon: Boxes, roles: ["DRIVER"] },
+  { key: "deliveries", label: "My deliveries", icon: Bike, roles: ["DRIVER"] },
+  {
+    key: "import",
+    label: "Excel import",
+    icon: FileSpreadsheet,
+    roles: ["ADMIN", "PARTNER"],
+  },
+  { key: "partners", label: "Partner pages", icon: Store, roles: ["ADMIN"] },
+  { key: "drivers", label: "Drivers", icon: Bike, roles: ["ADMIN"] },
+  {
+    key: "invoices",
+    label: "Invoices",
+    icon: ReceiptText,
+    roles: ["ADMIN", "PARTNER"],
+  },
+  {
+    key: "payments",
+    label: "Bank transfers",
+    icon: Wallet,
+    roles: ["ADMIN", "PARTNER"],
+  },
+  {
+    key: "cod",
+    label: "Cash on delivery",
+    icon: Wallet,
+    roles: ["ADMIN", "PARTNER", "DRIVER"],
+  },
+  { key: "reports", label: "Reports", icon: ClipboardList, roles: ["ADMIN"] },
+  { key: "audit", label: "Activity log", icon: History, roles: ["ADMIN"] },
+  {
+    key: "settings",
+    label: "Settings & rates",
+    icon: Settings2,
+    roles: ["ADMIN", "PARTNER"],
+  },
+  {
+    key: "notifications",
+    label: "Notifications",
+    icon: Bell,
+    roles: ["ADMIN", "PARTNER", "DRIVER"],
+  },
+];
+const descriptions: Record<string, string> = {
+  overview: "A clear view of your deliveries and what comes next.",
+  packages: "Every package, from registration to doorstep.",
+  collections:
+    "Select only the packages physically handed to you, then confirm pickup.",
+  deliveries:
+    "Your picked-up packages. Confirm delivery and any cash received.",
+  partners: "Review the businesses joining your delivery network.",
+  drivers: "Approve and manage your delivery team.",
+  invoices: "Daily delivery invoices. Older unpaid balances stay outstanding.",
+  payments:
+    "Bank evidence stays pending until an authorized admin verifies it.",
+  cod: "Recipient money stays separate from delivery-fee invoices.",
+  reports: "Operational totals from your actual delivery records.",
+  audit: "An append-only record of operational and financial changes.",
+  settings: "Business details, bank information and delivery rates.",
+  notifications: "Updates from your delivery workspace.",
+  import: "A faster way to register your next collection.",
+};
+
+export function DeliveryApplication({ actor }: { actor: Actor }) {
+  const [role, setRole] = useState("PARTNER"),
+    [busy, setBusy] = useState(false),
+    [error, setError] = useState(""),
+    [sent, setSent] = useState(false);
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const f = new FormData(event.currentTarget);
+    setBusy(true);
+    setError("");
+    try {
+      const application = {
+        role,
+        name: f.get("name"),
+        phone: f.get("phone"),
+        ...(role === "PARTNER"
+          ? {
+              businessName: f.get("businessName"),
+              pageUrl: f.get("pageUrl"),
+              pickupAddress: f.get("pickupAddress"),
+              pickupArea: f.get("pickupArea"),
+            }
+          : {}),
+      };
+      const response = await fetch("/api/delivery/commands", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Idempotency-Key": crypto.randomUUID(),
+        },
+        body: JSON.stringify({ type: "apply", application }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error);
+      setSent(true);
+    } catch (e) {
+      setError(
+        e instanceof Error ? e.message : "Could not submit application.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <main className="d-application">
+      <div className="d-application-card">
+        <Image
+          src="/brand/igo-delivery.jpg"
+          width={180}
+          height={101}
+          alt="iGO Delivery"
+          priority
+        />
+        {actor.status !== "UNREGISTERED" || sent ? (
+          <>
+            <span className="d-eyebrow">YOUR APPLICATION</span>
+            <h1>
+              {sent || actor.status === "PENDING"
+                ? "You’re on the list."
+                : actor.status === "REJECTED"
+                  ? "Your application needs attention."
+                  : "Your account is paused."}
+            </h1>
+            <p>
+              {sent || actor.status === "PENDING"
+                ? "Your details have been saved. An admin will review your application before you can access deliveries."
+                : "Contact iGO about your application or account status. Existing records are retained."}
+            </p>
+            <div className="d-import-actions">
+              <Button onClick={() => window.location.reload()}>
+                Check approval <RefreshCw size={15} />
+              </Button>
+              <UserButton />
+            </div>
+          </>
+        ) : (
+          <>
+            <span className="d-eyebrow">LET’S GET YOU MOVING</span>
+            <h1>
+              A home for your
+              <br />
+              next delivery.
+            </h1>
+            <p>
+              Tell us a little about yourself. Your workspace opens after admin
+              approval.
+            </p>
+            <form onSubmit={submit} className="d-form">
+              <Pick
+                name="role"
+                label="I’m joining as"
+                options={[
+                  { id: "PARTNER", name: "Partner page / online seller" },
+                  { id: "DRIVER", name: "Delivery driver" },
+                ]}
+                value={role}
+                onChange={setRole}
+              />
+              <div />
+              <Field name="name" label="Contact name" />
+              <Field name="phone" label="Maldives phone number" type="tel" />
+              {role === "PARTNER" && (
+                <>
+                  <Field name="businessName" label="Business / page name" />
+                  <Field
+                    name="pageUrl"
+                    label="Facebook or Instagram page URL"
+                    type="url"
+                  />
+                  <Field
+                    name="pickupAddress"
+                    label="Pickup building, street and instructions"
+                    full
+                  />
+                  <Pick
+                    name="pickupArea"
+                    label="Pickup island"
+                    options={[
+                      { id: "Malé", name: "Malé" },
+                      { id: "Hulhumalé", name: "Hulhumalé" },
+                    ]}
+                    value="Malé"
+                  />
+                </>
+              )}
+              <Label className="d-check-label full">
+                <Checkbox required name="understood" />I understand delivery
+                fees are invoiced separately from money collected for my goods,
+                and my account requires approval.
+              </Label>
+              {error && (
+                <div className="d-error" role="alert">
+                  {error}
+                </div>
+              )}
+              <div className="d-form-footer">
+                <UserButton />
+                <Button type="submit" disabled={busy}>
+                  {busy ? "Submitting…" : "Submit application"}
+                  <ArrowRight size={16} />
+                </Button>
+              </div>
+            </form>
+          </>
+        )}
+      </div>
+    </main>
+  );
+}
+
+type Action = {
+  kind: string;
+  parcel?: Parcel;
+  account?: Account;
+  invoice?: Invoice;
+  payment?: Payment;
+  zone?: string;
+  fee?: number;
+};
+export function DeliveryPortal({
+  actor,
+  screen,
+}: {
+  actor: Actor;
+  screen: string;
+}) {
+  const [revision, setRevision] = useState(0),
+    [page, setPage] = useState(1),
+    [q, setQ] = useState(""),
+    [choiceSearch, setChoiceSearch] = useState(""),
+    [filter, setFilter] = useState(""),
+    [selected, setSelected] = useState<string[]>([]),
+    [mobileOpen, setMobileOpen] = useState(false),
+    [action, setAction] = useState<Action | null>(null),
+    [invoiceId, setInvoiceId] = useState<string | null>(null),
+    [busy, setBusy] = useState(false),
+    [error, setError] = useState(""),
+    [decision, setDecision] = useState("CONFIRM");
+  const retry = useRef<{ body: string; key: string } | null>(null);
+  const resource =
+    screen === "import" ? "rates" : screen === "settings" ? "settings" : screen;
+  const query = `page=${page}&q=${encodeURIComponent(q)}&state=${filter}`;
+  const request = useResource<unknown>(resource, query, revision);
+  const notices = useResource<List<Notice> & { unread: number }>(
+    "notifications",
+    "page=1",
+    revision,
+  );
+  const choices = useResource<{
+    partners: { id: string; businessName: string }[];
+    drivers: { id: string; name: string }[];
+  }>(
+    "choices",
+    `q=${encodeURIComponent(choiceSearch)}`,
+    revision,
+    actor.role === "ADMIN",
+  );
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (document.visibilityState === "visible") setRevision((v) => v + 1);
+    }, 30000);
+    return () => clearInterval(interval);
+  }, []);
+  const refresh = () => setRevision((v) => v + 1);
+  function open(value: Action) {
+    setAction(value);
+    setError("");
+    setDecision("CONFIRM");
+    retry.current = null;
+  }
+  async function command(value: unknown) {
+    const body = JSON.stringify(value);
+    if (retry.current?.body !== body)
+      retry.current = { body, key: crypto.randomUUID() };
+    const response = await fetch("/api/delivery/commands", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Idempotency-Key": retry.current.key,
+      },
+      body,
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error ?? "Operation failed.");
+    return result;
+  }
+  async function execute(value: unknown) {
+    setBusy(true);
+    setError("");
+    try {
+      const result = await command(value);
+      toast.success(result.message ?? `${result.count} packages registered.`);
+      setAction(null);
+      setSelected([]);
+      refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Operation failed.");
+    } finally {
+      setBusy(false);
+    }
+  }
+  const title = navItems.find((n) => n.key === screen)?.label ?? "Overview";
+  const list = request.data as List<Parcel> | null;
+  const chosen = list?.items?.filter((p) => selected.includes(p.id)) ?? [];
+  function select(id: string, checked: boolean) {
+    setSelected((v) =>
+      checked ? [...new Set([...v, id])] : v.filter((i) => i !== id),
+    );
+  }
+  function changePage(p: number) {
+    setPage(p);
+    setSelected([]);
+  }
+  const navigation = (close?: () => void) => (
+    <aside className="d-sidebar">
+      <div className="d-nav-brand">
+        <Link href="/" aria-label="iGO Delivery home">
+          <Image
+            src="/brand/igo-delivery.jpg"
+            alt="iGO Delivery"
+            width={128}
+            height={72}
+          />
+        </Link>
+        <p>
+          {actor.role === "ADMIN"
+            ? "Administration"
+            : actor.role === "PARTNER"
+              ? "Partner workspace"
+              : "Driver workspace"}
+        </p>
+      </div>
+      <nav aria-label="Workspace navigation">
+        {navItems
+          .filter((i) => i.roles.includes(actor.role))
+          .map(({ key, label, icon: Icon }) => (
+            <Link
+              key={key}
+              href={`/delivery/${key}`}
+              className={screen === key ? "active" : ""}
+              aria-current={screen === key ? "page" : undefined}
+              onClick={close}
+            >
+              <Icon size={18} />
+              {label}
+            </Link>
+          ))}
+      </nav>
+      <div className="d-nav-footer">
+        <strong>{actor.name}</strong>
+        <p>Maldives · MVR · UTC+5</p>
+        <p>You order. I go.</p>
+        {actor.role === "ADMIN" && (
+          <Link href="/legacy">
+            Phase 2 administration <ArrowUpRight size={11} />
+          </Link>
+        )}
+      </div>
+    </aside>
+  );
+  const parcelRows = (items: Parcel[], checkbox = false) =>
+    items.map((p) => [
+      <div key="ref" className="d-parcel-ref">
+        {checkbox && (
+          <Checkbox
+            aria-label={`Select ${p.publicId}`}
+            checked={selected.includes(p.id)}
+            onCheckedChange={(v) => select(p.id, v)}
+          />
+        )}
+        <div>
+          <strong>{p.publicId}</strong>
+          <small>{p.externalReference}</small>
+        </div>
+      </div>,
+      <div key="recipient">
+        <strong>{p.recipientName}</strong>
+        <small>{p.recipientPhone}</small>
+      </div>,
+      <div key="place">
+        <strong>{zoneLabels[p.zone]}</strong>
+        <small>{p.partner.businessName}</small>
+      </div>,
+      <Status key="state" value={p.state} />,
+      <span key="fee">
+        {money(p.fee)}
+        <small>
+          {p.state === "DELIVERED"
+            ? (p.invoiceLine?.invoice.publicId ?? "Awaiting billing")
+            : "Estimate · not invoiced"}
+        </small>
+      </span>,
+      <div className="d-row-actions" key="actions">
+        <Button
+          variant="outline"
+          onClick={() => open({ kind: "detail", parcel: p })}
+        >
+          Details
+        </Button>
+        {p.state === "REGISTERED" && actor.role !== "DRIVER" && (
+          <Button
+            variant="ghost"
+            onClick={() => open({ kind: "cancel", parcel: p })}
+          >
+            Cancel
+          </Button>
+        )}
+      </div>,
+    ]);
+  function parcelCards(items: Parcel[], pickup = false) {
+    return (
+      <div className="d-parcel-grid">
+        {items.map((p) => (
+          <article
+            className={`d-parcel ${selected.includes(p.id) ? "selected" : ""}`}
+            key={p.id}
+          >
+            <div className="d-parcel-head">
+              <div className="d-parcel-ref">
+                {pickup && (
+                  <Checkbox
+                    aria-label={`Select ${p.publicId}`}
+                    className="d-driver-checkbox"
+                    checked={selected.includes(p.id)}
+                    onCheckedChange={(v) => select(p.id, v)}
+                  />
+                )}
+                <strong>{p.publicId}</strong>
+              </div>
+              <Status value={p.state} />
+            </div>
+            <h3>{p.recipientName}</h3>
+            <p>{p.destination}</p>
+            <a href={`tel:${p.recipientPhone}`}>
+              {p.recipientPhone} <ArrowUpRight size={12} />
+            </a>
+            <dl>
+              <dt>Delivery area</dt>
+              <dd>{zoneLabels[p.zone]}</dd>
+              <dt>Parcel reference</dt>
+              <dd>{p.externalReference}</dd>
+              <dt>Collect from recipient</dt>
+              <dd>
+                <strong>
+                  {p.codAmount > 0
+                    ? money(p.codAmount)
+                    : "Prepaid · no collection"}
+                </strong>
+              </dd>
+              {p.deliveredAt && (
+                <>
+                  <dt>Delivered at (MVT)</dt>
+                  <dd>{stamp(p.deliveredAt)}</dd>
+                </>
+              )}
+            </dl>
+            {p.description && <p>{p.description}</p>}
+            <div className="d-row-actions">
+              <Button
+                variant="outline"
+                onClick={() => open({ kind: "detail", parcel: p })}
+              >
+                Package details
+              </Button>
+              {p.state === "PICKED_UP" && (
+                <Button onClick={() => open({ kind: "deliver", parcel: p })}>
+                  Complete delivery <Check size={15} />
+                </Button>
+              )}
+            </div>
+          </article>
+        ))}
+      </div>
+    );
+  }
+  function mainContent() {
+    if (request.error)
+      return (
+        <div className="d-error" role="alert">
+          {request.error}
+          <br />
+          <Button variant="outline" onClick={refresh}>
+            Retry <RefreshCw size={14} />
+          </Button>
+        </div>
+      );
+    if (!request.data) return <DeliverySkeleton />;
+    if (screen === "overview" || screen === "reports") {
+      const d = request.data as Summary;
+      return (
+        <>
+          <div className="d-stats">
+            <Stat
+              label="Invoiced balance due"
+              value={money(d.outstanding)}
+              note="Confirmed payments deducted only"
+              icon={<ReceiptText />}
+              accent
+            />
+            <Stat
+              label="Pending deliveries"
+              value={String(d.registered + d.pickedUp)}
+              note={`${d.registered} registered · ${d.pickedUp} picked up`}
+              icon={<Package />}
+            />
+            <Stat
+              label="Delivered packages"
+              value={String(d.delivered)}
+              note="Completed by assigned drivers"
+              icon={<PackageCheck />}
+            />
+            <Stat
+              label="COD owed to partners"
+              value={money(d.codOwed)}
+              note="Separate from delivery invoice debt"
+              icon={<Wallet />}
+            />
+          </div>
+          <div className="d-grid-two">
+            <section className="d-card">
+              <div className="d-card-header">
+                <div>
+                  <h2>
+                    {screen === "reports"
+                      ? "Operational summary"
+                      : "Latest packages"}
+                  </h2>
+                  <p>
+                    {screen === "reports"
+                      ? "All-time recorded totals. Export contains these totals."
+                      : "Your most recently registered packages"}
+                  </p>
+                </div>
+                <Link href="/delivery/packages">
+                  View all <ArrowUpRight size={13} />
+                </Link>
+              </div>
+              {screen === "reports" ? (
+                <div className="d-card-pad">
+                  <div className="d-report-bars">
+                    {[
+                      ["Registered", d.registered],
+                      ["Picked up", d.pickedUp],
+                      ["Delivered", d.delivered],
+                    ].map(([label, value]) => (
+                      <div key={label}>
+                        <div>
+                          <span>{label}</span>
+                          <strong>{value}</strong>
+                        </div>
+                        <div className="d-report-bar">
+                          <span
+                            style={{
+                              width: `${(Number(value) / Math.max(1, d.registered + d.pickedUp + d.delivered)) * 100}%`,
+                            }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <Button
+                    variant="outline"
+                    className="mt-7"
+                    onClick={() => downloadReport(d)}
+                  >
+                    Export totals CSV <Download size={14} />
+                  </Button>
+                </div>
+              ) : d.latest.length ? (
+                <GridTable
+                  headings={[
+                    "Package",
+                    "Recipient",
+                    "Area",
+                    "Status",
+                    "Delivery fee",
+                    "",
+                  ]}
+                  rows={parcelRows(d.latest)}
+                />
+              ) : (
+                <Empty
+                  title="Your first package starts here"
+                  text="Register a package or import an Excel list to start your delivery workflow."
+                />
+              )}
+            </section>
+            <section className="d-card">
+              <div className="d-card-header">
+                <div>
+                  <h2>A clear view of your money</h2>
+                  <p>Delivery fees and recipient collections stay separate</p>
+                </div>
+                <ShieldCheck size={18} />
+              </div>
+              {[
+                [
+                  "Pending delivery estimate",
+                  d.pendingEstimate,
+                  "Unpicked or in transit; not invoice debt",
+                ],
+                [
+                  "Delivered, awaiting billing",
+                  d.awaitingBilling,
+                  "Included only at the next eligible cutoff",
+                ],
+                [
+                  "COD held by drivers",
+                  d.driverCash,
+                  "Awaiting verified handover to iGO",
+                ],
+                [
+                  "COD received by iGO",
+                  d.companyCash,
+                  "Awaiting remittance to the partner",
+                ],
+              ].map(([label, value, note]) => (
+                <div className="d-info-row" key={String(label)}>
+                  <div className="d-info-icon">
+                    <Wallet size={17} />
+                  </div>
+                  <div>
+                    <strong>{label}</strong>
+                    <p>{note}</p>
+                  </div>
+                  <span>{money(Number(value))}</span>
+                </div>
+              ))}
+              {actor.role === "ADMIN" && (
+                <>
+                  <div className="d-info-row">
+                    <div>
+                      <strong>Partner / driver applications</strong>
+                      <p>Awaiting review</p>
+                    </div>
+                    <span>{d.awaitingApproval}</span>
+                  </div>
+                  <div className="d-info-row">
+                    <div>
+                      <strong>Bank transfers</strong>
+                      <p>Awaiting verification</p>
+                    </div>
+                    <span>{d.paymentReview}</span>
+                  </div>
+                </>
+              )}
+            </section>
+          </div>
+        </>
+      );
+    }
+    if (screen === "import")
+      return (
+        <ImportPanel
+          actor={actor}
+          choices={choices.data?.partners ?? []}
+          search={choiceSearch}
+          onSearch={setChoiceSearch}
+          onDone={refresh}
+        />
+      );
+    if (["packages", "collections", "deliveries", "cod"].includes(screen)) {
+      const d = request.data as List<Parcel>;
+      return (
+        <>
+          <div className="d-list-toolbar">
+            <div className="d-search">
+              <Search />
+              <Input
+                aria-label="Search packages"
+                placeholder="Search package, reference, recipient…"
+                value={q}
+                onChange={(e) => {
+                  setQ(e.target.value);
+                  setPage(1);
+                  setSelected([]);
+                }}
+              />
+            </div>
+            {screen === "packages" && (
+              <div className="d-filter-tabs">
+                {[
+                  ["", "All"],
+                  ["REGISTERED", "Registered"],
+                  ["PICKED_UP", "Picked up"],
+                  ["DELIVERED", "Delivered"],
+                ].map(([v, label]) => (
+                  <button
+                    key={v}
+                    className={filter === v ? "active" : ""}
+                    onClick={() => {
+                      setFilter(v);
+                      setPage(1);
+                      setSelected([]);
+                    }}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          <div className="d-note">
+            {screen === "collections" ? (
+              <>
+                <strong>Selection does not record pickup.</strong> Check only
+                the packages physically received, then use Confirm Pickup.
+              </>
+            ) : screen === "cod" ? (
+              <>
+                <strong>COD is recipient money.</strong> Delivery invoices
+                remain separately payable. Driver cash is not treated as
+                received by iGO until admin verifies a handover.
+              </>
+            ) : (
+              <>
+                Registration and driver assignment do not mean pickup. Pending
+                delivery fees are estimates.
+              </>
+            )}
+          </div>
+          {d.items.length ? (
+            screen === "collections" ? (
+              <>
+                {[...new Set(d.items.map((p) => p.partnerId))].map((id) => {
+                  const group = d.items.filter((p) => p.partnerId === id);
+                  return (
+                    <section className="d-collection-group" key={id}>
+                      <div className="d-collection-title">
+                        <Store size={24} />
+                        <div>
+                          <strong>{group[0].partner.businessName}</strong>
+                          <p>
+                            {group[0].partner.pickupAddress} ·{" "}
+                            {group[0].partner.account.phone}
+                          </p>
+                        </div>
+                      </div>
+                      {parcelCards(group, true)}
+                    </section>
+                  );
+                })}
+              </>
+            ) : screen === "deliveries" ? (
+              parcelCards(d.items)
+            ) : screen === "cod" ? (
+              <section className="d-card">
+                <GridTable
+                  headings={[
+                    "Package",
+                    "Partner / driver",
+                    "COD collected",
+                    "Cash location",
+                    "",
+                  ]}
+                  rows={d.items.map((p) => [
+                    <div key="id" className="d-parcel-ref">
+                      {actor.role === "ADMIN" && (
+                        <Checkbox
+                          aria-label={`Select ${p.publicId}`}
+                          checked={selected.includes(p.id)}
+                          onCheckedChange={(v) => select(p.id, v)}
+                        />
+                      )}
+                      <strong>{p.publicId}</strong>
+                    </div>,
+                    <div key="who">
+                      <strong>{p.partner.businessName}</strong>
+                      <small>{p.driver?.name ?? "Driver"}</small>
+                    </div>,
+                    money(p.codAmount),
+                    p.remittanceId
+                      ? "Remitted to partner"
+                      : p.handoverId
+                        ? "Held by iGO"
+                        : "Held by driver",
+                    <Button
+                      variant="outline"
+                      key="view"
+                      onClick={() => open({ kind: "detail", parcel: p })}
+                    >
+                      Details
+                    </Button>,
+                  ])}
+                />
+              </section>
+            ) : (
+              <section className="d-card">
+                <GridTable
+                  headings={[
+                    "Package",
+                    "Recipient",
+                    "Area / partner",
+                    "Status",
+                    "Delivery fee",
+                    "Actions",
+                  ]}
+                  rows={parcelRows(d.items, actor.role === "ADMIN")}
+                />
+              </section>
+            )
+          ) : (
+            <div className="d-card">
+              <Empty
+                title={
+                  screen === "collections"
+                    ? "No collections assigned"
+                    : "No matching packages"
+                }
+                text={
+                  screen === "collections"
+                    ? "An admin assigns packages before they appear in your collection list."
+                    : "Try another search, register a package or wait for the next delivery update."
+                }
+              />
+            </div>
+          )}
+          <Pager list={d} onPage={changePage} />
+          {chosen.length > 0 && (
+            <div className="d-selection-bar">
+              <div>
+                <strong>{chosen.length} packages selected</strong>
+                <p>Selection has not changed any status</p>
+              </div>
+              <div className="d-row-actions">
+                {screen === "collections" ? (
+                  <Button onClick={() => open({ kind: "pickup" })}>
+                    Confirm Pickup <Check size={15} />
+                  </Button>
+                ) : screen === "cod" ? (
+                  <>
+                    <Button
+                      disabled={
+                        chosen.some((p) => !!p.handoverId) ||
+                        new Set(chosen.map((p) => p.driverId)).size !== 1
+                      }
+                      onClick={() => open({ kind: "handover" })}
+                    >
+                      Verify driver handover
+                    </Button>
+                    <Button
+                      disabled={
+                        chosen.some((p) => !p.handoverId || !!p.remittanceId) ||
+                        new Set(chosen.map((p) => p.partnerId)).size !== 1
+                      }
+                      onClick={() => open({ kind: "remit" })}
+                    >
+                      Record partner payout
+                    </Button>
+                  </>
+                ) : (
+                  <Button
+                    disabled={chosen.some((p) => p.state !== "REGISTERED")}
+                    onClick={() => open({ kind: "assign" })}
+                  >
+                    Assign driver
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
+        </>
+      );
+    }
+    if (screen === "partners" || screen === "drivers") {
+      const d = request.data as List<Account>;
+      return (
+        <section className="d-card">
+          <div className="d-card-header">
+            <div>
+              <h2>{title}</h2>
+              <p>Only an admin can approve or suspend access</p>
+            </div>
+          </div>
+          {d.items.length ? (
+            <GridTable
+              headings={[
+                screen === "partners" ? "Business / contact" : "Driver",
+                "Phone",
+                "Status",
+                "Registered (MVT)",
+                "Actions",
+              ]}
+              rows={d.items.map((a) => [
+                <div key="who">
+                  <strong>{a.partner?.businessName ?? a.name}</strong>
+                  <small>{a.partner ? a.name : a.role}</small>
+                </div>,
+                a.phone,
+                <Status key="s" value={a.status} />,
+                stamp(a.createdAt),
+                <div key="action" className="d-row-actions">
+                  <Button
+                    variant="outline"
+                    onClick={() => open({ kind: "reviewAccount", account: a })}
+                  >
+                    Review access
+                  </Button>
+                  {a.partner && (
+                    <Button
+                      variant="ghost"
+                      onClick={() => open({ kind: "cutoff", account: a })}
+                    >
+                      Invoice cutoff
+                    </Button>
+                  )}
+                </div>,
+              ])}
+            />
+          ) : (
+            <Empty
+              title="No applications yet"
+              text="Applicants register through the website and submit their details for review."
+            />
+          )}
+          <Pager list={d} onPage={changePage} />
+        </section>
+      );
+    }
+    if (screen === "invoices") {
+      const d = request.data as List<Invoice>;
+      return (
+        <>
+          <div className="d-note">
+            Only delivered packages enter invoices. Empty billing cycles create
+            no invoice. Previous unpaid invoices remain due when a new invoice
+            is issued.
+          </div>
+          <section className="d-card">
+            {d.items.length ? (
+              <GridTable
+                headings={[
+                  "Invoice / cycle",
+                  "Partner",
+                  "Total",
+                  "Verified paid",
+                  "Outstanding",
+                  "Actions",
+                ]}
+                rows={d.items.map((i) => [
+                  <div key="id">
+                    <strong>{i.publicId}</strong>
+                    <small>
+                      {i.cycle.localDate} · {stamp(i.cycle.cutoffAt)}
+                    </small>
+                  </div>,
+                  i.partner.businessName,
+                  money(i.total),
+                  money(i.paid),
+                  <span key="due">
+                    <strong>{money(i.total - i.paid)}</strong>
+                    <Status
+                      value={
+                        i.paid === i.total
+                          ? "PAID"
+                          : i.paid
+                            ? "PARTIAL"
+                            : "UNPAID"
+                      }
+                    />
+                  </span>,
+                  <div key="actions" className="d-row-actions">
+                    <Button
+                      variant="outline"
+                      onClick={() => setInvoiceId(i.id)}
+                    >
+                      View packages
+                    </Button>
+                    {actor.role === "PARTNER" && i.paid < i.total && (
+                      <Button
+                        onClick={() =>
+                          open({ kind: "submitPayment", invoice: i })
+                        }
+                      >
+                        Submit transfer
+                      </Button>
+                    )}
+                  </div>,
+                ])}
+              />
+            ) : (
+              <Empty
+                title="No invoices yet"
+                text="Delivered packages are invoiced automatically at your partner’s daily cutoff. Registered and picked-up packages are estimates only."
+              />
+            )}
+            <Pager list={d} onPage={changePage} />
+          </section>
+        </>
+      );
+    }
+    if (screen === "payments") {
+      const d = request.data as List<Payment>;
+      return (
+        <>
+          <div className="d-note">
+            <strong>Receipt submission is not payment confirmation.</strong>{" "}
+            Pending and rejected submissions do not reduce invoice balances.
+            Partial verification credits only the amount actually confirmed by
+            admin.
+          </div>
+          <section className="d-card">
+            {d.items.length ? (
+              <GridTable
+                headings={[
+                  "Bank reference",
+                  "Partner / invoice",
+                  "Submitted",
+                  "Verified",
+                  "Status",
+                  "Actions",
+                ]}
+                rows={d.items.map((p) => [
+                  <div key="ref">
+                    <strong>{p.bankReference}</strong>
+                    <small>{stamp(p.createdAt)}</small>
+                  </div>,
+                  <div key="invoice">
+                    <strong>{p.partner.businessName}</strong>
+                    <small>{p.invoice.publicId}</small>
+                  </div>,
+                  money(p.amount),
+                  money(p.confirmedAmount),
+                  <Status key="s" value={p.status} />,
+                  <div key="actions" className="d-row-actions">
+                    <a
+                      href={`/api/delivery/receipt?id=${p.receiptId}`}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      <Button variant="outline">
+                        View receipt <ArrowUpRight size={12} />
+                      </Button>
+                    </a>
+                    {actor.role === "ADMIN" && p.status === "PENDING" && (
+                      <Button
+                        onClick={() =>
+                          open({ kind: "reviewPayment", payment: p })
+                        }
+                      >
+                        Verify transfer
+                      </Button>
+                    )}
+                    {p.reviewNote && <small>{p.reviewNote}</small>}
+                  </div>,
+                ])}
+              />
+            ) : (
+              <Empty
+                title="No bank transfers submitted"
+                text="Partners submit evidence from an outstanding invoice. Admins verify transfers against actual bank records."
+              />
+            )}
+            <Pager list={d} onPage={changePage} />
+          </section>
+        </>
+      );
+    }
+    if (screen === "notifications") {
+      const d = request.data as List<Notice>;
+      return (
+        <section className="d-card">
+          {d.items.length ? (
+            d.items.map((n) => (
+              <div className="d-info-row" key={n.id}>
+                <div className="d-info-icon">
+                  <Bell size={17} />
+                </div>
+                <div>
+                  <strong>{n.title}</strong>
+                  <p>{n.message}</p>
+                  <small className="d-muted">{stamp(n.createdAt)}</small>
+                </div>
+                {!n.readAt && (
+                  <Button
+                    variant="outline"
+                    disabled={busy}
+                    onClick={() => execute({ type: "readNotice", id: n.id })}
+                  >
+                    Mark read
+                  </Button>
+                )}
+              </div>
+            ))
+          ) : (
+            <Empty
+              title="You’re all caught up"
+              text="Pickup, delivery, application and invoice updates appear here."
+            />
+          )}
+          <Pager list={d} onPage={changePage} />
+        </section>
+      );
+    }
+    if (screen === "audit") {
+      const d = request.data as List<Activity>;
+      return (
+        <section className="d-card">
+          <GridTable
+            headings={["Time (MVT)", "Action", "Actor / role", "Details"]}
+            rows={d.items.map((a) => [
+              stamp(a.createdAt),
+              a.kind.replaceAll("_", " "),
+              <div key="actor">
+                <strong>{a.role}</strong>
+                <small>{a.actor}</small>
+              </div>,
+              <span className="break-all" key="detail">
+                {JSON.stringify(a.detail)}
+              </span>,
+            ])}
+          />
+          {!d.items.length && (
+            <Empty title="Activity starts with your first action" />
+          )}
+          <Pager list={d} onPage={changePage} />
+        </section>
+      );
+    }
+    if (screen === "settings")
+      return (
+        <SettingsPanel
+          actor={actor}
+          settings={(request.data as { settings: SettingValues }).settings}
+          openRate={(zone, fee) => open({ kind: "rate", zone, fee })}
+          execute={execute}
+          busy={busy}
+          error={error}
+          revision={revision}
+        />
+      );
+    return null;
+  }
+  async function submitAction(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!action) return;
+    const f = new FormData(event.currentTarget),
+      s = (name: string) => String(f.get(name) ?? "");
+    if (action.kind === "submitPayment") {
+      setBusy(true);
+      setError("");
+      try {
+        const upload = new FormData();
+        upload.set("file", f.get("file")!);
+        const response = await fetch("/api/delivery/receipt", {
+          method: "POST",
+          body: upload,
+        });
+        const receipt = await response.json();
+        if (!response.ok) throw new Error(receipt.error);
+        await execute({
+          type: "submitPayment",
+          invoiceId: action.invoice!.id,
+          receiptId: receipt.receiptId,
+          bankReference: s("bankReference"),
+          amount: s("amount"),
+        });
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Receipt upload failed.");
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
+    const values: Record<string, unknown> = { type: action.kind };
+    if (action.kind === "register")
+      Object.assign(values, {
+        ...(actor.role === "ADMIN" ? { partnerId: s("partnerId") } : {}),
+        parcel: {
+          externalReference: s("externalReference"),
+          recipientName: s("recipientName"),
+          recipientPhone: s("recipientPhone"),
+          destination: s("destination"),
+          zone: s("zone"),
+          description: s("description"),
+          codAmount: s("codAmount"),
+        },
+      });
+    if (action.kind === "assign")
+      Object.assign(values, {
+        parcelIds: chosen.map((p) => p.id),
+        driverId: s("driverId"),
+      });
+    if (action.kind === "pickup")
+      Object.assign(values, { parcelIds: chosen.map((p) => p.id) });
+    if (action.kind === "deliver")
+      Object.assign(values, {
+        parcelId: action.parcel!.id,
+        codReceived: f.get("codReceived") === "on",
+      });
+    if (action.kind === "cancel")
+      Object.assign(values, { parcelId: action.parcel!.id, reason: s("note") });
+    if (action.kind === "reviewAccount")
+      Object.assign(values, {
+        accountId: action.account!.id,
+        status: s("status"),
+        note: s("note"),
+      });
+    if (action.kind === "cutoff") {
+      const [h, m] = s("cutoff").split(":").map(Number);
+      Object.assign(values, {
+        partnerId: action.account!.partner!.id,
+        minutes: h * 60 + m,
+      });
+    }
+    if (action.kind === "rate")
+      Object.assign(values, { zone: action.zone, fee: s("fee") });
+    if (action.kind === "reviewPayment")
+      Object.assign(values, {
+        paymentId: action.payment!.id,
+        decision: s("decision"),
+        confirmedAmount:
+          s("decision") === "REJECT" ? "0" : s("confirmedAmount"),
+        note: s("note"),
+      });
+    if (action.kind === "handover" || action.kind === "remit")
+      Object.assign(values, {
+        parcelIds: chosen.map((p) => p.id),
+        reference: s("reference"),
+        ...(action.kind === "handover"
+          ? { driverId: chosen[0].driverId }
+          : { partnerId: chosen[0].partnerId }),
+      });
+    await execute(values);
+  }
+  function actionFields() {
+    if (!action) return null;
+    const p = action.parcel;
+    switch (action.kind) {
+      case "register":
+        return (
+          <>
+            {actor.role === "ADMIN" && (
+              <div className="d-field full">
+                <Label htmlFor="partner-search">Find an approved partner</Label>
+                <Input
+                  id="partner-search"
+                  value={choiceSearch}
+                  onChange={(e) => setChoiceSearch(e.target.value)}
+                  placeholder="Search business name"
+                />
+                <Pick
+                  name="partnerId"
+                  label="Partner page"
+                  options={(choices.data?.partners ?? []).map((p) => ({
+                    id: p.id,
+                    name: p.businessName,
+                  }))}
+                />
+              </div>
+            )}
+            <Field
+              name="externalReference"
+              label="Unique parcel reference from your page"
+            />
+            <Field name="recipientName" label="Recipient name" />
+            <Field name="recipientPhone" label="Recipient phone" type="tel" />
+            <Field
+              name="destination"
+              label="Building, street, island and delivery instructions"
+              full
+            />
+            <Pick
+              name="zone"
+              label="Delivery zone"
+              options={Object.entries(zoneLabels).map(([id, name]) => ({
+                id,
+                name,
+              }))}
+              value="MALE"
+            />
+            <Field
+              name="codAmount"
+              label="Parcel amount to collect (MVR)"
+              value="0"
+              type="number"
+              min={0}
+              step="0.01"
+            />
+            <Field
+              name="description"
+              label="Parcel description / handling notes"
+              full
+              required={false}
+            />
+            <p className="full">
+              Use 0 for prepaid goods. Delivery fees are calculated separately
+              at current rates and frozen on registration. Registration does not
+              record pickup.
+            </p>
+          </>
+        );
+      case "assign":
+        return (
+          <>
+            <p className="full">
+              Assign {chosen.length} registered packages. This does not mark
+              them picked up.
+            </p>
+            <div className="d-field full">
+              <Label htmlFor="driver-search">Find an approved driver</Label>
+              <Input
+                id="driver-search"
+                value={choiceSearch}
+                onChange={(e) => setChoiceSearch(e.target.value)}
+                placeholder="Search driver name"
+              />
+            </div>
+            <Pick
+              name="driverId"
+              label="Approved driver"
+              options={choices.data?.drivers ?? []}
+            />
+          </>
+        );
+      case "pickup":
+        return (
+          <>
+            <p className="full">
+              You are confirming that you physically received {chosen.length}{" "}
+              selected packages. Unselected packages remain registered.
+            </p>
+            <Label className="d-check-label full">
+              <Checkbox required />I have physically received every selected
+              package.
+            </Label>
+          </>
+        );
+      case "deliver":
+        return (
+          <>
+            <p className="full">
+              {p!.publicId} · {p!.recipientName}
+              <br />
+              {p!.destination}
+            </p>
+            <div className="d-note full">
+              {p!.codAmount > 0
+                ? `Collect ${money(p!.codAmount)} for the goods. Delivery fees are billed separately to the partner.`
+                : "Prepaid goods. No recipient cash collection is required."}
+            </div>
+            {p!.codAmount > 0 && (
+              <Label className="d-check-label full">
+                <Checkbox name="codReceived" required />I received the full{" "}
+                {money(p!.codAmount)} from the recipient.
+              </Label>
+            )}
+            <Label className="d-check-label full">
+              <Checkbox required />
+              The recipient has physically received this package.
+            </Label>
+          </>
+        );
+      case "cancel":
+        return (
+          <>
+            <p className="full">
+              Cancel this unpicked package: {p!.publicId}. Picked-up packages
+              cannot be cancelled here.
+            </p>
+            <Field name="note" label="Cancellation reason" full />
+          </>
+        );
+      case "reviewAccount":
+        return (
+          <>
+            <div className="d-note full">
+              <strong>
+                {action.account!.partner?.businessName ?? action.account!.name}
+              </strong>
+              <p>
+                {action.account!.name} · {action.account!.phone}
+              </p>
+              {action.account!.partner && (
+                <>
+                  <p>{action.account!.partner.pageUrl}</p>
+                  <p>{action.account!.partner.pickupAddress}</p>
+                </>
+              )}
+            </div>
+            <Pick
+              name="status"
+              label="Access decision"
+              value="APPROVED"
+              options={[
+                { id: "APPROVED", name: "Approve access" },
+                { id: "REJECTED", name: "Reject application" },
+                { id: "SUSPENDED", name: "Suspend access" },
+              ]}
+            />
+            <Field name="note" label="Review reason / message" full />
+          </>
+        );
+      case "cutoff":
+        return (
+          <>
+            <Field
+              name="cutoff"
+              label="Daily cutoff (Maldives Time, UTC+5)"
+              type="time"
+              value={`${String(Math.floor(action.account!.partner!.cutoffMinutes / 60)).padStart(2, "0")}:${String(action.account!.partner!.cutoffMinutes % 60).padStart(2, "0")}`}
+            />
+            <p className="full">
+              The next occurrence uses this cutoff. Uninvoiced deliveries carry
+              forward; older outstanding invoices stay due.
+            </p>
+          </>
+        );
+      case "rate":
+        return (
+          <>
+            <p className="full">
+              {zoneLabels[action.zone!]}. New rate applies only to future
+              packages.
+            </p>
+            <Field
+              name="fee"
+              label="Delivery fee (MVR)"
+              type="number"
+              min={0.01}
+              step="0.01"
+              value={(action.fee! / 100).toFixed(2)}
+            />
+          </>
+        );
+      case "submitPayment":
+        return (
+          <>
+            <div className="d-note full">
+              {action.invoice!.publicId} · Outstanding{" "}
+              {money(action.invoice!.total - action.invoice!.paid)}. Upload an
+              actual bank transfer receipt. Submission does not mark the invoice
+              paid.
+            </div>
+            <BankDetails />
+            <Field
+              name="amount"
+              label="Amount transferred (MVR)"
+              type="number"
+              min={0.01}
+              step="0.01"
+              value={(
+                (action.invoice!.total - action.invoice!.paid) /
+                100
+              ).toFixed(2)}
+            />
+            <Field
+              name="bankReference"
+              label="Unique bank transaction reference"
+            />
+            <div className="d-field full">
+              <Label htmlFor="receipt-file">
+                Bank receipt (JPG, PNG or WebP, up to 5 MB)
+              </Label>
+              <Input
+                id="receipt-file"
+                type="file"
+                name="file"
+                accept="image/jpeg,image/png,image/webp"
+                required
+              />
+            </div>
+          </>
+        );
+      case "reviewPayment":
+        return (
+          <>
+            <div className="d-note full">
+              <strong>{action.payment!.bankReference}</strong>
+              <p>
+                Submitted {money(action.payment!.amount)} · Invoice balance{" "}
+                {money(
+                  action.payment!.invoice.total - action.payment!.invoice.paid,
+                )}
+              </p>
+              <a
+                href={`/api/delivery/receipt?id=${action.payment!.receiptId}`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Open private receipt <ArrowUpRight size={12} />
+              </a>
+            </div>
+            <Pick
+              name="decision"
+              label="Bank verification decision"
+              value="CONFIRM"
+              onChange={setDecision}
+              options={[
+                { id: "CONFIRM", name: "Confirm verified amount" },
+                { id: "REJECT", name: "Reject evidence" },
+              ]}
+            />
+            {decision === "CONFIRM" && (
+              <Field
+                name="confirmedAmount"
+                label="Amount actually verified in the bank (MVR)"
+                type="number"
+                min={0.01}
+                step="0.01"
+                value={(action.payment!.amount / 100).toFixed(2)}
+              />
+            )}
+            <Field
+              name="note"
+              label="Verification reason / bank-check notes"
+              full
+            />
+            <Label className="d-check-label full">
+              <Checkbox required />I checked the bank records, not only the
+              uploaded receipt.
+            </Label>
+          </>
+        );
+      case "handover":
+      case "remit":
+        return (
+          <>
+            <div className="d-note full">
+              <strong>
+                {money(chosen.reduce((a, p) => a + p.codAmount, 0))}
+              </strong>{" "}
+              across {chosen.length} packages.
+              <p>
+                {action.kind === "handover"
+                  ? "Record only cash physically received from this driver."
+                  : "Record only money actually sent to this partner. This does not pay or deduct delivery-fee invoices."}
+              </p>
+            </div>
+            <Field
+              name="reference"
+              label={
+                action.kind === "handover"
+                  ? "Unique handover / receipt reference"
+                  : "Unique bank payout reference"
+              }
+              full
+            />
+            <Label className="d-check-label full">
+              <Checkbox required />
+              {action.kind === "handover"
+                ? "I verified that iGO physically received this cash."
+                : "I verified the outgoing bank payout to the partner."}
+            </Label>
+          </>
+        );
+      default:
+        return null;
+    }
+  }
+  return (
+    <div className="d-app">
+      {navigation()}
+      <div className="d-main">
+        <header className="d-topbar">
+          <div className="d-breadcrumb">
+            <Button
+              variant="ghost"
+              className="d-mobile-menu"
+              aria-label="Open navigation"
+              onClick={() => setMobileOpen(true)}
+            >
+              <Menu size={20} />
+            </Button>
+            <span>Workspace</span>
+            <ChevronRight size={13} />
+            <strong>{title}</strong>
+          </div>
+          <div className="d-top-actions">
+            <span className="d-mvt">Maldives · UTC+5</span>
+            <Link href="/delivery/notifications" aria-label="Notifications">
+              <Bell size={19} />
+              {!!notices.data?.unread && <span className="d-notice-dot" />}
+            </Link>
+            <UserButton />
+          </div>
+        </header>
+        <main className="d-content d-content-enter">
+          <div className="d-heading">
+            <div>
+              <span className="d-eyebrow">
+                {actor.role === "ADMIN"
+                  ? "YOUR DELIVERY NETWORK"
+                  : actor.role === "DRIVER"
+                    ? "LET’S GET MOVING"
+                    : "YOUR BUSINESS, DELIVERED"}
+              </span>
+              <h1>
+                {screen === "overview"
+                  ? `Good to see you${actor.role === "PARTNER" ? `, ${actor.name.split(" ")[0]}` : ""}.`
+                  : title}
+              </h1>
+              <p>{descriptions[screen]}</p>
+            </div>
+            <div className="d-heading-actions">
+              <Button
+                variant="outline"
+                aria-label="Refresh records"
+                onClick={refresh}
+              >
+                <RefreshCw size={15} />
+              </Button>
+              {screen === "packages" && (
+                <>
+                  <Link href="/delivery/import">
+                    <Button variant="outline">
+                      <Upload size={15} /> Import Excel
+                    </Button>
+                  </Link>
+                  <Button onClick={() => open({ kind: "register" })}>
+                    <Plus size={16} /> Register package
+                  </Button>
+                </>
+              )}
+              {screen === "overview" && (
+                <Link href="/delivery/packages">
+                  <Button>
+                    View packages <ArrowUpRight size={15} />
+                  </Button>
+                </Link>
+              )}
+              {screen === "invoices" && actor.role === "ADMIN" && (
+                <Button
+                  variant="outline"
+                  disabled={busy}
+                  onClick={async () => {
+                    setBusy(true);
+                    try {
+                      const r = await fetch("/api/delivery/invoice-run", {
+                        method: "POST",
+                        headers: { "Idempotency-Key": crypto.randomUUID() },
+                      });
+                      const value = await r.json();
+                      if (!r.ok) throw new Error(value.error);
+                      toast.success(value.message);
+                      refresh();
+                    } catch (e) {
+                      toast.error(
+                        e instanceof Error
+                          ? e.message
+                          : "Could not run billing.",
+                      );
+                    } finally {
+                      setBusy(false);
+                    }
+                  }}
+                >
+                  Process due cycles <Clock3 size={15} />
+                </Button>
+              )}
+            </div>
+          </div>
+          {mainContent()}
+        </main>
+        <footer className="d-footer">
+          <span>iGO Delivery · You order. I go.</span>
+          <span>Maldives · MVR · UTC+5</span>
+        </footer>
+      </div>
+      <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+        <SheetContent side="left" className="d-mobile-nav">
+          <SheetTitle className="sr-only">Workspace navigation</SheetTitle>
+          {navigation(() => setMobileOpen(false))}
+        </SheetContent>
+      </Sheet>
+      <Dialog
+        open={!!action}
+        onOpenChange={(v) => {
+          if (!v && !busy) setAction(null);
+        }}
+      >
+        <DialogContent className="d-modal">
+          <DialogHeader>
+            <DialogTitle>
+              {
+                (
+                  {
+                    register: "Register package",
+                    assign: "Assign collection",
+                    pickup: "Confirm physical pickup",
+                    deliver: "Complete delivery",
+                    cancel: "Cancel unpicked package",
+                    reviewAccount: "Review account access",
+                    cutoff: "Partner invoice cutoff",
+                    rate: "Update delivery rate",
+                    submitPayment: "Submit bank transfer",
+                    reviewPayment: "Verify bank transfer",
+                    handover: "Verify driver cash handover",
+                    remit: "Record COD partner payout",
+                    detail: "Package details",
+                  } as Record<string, string>
+                )[action?.kind ?? ""]
+              }
+            </DialogTitle>
+            <DialogDescription>
+              {action?.kind === "detail"
+                ? "Saved details and recorded delivery milestones."
+                : "Changes are validated and recorded securely by the server."}
+            </DialogDescription>
+          </DialogHeader>
+          {action?.kind === "detail" ? (
+            <ParcelDetail parcel={action.parcel!} />
+          ) : (
+            <form className="d-form" onSubmit={submitAction}>
+              {actionFields()}
+              {error && (
+                <div className="d-error" role="alert">
+                  {error}
+                </div>
+              )}
+              <div className="d-form-footer">
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={busy}
+                  onClick={() => setAction(null)}
+                >
+                  Close
+                </Button>
+                <Button type="submit" disabled={busy}>
+                  {busy
+                    ? "Saving…"
+                    : action?.kind === "pickup"
+                      ? "Confirm Pickup"
+                      : action?.kind === "submitPayment"
+                        ? "Submit for verification"
+                        : "Confirm & save"}
+                </Button>
+              </div>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
+      {invoiceId && (
+        <InvoiceModal
+          id={invoiceId}
+          close={() => setInvoiceId(null)}
+          actor={actor}
+          pay={(i) => {
+            setInvoiceId(null);
+            open({ kind: "submitPayment", invoice: i });
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function Stat({
+  label,
+  value,
+  note,
+  icon,
+  accent = false,
+}: {
+  label: string;
+  value: string;
+  note: string;
+  icon: ReactNode;
+  accent?: boolean;
+}) {
+  return (
+    <article className={`d-stat ${accent ? "accent" : ""}`}>
+      <div>
+        <span>{label}</span>
+        {icon}
+      </div>
+      <strong>{value}</strong>
+      <small>{note}</small>
+    </article>
+  );
+}
+function ParcelDetail({ parcel: p }: { parcel: Parcel }) {
+  return (
+    <div className="d-card-pad">
+      <Status value={p.state} />
+      <h2 className="mt-4">{p.publicId}</h2>
+      <p>
+        {p.externalReference} · {p.partner.businessName}
+      </p>
+      <div className="d-note mt-5">
+        <strong>
+          {p.recipientName} · {p.recipientPhone}
+        </strong>
+        <p>{p.destination}</p>
+        <p>
+          {zoneLabels[p.zone]} · {p.description}
+        </p>
+      </div>
+      {[
+        ["Registered", p.registeredAt],
+        ["Physically picked up", p.pickedUpAt],
+        ["Delivered", p.deliveredAt],
+      ].map(([label, time]) => (
+        <div className="d-info-row" key={label}>
+          <div className="d-info-icon">
+            <CheckCircle2 size={17} />
+          </div>
+          <div>
+            <strong>{label}</strong>
+            <p>{stamp(time)}</p>
+          </div>
+        </div>
+      ))}
+      <div className="d-info-row">
+        <div>
+          <strong>Driver</strong>
+          <p>{p.driver?.name ?? "Not assigned"}</p>
+        </div>
+        <span>{p.invoiceLine?.invoice.publicId ?? "Not invoiced"}</span>
+      </div>
+      <div className="d-info-row">
+        <div>
+          <strong>Delivery fee</strong>
+          <p>
+            {p.invoiceLine
+              ? "Included on the invoice above"
+              : "Estimate until invoiced after delivery"}
+          </p>
+        </div>
+        <span>{money(p.fee)}</span>
+      </div>
+      <div className="d-info-row">
+        <div>
+          <strong>Recipient COD amount</strong>
+          <p>Separate from delivery fees</p>
+        </div>
+        <span>{money(p.codAmount)}</span>
+      </div>
+    </div>
+  );
+}
+function BankDetails() {
+  const { data, error } = useResource<{ settings: SettingValues }>("settings");
+  return (
+    <div className="d-note full">
+      {error ? (
+        error
+      ) : !data ? (
+        "Loading beneficiary details…"
+      ) : data.settings.bankAccount && data.settings.beneficiary ? (
+        <>
+          <strong>{data.settings.bankName}</strong>
+          <p>
+            {data.settings.beneficiary} · {data.settings.bankAccount}
+          </p>
+        </>
+      ) : (
+        <strong>
+          Bank beneficiary details are not configured. Contact iGO before
+          transferring.
+        </strong>
+      )}
+    </div>
+  );
+}
+function InvoiceModal({
+  id,
+  close,
+  actor,
+  pay,
+}: {
+  id: string;
+  close: () => void;
+  actor: Actor;
+  pay: (i: Invoice) => void;
+}) {
+  const [page, setPage] = useState(1);
+  const { data, error } = useResource<InvoiceDetail>(
+    "invoice",
+    `id=${id}&page=${page}`,
+  );
+  return (
+    <Dialog
+      open
+      onOpenChange={(v) => {
+        if (!v) close();
+      }}
+    >
+      <DialogContent className="d-modal">
+        <DialogHeader>
+          <DialogTitle>Invoice details</DialogTitle>
+          <DialogDescription>
+            Delivered package fees and bank-confirmed payments only.
+          </DialogDescription>
+        </DialogHeader>
+        {error ? (
+          <div className="d-error">{error}</div>
+        ) : !data ? (
+          <DeliverySkeleton />
+        ) : (
+          <>
+            <div className="d-invoice-summary">
+              <div>
+                <h2>{data.invoice.publicId}</h2>
+                <p>
+                  {data.invoice.partner.businessName} ·{" "}
+                  {data.invoice.cycle.localDate}
+                </p>
+                <p>Cutoff {stamp(data.invoice.cycle.cutoffAt)} MVT</p>
+              </div>
+              <div>
+                <strong>{money(data.invoice.total - data.invoice.paid)}</strong>
+                <p>Outstanding of {money(data.invoice.total)}</p>
+              </div>
+            </div>
+            <GridTable
+              headings={["Package", "Recipient", "Delivered (MVT)", "Fee"]}
+              rows={data.items.map((l) => [
+                <div key="id">
+                  <strong>{l.parcel.publicId}</strong>
+                  <small>{l.parcel.externalReference}</small>
+                </div>,
+                l.parcel.recipientName,
+                stamp(l.parcel.deliveredAt),
+                money(l.amount),
+              ])}
+            />
+            <Pager list={data} onPage={setPage} />
+            <div className="d-row-actions">
+              <Button variant="outline" onClick={() => window.print()}>
+                Print invoice
+              </Button>
+              {actor.role === "PARTNER" &&
+                data.invoice.paid < data.invoice.total && (
+                  <Button onClick={() => pay(data.invoice)}>
+                    Submit bank transfer
+                  </Button>
+                )}
+            </div>
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+function SettingsPanel({
+  actor,
+  settings,
+  openRate,
+  execute,
+  busy,
+  error,
+  revision,
+}: {
+  actor: Actor;
+  settings: SettingValues;
+  openRate: (zone: string, fee: number) => void;
+  execute: (v: unknown) => Promise<void>;
+  busy: boolean;
+  error: string;
+  revision: number;
+}) {
+  const rates = useResource<{ items: { zone: string; fee: number }[] }>(
+    "rates",
+    "",
+    revision,
+  );
+  return (
+    <div className="d-settings">
+      {actor.role === "ADMIN" && <ScheduleHealth revision={revision} />}
+      <section className="d-card">
+        <div className="d-card-header">
+          <div>
+            <h2>Delivery rates</h2>
+            <p>
+              Registration freezes the rate. Historical charges never change.
+            </p>
+          </div>
+        </div>
+        {rates.data?.items.map((r) => (
+          <div className="d-info-row" key={r.zone}>
+            <div>
+              <strong>{zoneLabels[r.zone]}</strong>
+              <p>Per package</p>
+            </div>
+            <span>{money(r.fee)}</span>
+            {actor.role === "ADMIN" && (
+              <Button variant="outline" onClick={() => openRate(r.zone, r.fee)}>
+                Edit
+              </Button>
+            )}
+          </div>
+        ))}
+      </section>
+      <section className="d-card mt-6">
+        <div className="d-card-header">
+          <div>
+            <h2>Business & bank details</h2>
+            <p>
+              {actor.role === "ADMIN"
+                ? "Complete these before accepting live partner transfers."
+                : "Use these beneficiary details for your invoice payments."}
+            </p>
+          </div>
+        </div>
+        {actor.role === "ADMIN" ? (
+          <form
+            className="d-form"
+            onSubmit={(event) => {
+              event.preventDefault();
+              const f = new FormData(event.currentTarget);
+              execute({ type: "settings", ...Object.fromEntries(f.entries()) });
+            }}
+          >
+            {Object.entries({
+              businessLegalName: "Registered business name",
+              registrationNumber: "Registration number",
+              supportPhone: "Support phone",
+              supportEmail: "Support email",
+              bankName: "Bank name",
+              beneficiary: "Account beneficiary",
+              bankAccount: "Bank account number",
+            }).map(([name, label]) => (
+              <Field
+                key={name}
+                name={name}
+                label={label}
+                value={settings?.[name as keyof SettingValues] ?? ""}
+                required={false}
+              />
+            ))}
+            {error && <div className="d-error">{error}</div>}
+            <div className="d-form-footer">
+              <Button disabled={busy} type="submit">
+                {busy ? "Saving…" : "Save business details"}
+              </Button>
+            </div>
+          </form>
+        ) : (
+          <div className="d-card-pad">
+            <BankDetails />
+            <p>
+              Delivery fees are invoiced separately. Cash-on-delivery payouts do
+              not automatically reduce your invoice balances.
+            </p>
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
+function ScheduleHealth({ revision }: { revision: number }) {
+  const { data, error } = useResource<{
+    enabled: boolean;
+    active: boolean;
+    overdue: number;
+    runs: { status: string; start_time: string; end_time: string | null }[];
+  }>("scheduler", "", revision);
+  return (
+    <section className="d-card mb-6">
+      <div className="d-card-header">
+        <div>
+          <h2>Automatic daily invoicing</h2>
+          <p>
+            Each partner’s cutoff uses Maldives Time. The scheduler checks every
+            five minutes.
+          </p>
+        </div>
+      </div>
+      <div className="d-card-pad">
+        {error ? (
+          <div className="d-error" role="alert">
+            {error}
+          </div>
+        ) : !data ? (
+          <p>Checking the schedule…</p>
+        ) : (
+          <>
+            <strong>
+              {data.enabled && data.active
+                ? "Invoice schedule is active"
+                : "Invoice schedule needs configuration"}
+            </strong>
+            <p>
+              {data.overdue} partner cycles currently due. Missed cycles catch
+              up automatically.
+            </p>
+            {data.runs.length ? (
+              data.runs.map((run, i) => (
+                <p key={i}>
+                  {stamp(run.start_time)} · {run.status}
+                </p>
+              ))
+            ) : (
+              <p>No scheduled execution has been recorded yet.</p>
+            )}
+          </>
+        )}
+      </div>
+    </section>
+  );
+}
+function ImportPanel({
+  actor,
+  choices,
+  search,
+  onSearch,
+  onDone,
+}: {
+  actor: Actor;
+  choices: { id: string; businessName: string }[];
+  search: string;
+  onSearch: (v: string) => void;
+  onDone: () => void;
+}) {
+  const [file, setFile] = useState<File | null>(null),
+    [partner, setPartner] = useState(""),
+    [busy, setBusy] = useState(false),
+    [error, setError] = useState(""),
+    [result, setResult] = useState<{
+      count: number;
+      errors: { row: number; message: string }[];
+      examples: Record<string, unknown>[];
+    } | null>(null);
+  const key = useRef<string | null>(null);
+  async function upload(mode: string) {
+    if (!file) return;
+    setBusy(true);
+    setError("");
+    const form = new FormData();
+    form.set("file", file);
+    form.set("mode", mode);
+    if (partner) form.set("partnerId", partner);
+    key.current ??= crypto.randomUUID();
+    try {
+      const r = await fetch("/api/delivery/import", {
+        method: "POST",
+        headers: {
+          "Idempotency-Key":
+            mode === "preview" ? crypto.randomUUID() : key.current,
+        },
+        body: form,
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error);
+      if (mode === "preview") setResult(data);
+      else {
+        toast.success(
+          `${data.count} packages registered. No pickups recorded.`,
+        );
+        setResult(null);
+        setFile(null);
+        key.current = null;
+        onDone();
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Import failed.");
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <section className="d-card d-card-pad">
+      <div className="d-heading">
+        <div>
+          <h2>One list. Every delivery.</h2>
+          <p>
+            Download the template, enter your package details, then validate
+            before importing.
+          </p>
+        </div>
+        <Link href="/api/delivery/template" prefetch={false} download>
+          <Button variant="outline">
+            <Download size={15} /> Download Excel template
+          </Button>
+        </Link>
+      </div>
+      {actor.role === "ADMIN" && (
+        <div className="mb-5">
+          <Label htmlFor="import-partner-search">
+            Find an approved partner
+          </Label>
+          <Input
+            id="import-partner-search"
+            value={search}
+            onChange={(e) => onSearch(e.target.value)}
+            placeholder="Search business name"
+            className="mb-3"
+          />
+          <Pick
+            name="import-partner"
+            label="Import for partner"
+            options={choices.map((p) => ({ id: p.id, name: p.businessName }))}
+            onChange={(v) => {
+              setPartner(v);
+              setResult(null);
+              key.current = null;
+            }}
+          />
+        </div>
+      )}
+      <div className="d-upload-zone">
+        <FileSpreadsheet size={32} />
+        <strong>Select your package workbook</strong>
+        <Input
+          aria-label="Package Excel workbook"
+          type="file"
+          accept=".xlsx"
+          onChange={(e) => {
+            setFile(e.target.files?.[0] ?? null);
+            setResult(null);
+            key.current = null;
+          }}
+        />
+        <p>
+          .xlsx · up to 1 MB · maximum 500 packages
+          <br />
+          Use one unique parcel reference for every package.
+        </p>
+      </div>
+      {error && (
+        <div className="d-error mt-5" role="alert">
+          {error}
+        </div>
+      )}
+      <div className="d-import-actions">
+        <Button
+          disabled={!file || busy || (actor.role === "ADMIN" && !partner)}
+          onClick={() => upload("preview")}
+        >
+          {busy ? "Checking…" : "Validate workbook"}
+          <CheckCircle2 size={15} />
+        </Button>
+        {result && !result.errors.length && (
+          <Button disabled={busy} onClick={() => upload("commit")}>
+            Confirm import of {result.count} packages <ArrowRight size={15} />
+          </Button>
+        )}
+      </div>
+      {result && (
+        <div className="d-import-preview">
+          <div className="d-note">
+            {result.count} valid package rows. Validation has not created
+            packages or recorded pickups.
+          </div>
+          {result.errors.length ? (
+            <div className="d-import-errors" role="alert">
+              {result.errors.map((e, i) => (
+                <p key={i}>
+                  Row {e.row || "reference"}: {e.message}
+                </p>
+              ))}
+            </div>
+          ) : (
+            <GridTable
+              headings={["Reference", "Recipient", "Zone", "COD (MVR)"]}
+              rows={result.examples.map((r) => [
+                String(r.externalReference),
+                String(r.recipientName),
+                zoneLabels[String(r.zone)],
+                money(Number(r.codAmount)),
+              ])}
+            />
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
+function downloadReport(data: Summary) {
+  const fields = [
+    "registered",
+    "pickedUp",
+    "delivered",
+    "pendingEstimate",
+    "awaitingBilling",
+    "invoiced",
+    "confirmedPayments",
+    "outstanding",
+    "codOwed",
+    "driverCash",
+    "companyCash",
+  ] as const;
+  const text =
+    "Metric,Value,Unit\n" +
+    fields
+      .map(
+        (k) =>
+          `${k},${k.endsWith("Estimate") || ["awaitingBilling", "invoiced", "confirmedPayments", "outstanding", "codOwed", "driverCash", "companyCash"].includes(k) ? (data[k] / 100).toFixed(2) : data[k]},${["registered", "pickedUp", "delivered"].includes(k) ? "packages" : "MVR"}`,
+      )
+      .join("\n");
+  const url = URL.createObjectURL(
+    new Blob([text], { type: "text/csv;charset=utf-8" }),
+  );
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "igo-operational-totals.csv";
+  a.click();
+  URL.revokeObjectURL(url);
+}

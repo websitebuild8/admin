@@ -1,0 +1,221 @@
+import Link from "next/link";
+import Image from "next/image";
+import {
+  ArrowRight,
+  Package,
+  MapPin,
+  Check,
+  ArrowUpRight,
+  Truck,
+  FileSpreadsheet,
+  ReceiptText,
+  ShieldCheck,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+export default function Page() {
+  return (
+    <div className="d-site">
+      <header className="d-site-header">
+        <Link href="/" aria-label="iGO Delivery home">
+          <Image
+            src="/brand/igo-delivery.jpg"
+            width={108}
+            height={61}
+            alt="iGO Delivery"
+            priority
+          />
+        </Link>
+        <nav aria-label="Main navigation">
+          <a href="#how-it-works">How it works</a>
+          <a href="#delivery-rates">Delivery rates</a>
+          <Link href="/delivery/sign-in">Sign in</Link>
+          <Link href="/join">
+            <Button>
+              Become a partner <ArrowUpRight size={16} />
+            </Button>
+          </Link>
+        </nav>
+      </header>
+      <main>
+        <section className="d-hero">
+          <div>
+            <span className="d-eyebrow">
+              <span className="d-live-dot" /> MADE FOR YOUR ISLANDS
+            </span>
+            <h1>
+              You make
+              <br />
+              the sale.
+              <br />
+              <span>
+                We make
+                <br className="d-only-mobile" /> the move.
+              </span>
+            </h1>
+            <p>
+              From your page to their doorstep. A delivery partner for the
+              businesses building something of their own.
+            </p>
+            <div className="d-hero-actions">
+              <Link href="/join">
+                <Button size="lg">
+                  Let’s get your business moving <ArrowRight size={18} />
+                </Button>
+              </Link>
+              <a href="#how-it-works">
+                See how it works <ArrowUpRight size={16} />
+              </a>
+            </div>
+            <div className="d-hero-note">
+              <ShieldCheck size={17} /> Malé · Hulhumalé · Boat deliveries
+            </div>
+          </div>
+          <div
+            className="d-hero-art"
+            aria-label="From your business to your customer"
+          >
+            <div className="d-art-brand">
+              <Image
+                src="/brand/igo-delivery.jpg"
+                width={440}
+                height={248}
+                alt="You order. I go."
+                priority
+              />
+            </div>
+            <div className="d-route-card">
+              <div className="d-route-icon">
+                <Package size={26} />
+              </div>
+              <div>
+                <small>COLLECT FROM</small>
+                <strong>Your business</strong>
+              </div>
+              <span className="d-mini-badge">STEP 01</span>
+            </div>
+            <div className="d-route-line">
+              <span />
+              <span />
+              <span />
+              <Truck size={26} />
+              <span />
+              <span />
+            </div>
+            <div className="d-route-card destination">
+              <div className="d-route-icon">
+                <MapPin size={26} />
+              </div>
+              <div>
+                <small>DELIVER TO</small>
+                <strong>A happy customer</strong>
+              </div>
+              <div className="d-check-icon">
+                <Check size={21} />
+              </div>
+            </div>
+            <div className="d-art-caption">
+              <span>Less delivery admin.</span>
+              <strong>More room to grow.</strong>
+            </div>
+          </div>
+        </section>
+        <section id="how-it-works" className="d-how">
+          <span className="d-eyebrow">SMALL BUSINESS. BIG POSSIBILITIES.</span>
+          <h2>
+            Your next delivery,
+            <br />
+            without the back-and-forth.
+          </h2>
+          <div className="d-feature-grid">
+            {[
+              {
+                icon: FileSpreadsheet,
+                n: "01",
+                title: "Add your packages",
+                text: "Register one delivery or upload your Excel list. Keep every customer and parcel reference together.",
+              },
+              {
+                icon: Truck,
+                n: "02",
+                title: "We collect and deliver",
+                text: "Your driver confirms physical pickup and records delivery. See each milestone from your portal.",
+              },
+              {
+                icon: ReceiptText,
+                n: "03",
+                title: "Know what you owe",
+                text: "Daily invoices contain delivered packages only. Bank transfers are credited after verification.",
+              },
+            ].map(({ icon: Icon, n, title, text }) => (
+              <article key={n}>
+                <div>
+                  <Icon size={25} />
+                  <span>{n}</span>
+                </div>
+                <h3>{title}</h3>
+                <p>{text}</p>
+              </article>
+            ))}
+          </div>
+        </section>
+        <section id="delivery-rates" className="d-public-rates">
+          <div>
+            <span className="d-eyebrow">SIMPLE STARTING RATES</span>
+            <h2>
+              Small fees.
+              <br />A big weight off.
+            </h2>
+            <p>
+              Delivery fees per package, billed to your business. Cash collected
+              for your goods stays separate.
+            </p>
+            <Link href="/join">
+              Apply for your partner account <ArrowUpRight size={17} />
+            </Link>
+          </div>
+          <div className="d-rate-grid">
+            {[
+              ["Boat", "25"],
+              ["Within Malé", "25"],
+              ["Hulhumalé Phase 1", "35"],
+              ["Hulhumalé Phase 2", "45"],
+            ].map(([name, fee]) => (
+              <article key={name}>
+                <MapPin size={19} />
+                <h3>{name}</h3>
+                <strong>
+                  <small>MVR</small> {fee}
+                </strong>
+                <p>per package</p>
+              </article>
+            ))}
+          </div>
+        </section>
+        <section className="d-final-cta">
+          <div>
+            <span className="d-eyebrow">YOUR CUSTOMERS ARE WAITING.</span>
+            <h2>Ready when you are.</h2>
+            <p>
+              Bring your Facebook or Instagram business. We’ll take it from
+              here.
+            </p>
+          </div>
+          <Link href="/join">
+            <Button size="lg">
+              Apply as a partner <ArrowUpRight size={19} />
+            </Button>
+          </Link>
+        </section>
+      </main>
+      <footer className="d-public-footer">
+        <strong>
+          iGO Delivery <span>You order. I go.</span>
+        </strong>
+        <p>Maldives · MVR · UTC+5</p>
+        <Link href="/delivery/sign-in">
+          Partner, driver & admin sign in <ArrowRight size={14} />
+        </Link>
+      </footer>
+    </div>
+  );
+}

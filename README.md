@@ -1,6 +1,21 @@
-# iGO — agreed product and legal foundation
+# iGO Delivery
 
-Status: admin and connected role-based Flutter app under development, updated 5 October 2026. The Next.js admin lives in `apps/admin`; the role-based Flutter application lives in `apps/mobile`. Clerk is the identity provider and Supabase/PostgreSQL is the database. BML collection is disabled; legal drafts retain business placeholders. These files do not certify legal compliance.
+Phase 1 is the responsive seller delivery website for Facebook/Instagram businesses,
+with approved partner, driver and admin workspaces. Next.js, Clerk, Prisma and
+Supabase remain the shared stack. COD collection and partner payouts are separate
+from daily delivery-fee invoices. Mobile/restaurant work is preserved for Phase 2.
+
+- [Phase 1 architecture and business rules](docs/phase-one-delivery.md)
+- [Phase 1 deployment, verified checks and launch gates](docs/phase-one-launch.md)
+
+The public website is `/`, the role-based portal is `/delivery`, and preserved
+Phase 2 administration is `/legacy`. No deployment or legal approval is implied
+by the presence of this code. Business/legal/bank details remain launch inputs.
+
+## Preserved Phase 2 references
+
+The following documents describe the earlier restaurant/mobile product. Its
+card-only checkout rules do not apply to Phase 1 seller COD and bank invoices.
 
 - [Admin setup and capabilities](apps/admin/README.md)
 - [Shared demo purchases and simulated bank gateway](docs/demo-purchases.md)

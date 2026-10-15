@@ -1,0 +1,541 @@
+import { config } from "dotenv";
+config({ path: ".env.local", quiet: true });
+config({ path: ".env", quiet: true });
+import assert from "node:assert/strict";
+import { randomBytes, randomUUID } from "node:crypto";
+import { readFile } from "node:fs/promises";
+import pg from "pg";
+import ExcelJS from "exceljs";
+import { PrismaPg } from "@prisma/adapter-pg";
+import { PrismaClient } from "../src/generated/prisma/client";
+import { databaseUrl } from "../src/lib/database-url";
+import { deliveryCommand } from "../src/lib/delivery/commands";
+import { deliveryQuery } from "../src/lib/delivery/queries";
+import { packageImport } from "../src/lib/delivery/import-service";
+import { importColumns } from "../src/lib/delivery/import";
+import {
+  nextCutoff,
+  type Actor,
+  type DeliveryCommandInput,
+} from "../src/lib/delivery/domain";
+
+async function main() {
+  if (process.env.NODE_ENV !== "test")
+    throw new Error("Run this isolated check with NODE_ENV=test.");
+  if (!process.env.DIRECT_URL)
+    throw new Error("DIRECT_URL is required for isolated schema verification.");
+  const schema = `igo_qa_${randomBytes(8).toString("hex")}`;
+  process.env.IGO_DELIVERY_TEST_SCHEMA = schema;
+  const connectionString = databaseUrl(process.env.DIRECT_URL),
+    owner = new pg.Client({ connectionString, connectionTimeoutMillis: 10000 });
+  let db: PrismaClient | undefined,
+    created = false,
+    checks = 0;
+  const ok = (label: string) => {
+    checks++;
+    console.log(`PASS ${label}`);
+  };
+  try {
+    await owner.connect();
+    await owner.query(`CREATE SCHEMA "${schema}"`);
+    created = true;
+    await owner.query(`SET search_path TO "${schema}"`);
+    for (const folder of [
+      "20261016000000_seller_delivery",
+      "20261016010000_delivery_invariants",
+      "20261016020000_delivery_ledger_reconciliation",
+      "20261016030000_delivery_history_guards",
+      "20261016040000_delivery_function_permissions",
+    ]) {
+      let sql = await readFile(
+        `prisma/migrations/${folder}/migration.sql`,
+        "utf8",
+      );
+      sql = sql
+        .replaceAll("public.", `${schema}.`)
+        .replaceAll("'public'", `'${schema}'`)
+        .replaceAll(
+          "819201016",
+          String(100000000 + parseInt(schema.slice(-6), 16)),
+        );
+      await owner.query(sql);
+    }
+    db = new PrismaClient({
+      adapter: new PrismaPg({ connectionString, max: 5 }, { schema }),
+    });
+    (globalThis as unknown as { igoPrisma: PrismaClient }).igoPrisma = db;
+    const cutoff = nextCutoff(new Date(), 1080);
+    const account = async (name: string, role: "PARTNER" | "DRIVER") =>
+      db!.deliveryAccount.create({
+        data: {
+          clerkUserId: `qa_${name}_${schema}`,
+          role,
+          status: "APPROVED",
+          name,
+          phone: "7771234",
+          ...(role === "PARTNER"
+            ? {
+                partner: {
+                  create: {
+                    businessName: name,
+                    pageUrl: "https://example.com/qa",
+                    pickupAddress: "Disposable QA pickup",
+                    pickupArea: "Malé",
+                    nextInvoiceAt: cutoff,
+                  },
+                },
+              }
+            : {}),
+        },
+        include: { partner: true },
+      });
+    const [a, b, d, d2] = await Promise.all([
+      account("partner_a", "PARTNER"),
+      account("partner_b", "PARTNER"),
+      account("driver_a", "DRIVER"),
+      account("driver_b", "DRIVER"),
+    ]);
+    const actor = (v: typeof a): Actor => ({
+      userId: v.clerkUserId,
+      id: v.id,
+      role: v.role,
+      partnerId: v.partner?.id ?? null,
+      status: "APPROVED",
+      name: v.name,
+    });
+    const partner = actor(a),
+      other = actor(b),
+      driver = actor(d),
+      otherDriver = actor(d2),
+      admin: Actor = {
+        userId: `qa_admin_${schema}`,
+        id: null,
+        partnerId: null,
+        role: "ADMIN",
+        status: "APPROVED",
+        name: "QA Admin",
+      };
+    const cmd = (
+      who: Actor,
+      command: DeliveryCommandInput,
+      key = randomUUID(),
+    ) => deliveryCommand(who, key, command);
+    const make = (
+      ref: string,
+      zone: "MALE" | "HULHUMALE_1" | "HULHUMALE_2" = "MALE",
+      codAmount = 0,
+    ) => ({
+      type: "register" as const,
+      parcel: {
+        externalReference: ref,
+        recipientName: "QA recipient",
+        recipientPhone: "7771234",
+        destination: "Disposable QA destination",
+        zone,
+        codAmount,
+        description: "Not a real delivery",
+      },
+    });
+    const key = randomUUID(),
+      first = await cmd(partner, make("QA-ONE", "MALE", 10000), key);
+    assert.deepEqual(
+      await cmd(partner, make("QA-ONE", "MALE", 10000), key),
+      first,
+    );
+    ok("registration replay is idempotent");
+    await assert.rejects(cmd(partner, make("DIFFERENT"), key));
+    ok("same key rejects changed request");
+    await assert.rejects(cmd(partner, make("QA-ONE")));
+    ok("unique partner parcel reference prevents duplicate registration");
+    await cmd(partner, make("QA-TWO", "HULHUMALE_1"));
+    await cmd(partner, make("QA-UNPICKED", "HULHUMALE_2"));
+    const parcels = await db.deliveryParcel.findMany({
+      where: { partnerId: a.partner!.id },
+      orderBy: { externalReference: "asc" },
+    });
+    const p1 = parcels.find((p) => p.externalReference === "QA-ONE")!,
+      p2 = parcels.find((p) => p.externalReference === "QA-TWO")!,
+      p3 = parcels.find((p) => p.externalReference === "QA-UNPICKED")!;
+    assert(parcels.every((p) => p.state === "REGISTERED" && !p.pickedUpAt));
+    ok("registration is never pickup");
+    await assert.rejects(
+      cmd(partner, { ...make("ESCAPE"), partnerId: b.partner!.id }),
+    );
+    ok("partner cannot register into another tenant");
+    await cmd(admin, {
+      type: "assign",
+      driverId: d.id,
+      parcelIds: [p1.id, p2.id],
+    });
+    await deliveryQuery(driver, "collections", new URLSearchParams());
+    assert.equal(
+      (await db.deliveryParcel.findUniqueOrThrow({ where: { id: p1.id } }))
+        .state,
+      "REGISTERED",
+    );
+    ok("assignment and opening collection list do not record receipt");
+    await assert.rejects(
+      cmd(otherDriver, { type: "pickup", parcelIds: [p1.id] }),
+    );
+    ok("unassigned driver cannot confirm pickup");
+    const pickup = await Promise.allSettled([
+      cmd(driver, { type: "pickup", parcelIds: [p1.id] }),
+      cmd(driver, { type: "pickup", parcelIds: [p1.id] }),
+    ]);
+    assert.equal(pickup.filter((r) => r.status === "fulfilled").length, 1);
+    ok("concurrent pickup executes once");
+    assert.equal(
+      (await db.deliveryParcel.findUniqueOrThrow({ where: { id: p2.id } }))
+        .state,
+      "REGISTERED",
+    );
+    ok("unselected collection packages remain registered");
+    await assert.rejects(
+      cmd(driver, { type: "deliver", parcelId: p1.id, codReceived: false }),
+    );
+    ok("COD must be explicitly confirmed");
+    await cmd(driver, { type: "deliver", parcelId: p1.id, codReceived: true });
+    await cmd(driver, { type: "pickup", parcelIds: [p2.id] });
+    await cmd(driver, { type: "deliver", parcelId: p2.id, codReceived: false });
+    const delivered = await db.deliveryParcel.findUniqueOrThrow({
+      where: { id: p1.id },
+    });
+    assert.equal(delivered.deliveredBy, d.clerkUserId);
+    assert(delivered.deliveredAt && delivered.codCollectedAt);
+    ok("delivery records driver, server timestamp and COD");
+    const run = () =>
+      db!.$queryRawUnsafe(
+        `SELECT ${schema}.igo_invoice_due($1::timestamptz) AS result`,
+        new Date(cutoff.getTime() + 1000),
+      );
+    await Promise.all([run(), run()]);
+    await run();
+    const invoices = await db.deliveryInvoice.findMany({
+      include: { lines: true },
+    });
+    assert.equal(invoices.length, 1);
+    const invoice = invoices[0];
+    assert.equal(invoice.total, 6000);
+    assert.equal(invoice.lines.length, 2);
+    assert(!invoice.lines.some((l) => l.parcelId === p3.id));
+    ok("concurrent and repeated invoice runs bill delivered packages once");
+    assert.equal(
+      await db.deliveryInvoice.count({ where: { partnerId: b.partner!.id } }),
+      0,
+    );
+    ok("empty partner cycles create no invoice");
+    await assert.rejects(
+      deliveryQuery(other, "invoice", new URLSearchParams({ id: invoice.id })),
+    );
+    ok("invoice details are tenant isolated");
+    await assert.rejects(
+      db.deliveryInvoiceLine.create({
+        data: { invoiceId: invoice.id, parcelId: p3.id, amount: p3.fee },
+      }),
+    );
+    ok("SQL rejects invoice lines for unpicked packages");
+    await cmd(admin, { type: "assign", driverId: d.id, parcelIds: [p3.id] });
+    await cmd(driver, { type: "pickup", parcelIds: [p3.id] });
+    await cmd(driver, { type: "deliver", parcelId: p3.id, codReceived: false });
+    await db.$queryRawUnsafe(
+      `SELECT ${schema}.igo_invoice_due($1::timestamptz) AS result`,
+      new Date(cutoff.getTime() + 86401000),
+    );
+    const carry = (await deliveryQuery(
+      partner,
+      "overview",
+      new URLSearchParams(),
+    )) as { outstanding: number };
+    assert.equal(await db.deliveryInvoice.count(), 2);
+    assert.equal(carry.outstanding, 10500);
+    assert.equal(
+      (
+        await db.deliveryInvoice.findUniqueOrThrow({
+          where: { id: invoice.id },
+        })
+      ).paid,
+      0,
+    );
+    ok("new daily invoices preserve all older unpaid invoice balances");
+    const receipt = () =>
+      db!.deliveryReceipt.create({
+        data: {
+          partnerId: a.partner!.id,
+          path: `${a.partner!.id}/${randomUUID()}.webp`,
+          sha256: randomBytes(32).toString("hex"),
+          bytes: 100,
+          ready: true,
+        },
+      });
+    const r1 = await receipt();
+    await cmd(partner, {
+      type: "submitPayment",
+      invoiceId: invoice.id,
+      receiptId: r1.id,
+      bankReference: "QA-BANK-ONE",
+      amount: 4000,
+    });
+    const payment = await db.deliveryPayment.findFirstOrThrow({
+      where: { receiptId: r1.id },
+    });
+    assert.equal(
+      (
+        await db.deliveryInvoice.findUniqueOrThrow({
+          where: { id: invoice.id },
+        })
+      ).paid,
+      0,
+    );
+    ok("pending receipt does not reduce debt");
+    await assert.rejects(
+      cmd(other, {
+        type: "submitPayment",
+        invoiceId: invoice.id,
+        receiptId: r1.id,
+        bankReference: "QA-ESCAPE",
+        amount: 1,
+      }),
+    );
+    await assert.rejects(
+      cmd(partner, {
+        type: "reviewPayment",
+        paymentId: payment.id,
+        decision: "CONFIRM",
+        confirmedAmount: 2000,
+        note: "Not authorized",
+      }),
+    );
+    ok("cross-tenant receipts and partner verification are denied");
+    const reviewKey = randomUUID(),
+      partial = {
+        type: "reviewPayment" as const,
+        paymentId: payment.id,
+        decision: "CONFIRM" as const,
+        confirmedAmount: 2000,
+        note: "QA bank verified part",
+      };
+    await cmd(admin, partial, reviewKey);
+    await cmd(admin, partial, reviewKey);
+    assert.equal(
+      (
+        await db.deliveryInvoice.findUniqueOrThrow({
+          where: { id: invoice.id },
+        })
+      ).paid,
+      2000,
+    );
+    assert.equal(
+      (
+        await db.deliveryPayment.findUniqueOrThrow({
+          where: { id: payment.id },
+        })
+      ).status,
+      "PARTIAL",
+    );
+    ok("partial verification credits only confirmed amount once");
+    const pending = [];
+    for (let n = 0; n < 3; n++) {
+      const r = await receipt();
+      await cmd(partner, {
+        type: "submitPayment",
+        invoiceId: invoice.id,
+        receiptId: r.id,
+        bankReference: `QA-BANK-${n + 2}`,
+        amount: 4000,
+      });
+      pending.push(
+        await db.deliveryPayment.findFirstOrThrow({
+          where: { receiptId: r.id },
+        }),
+      );
+    }
+    const race = await Promise.allSettled(
+      pending.slice(0, 2).map((p) =>
+        cmd(admin, {
+          type: "reviewPayment",
+          paymentId: p.id,
+          decision: "CONFIRM",
+          confirmedAmount: 4000,
+          note: "QA actual bank credit",
+        }),
+      ),
+    );
+    assert.equal(race.filter((r) => r.status === "fulfilled").length, 1);
+    assert.equal(
+      (
+        await db.deliveryInvoice.findUniqueOrThrow({
+          where: { id: invoice.id },
+        })
+      ).paid,
+      6000,
+    );
+    ok("concurrent confirmations cannot over-credit an invoice");
+    await cmd(admin, {
+      type: "reviewPayment",
+      paymentId: pending[2].id,
+      decision: "REJECT",
+      confirmedAmount: 0,
+      note: "QA rejected evidence",
+    });
+    assert.equal(
+      (
+        await db.deliveryInvoice.findUniqueOrThrow({
+          where: { id: invoice.id },
+        })
+      ).paid,
+      6000,
+    );
+    ok("rejection never changes confirmed debt");
+    await assert.rejects(
+      db.deliveryInvoice.update({
+        where: { id: invoice.id },
+        data: { paid: 0 },
+      }),
+    );
+    ok("database rejects balances that do not reconcile to allocations");
+    await assert.rejects(
+      cmd(admin, {
+        type: "remit",
+        partnerId: a.partner!.id,
+        parcelIds: [p1.id],
+        reference: "QA-TOO-EARLY",
+      }),
+    );
+    ok("COD payout requires cash received from driver");
+    await cmd(admin, {
+      type: "handover",
+      driverId: d.id,
+      parcelIds: [p1.id],
+      reference: "QA-HANDOVER",
+    });
+    await cmd(admin, {
+      type: "remit",
+      partnerId: a.partner!.id,
+      parcelIds: [p1.id],
+      reference: "QA-PAYOUT",
+    });
+    const final = await db.deliveryParcel.findUniqueOrThrow({
+      where: { id: p1.id },
+    });
+    assert(final.handoverId && final.remittanceId);
+    assert.equal(
+      (
+        await db.deliveryInvoice.findUniqueOrThrow({
+          where: { id: invoice.id },
+        })
+      ).paid,
+      6000,
+    );
+    ok(
+      "COD handover and remittance reconcile separately from delivery payments",
+    );
+    const activity = await db.deliveryActivity.findFirstOrThrow();
+    await assert.rejects(
+      db.deliveryActivity.update({
+        where: { id: activity.id },
+        data: { kind: "TAMPER" },
+      }),
+    );
+    ok("audit history is append-only");
+    await assert.rejects(
+      db.deliveryInvoice.update({
+        where: { id: invoice.id },
+        data: { partnerId: b.partner!.id },
+      }),
+    );
+    ok("invoice ownership cannot be rewritten");
+    const wb = new ExcelJS.Workbook(),
+      sheet = wb.addWorksheet("Packages");
+    sheet.addRow(importColumns);
+    for (let n = 0; n < 12; n++)
+      sheet.addRow([
+        `BULK-${n}`,
+        "QA recipient",
+        "7771234",
+        "Disposable QA address",
+        "MALE",
+        "0",
+        "",
+      ]);
+    const bytes = Buffer.from(await wb.xlsx.writeBuffer()),
+      importKey = randomUUID();
+    await packageImport(other, bytes, "preview", randomUUID());
+    assert.equal(
+      await db.deliveryParcel.count({ where: { partnerId: other.partnerId! } }),
+      0,
+    );
+    ok("Excel preview creates no packages");
+    await packageImport(other, bytes, "commit", importKey);
+    await packageImport(other, bytes, "commit", importKey);
+    assert.equal(
+      await db.deliveryParcel.count({ where: { partnerId: other.partnerId! } }),
+      12,
+    );
+    ok("bulk import and replay create exactly one batch");
+    await assert.rejects(packageImport(other, bytes, "commit", randomUUID()));
+    ok("repeated file cannot create a second batch");
+    const list = (await deliveryQuery(
+      other,
+      "packages",
+      new URLSearchParams({ page: "1" }),
+    )) as { items: { id: string; partnerId: string }[]; total: number };
+    assert.equal(list.items.length, 10);
+    assert.equal(list.total, 12);
+    assert(list.items.every((p) => p.partnerId === other.partnerId));
+    ok("package lists paginate at ten and exclude other partners");
+    const secondPage = (await deliveryQuery(
+      other,
+      "packages",
+      new URLSearchParams({ page: "2" }),
+    )) as typeof list;
+    assert.equal(secondPage.items.length, 2);
+    assert.equal(
+      new Set([...list.items, ...secondPage.items].map((item) => item.id)).size,
+      12,
+    );
+    const repeatPage = (await deliveryQuery(
+      other,
+      "packages",
+      new URLSearchParams({ page: "1" }),
+    )) as typeof list;
+    assert.deepEqual(
+      repeatPage.items.map((item) => item.id),
+      list.items.map((item) => item.id),
+    );
+    ok("bulk packages with equal timestamps keep stable, disjoint pages");
+    const unpicked = await db.deliveryParcel.findFirstOrThrow({
+      where: { partnerId: other.partnerId! },
+    });
+    await assert.rejects(
+      db.deliveryParcel.delete({ where: { id: unpicked.id } }),
+    );
+    ok("even uninvoiced parcel history cannot be deleted");
+    await assert.rejects(
+      cmd(other, { type: "cancel", parcelId: p1.id, reason: "Foreign parcel" }),
+    );
+    ok("cross-partner operational changes are denied");
+    const notices = (await deliveryQuery(
+      other,
+      "notifications",
+      new URLSearchParams(),
+    )) as { total: number };
+    assert.equal(notices.total, 0);
+    ok("notifications are recipient scoped");
+    console.log(
+      `Verified ${checks} database integration checks in an isolated disposable schema.`,
+    );
+  } finally {
+    await db?.$disconnect();
+    if (created) {
+      assert(/^igo_qa_[a-f0-9]+$/.test(schema));
+      await owner.query(`DROP SCHEMA "${schema}" CASCADE`);
+      console.log("Disposable QA schema removed.");
+    }
+    await owner.end();
+    delete process.env.IGO_DELIVERY_TEST_SCHEMA;
+  }
+}
+main().catch((error) => {
+  console.error(error instanceof Error ? error.message : error);
+  process.exitCode = 1;
+});
