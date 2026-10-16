@@ -29,7 +29,9 @@ export default function Page() {
         <nav aria-label="Main navigation">
           <a href="#how-it-works">How it works</a>
           <a href="#delivery-rates">Delivery rates</a>
-          <Link href="/delivery/sign-in">Sign in</Link>
+          <Link href="/partner/sign-in" aria-label="Partner sign in">
+            Sign in
+          </Link>
           <Link href="/join">
             <Button>
               Become a partner <ArrowUpRight size={16} />
@@ -219,7 +221,7 @@ export default function Page() {
         </strong>
         <p>Maldives · MVR · UTC+5</p>
         <Link href="/delivery/sign-in">
-          Partner, driver & admin sign in <ArrowRight size={14} />
+          Administrator & driver sign in <ArrowRight size={14} />
         </Link>
       </footer>
     </LandingMotion>

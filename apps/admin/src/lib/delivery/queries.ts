@@ -3,6 +3,7 @@ import { z } from "zod";
 import { Prisma } from "@/generated/prisma/client";
 import { database } from "../db";
 import { DeliveryError, requireRole, type Actor } from "./domain";
+import { applicationSelection } from "./partner-applications";
 
 export const parcelSelection = {
   id: true,
@@ -85,6 +86,31 @@ export async function deliveryQuery(
   const page = parsed.data,
     take = 10,
     skip = (page - 1) * take;
+  if (resource === "applications") {
+    requireRole(actor, "ADMIN");
+    const [items, total] = await Promise.all([
+      db.deliveryPartnerApplication.findMany({
+        where: { logoReady: true },
+        select: applicationSelection,
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        take,
+        skip,
+      }),
+      db.deliveryPartnerApplication.count({ where: { logoReady: true } }),
+    ]);
+    return {
+      items: items.map((item) => ({
+        ...item,
+        canInvite:
+          item.invitationState !== "SENT" ||
+          !item.invitationSentAt ||
+          Date.now() - item.invitationSentAt.getTime() >= 7 * 86400000,
+      })),
+      total,
+      page,
+      pageSize: take,
+    };
+  }
   const partnerId = actor.role === "PARTNER" ? actor.partnerId! : undefined;
   const scope: Prisma.DeliveryParcelWhereInput =
     actor.role === "DRIVER"
@@ -148,7 +174,12 @@ export async function deliveryQuery(
         orderBy: [{ registeredAt: "desc" }, { id: "desc" }],
       }),
       actor.role === "ADMIN"
-        ? db.deliveryAccount.count({ where: { status: "PENDING" } })
+        ? Promise.all([
+            db.deliveryAccount.count({ where: { status: "PENDING" } }),
+            db.deliveryPartnerApplication.count({
+              where: { status: "PENDING", logoReady: true },
+            }),
+          ]).then((counts) => counts[0] + counts[1])
         : 0,
       actor.role === "ADMIN"
         ? db.deliveryPayment.count({ where: { status: "PENDING" } })

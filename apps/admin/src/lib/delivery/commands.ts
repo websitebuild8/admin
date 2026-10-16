@@ -39,7 +39,7 @@ export async function audit(
     },
   });
 }
-async function notify(
+export async function notify(
   tx: Tx,
   recipient: string,
   title: string,
@@ -47,7 +47,7 @@ async function notify(
 ) {
   await tx.deliveryNotification.create({ data: { recipient, title, message } });
 }
-async function notifyAdmins(tx: Tx, title: string, message: string) {
+export async function notifyAdmins(tx: Tx, title: string, message: string) {
   for (const recipient of (process.env.ADMIN_CLERK_USER_IDS ?? "")
     .split(",")
     .map((v) => v.trim())
@@ -178,24 +178,17 @@ export async function deliveryCommand(
         if (actor.role !== "APPLICANT")
           throw new DeliveryError("An application already exists.", 409);
         const a = command.application;
+        if (a.role === "PARTNER")
+          throw new DeliveryError(
+            "Submit your business application at /join. Partner access is granted after review.",
+            403,
+          );
         const account = await tx.deliveryAccount.create({
           data: {
             clerkUserId: actor.userId,
             role: a.role,
             name: a.name,
             phone: a.phone,
-            ...(a.role === "PARTNER"
-              ? {
-                  partner: {
-                    create: {
-                      businessName: a.businessName!,
-                      pageUrl: a.pageUrl!,
-                      pickupAddress: a.pickupAddress!,
-                      pickupArea: a.pickupArea!,
-                    },
-                  },
-                }
-              : {}),
           },
         });
         await audit(tx, actor, "APPLICATION_SUBMITTED", account.id, {

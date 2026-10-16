@@ -21,6 +21,9 @@ import {
 import { uploadReceipt, receiptUrl } from "@/lib/delivery/storage";
 import { packageImport } from "@/lib/delivery/import-service";
 import { database } from "@/lib/db";
+import { reviewPartnerApplication } from "@/lib/delivery/partner-applications";
+import { sendPartnerInvitation } from "@/lib/delivery/partner-invitations";
+import { partnerLogo } from "@/lib/delivery/partner-logos";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 type Context = { params: Promise<{ resource: string }> };
@@ -29,6 +32,20 @@ export async function GET(request: Request, context: Context) {
     const actor = await deliveryActor(),
       { resource } = await context.params;
     const params = new URL(request.url).searchParams;
+    if (resource === "partner-logo") {
+      const applicationId = params.get("id");
+      const logo = await partnerLogo(
+        actor,
+        applicationId ? z.uuid().parse(applicationId) : undefined,
+      );
+      return new Response(logo, {
+        headers: {
+          "Content-Type": "image/webp",
+          "Cache-Control": "private, no-store",
+          "X-Content-Type-Options": "nosniff",
+        },
+      });
+    }
     if (resource === "template") {
       requireRole(actor, "ADMIN", "PARTNER");
       const file = await readFile(
@@ -79,6 +96,42 @@ export async function POST(request: Request, context: Context) {
       );
     }
     const key = z.uuid().parse(request.headers.get("idempotency-key"));
+    if (resource === "partner-review" || resource === "partner-invitation") {
+      requireRole(actor, "ADMIN");
+      const body = JSON.parse(
+        (await boundedBody(request, 4000)).toString("utf8"),
+      );
+      if (resource === "partner-invitation") {
+        const input = z
+          .object({ applicationId: z.uuid() })
+          .strict()
+          .parse(body);
+        return json(
+          await sendPartnerInvitation(
+            actor,
+            input.applicationId,
+            new URL(request.url).origin,
+          ),
+        );
+      }
+      const input = z
+        .object({
+          applicationId: z.uuid(),
+          status: z.enum(["APPROVED", "REJECTED"]),
+          note: z.string().trim().min(3).max(500),
+        })
+        .strict()
+        .parse(body);
+      return json(
+        await reviewPartnerApplication(
+          actor,
+          key,
+          input.applicationId,
+          input.status,
+          input.note,
+        ),
+      );
+    }
     if (resource === "import") {
       const form = await formUpload(request, 1024 * 1024 + 16000),
         file = form.get("file");

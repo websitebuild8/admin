@@ -67,6 +67,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { money, zoneLabels, type Actor } from "@/lib/delivery/domain";
+import {
+  PartnerApplications,
+  type PartnerApplicationRecord,
+} from "./partner-applications";
 import { DeliverySkeleton } from "./skeleton";
 
 type Parcel = {
@@ -439,6 +443,12 @@ const navItems = [
     roles: ["ADMIN", "PARTNER"],
   },
   { key: "partners", label: "Partner pages", icon: Store, roles: ["ADMIN"] },
+  {
+    key: "applications",
+    label: "Partner applications",
+    icon: ClipboardList,
+    roles: ["ADMIN"],
+  },
   { key: "drivers", label: "Drivers", icon: Bike, roles: ["ADMIN"] },
   {
     key: "invoices",
@@ -481,6 +491,8 @@ const descriptions: Record<string, string> = {
   deliveries:
     "Your picked-up packages. Confirm delivery and any cash received.",
   partners: "Review the businesses joining your delivery network.",
+  applications:
+    "Review business details and send invitations to approved page owners.",
   drivers: "Approve and manage your delivery team.",
   invoices: "Daily delivery invoices. Older unpaid balances stay outstanding.",
   payments:
@@ -494,7 +506,7 @@ const descriptions: Record<string, string> = {
 };
 
 export function DeliveryApplication({ actor }: { actor: Actor }) {
-  const [role, setRole] = useState("PARTNER"),
+  const [role] = useState("DRIVER"),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [sent, setSent] = useState(false);
@@ -581,16 +593,10 @@ export function DeliveryApplication({ actor }: { actor: Actor }) {
               approval.
             </p>
             <form onSubmit={submit} className="d-form">
-              <Pick
-                name="role"
-                label="I’m joining as"
-                options={[
-                  { id: "PARTNER", name: "Partner page / online seller" },
-                  { id: "DRIVER", name: "Delivery driver" },
-                ]}
-                value={role}
-                onChange={setRole}
-              />
+              <p className="full">
+                This form is for delivery drivers. Business owners should{" "}
+                <Link href="/join">apply as a partner business</Link>.
+              </p>
               <div />
               <Field name="name" label="Contact name" />
               <Field name="phone" label="Maldives phone number" type="tel" />
@@ -672,6 +678,7 @@ export function DeliveryPortal({
     [error, setError] = useState(""),
     [decision, setDecision] = useState("CONFIRM");
   const retry = useRef<{ body: string; key: string } | null>(null);
+  const workspaceBase = actor.role === "PARTNER" ? "/partner" : "/delivery";
   const resource =
     screen === "import" ? "rates" : screen === "settings" ? "settings" : screen;
   const query = `page=${page}&q=${encodeURIComponent(q)}&state=${filter}`;
@@ -751,12 +758,25 @@ export function DeliveryPortal({
       <div className="d-nav-brand">
         <Link href="/" aria-label="iGO Delivery home">
           <Image
-            src="/brand/igo-delivery.jpg"
-            alt="iGO Delivery"
+            src={
+              actor.role === "PARTNER" && actor.logoAvailable
+                ? "/api/delivery/partner-logo"
+                : "/brand/igo-delivery.jpg"
+            }
+            alt={actor.businessName ?? "iGO Delivery"}
             width={128}
             height={72}
+            unoptimized={actor.role === "PARTNER" && actor.logoAvailable}
+            className={
+              actor.role === "PARTNER" && actor.logoAvailable
+                ? "d-business-logo"
+                : undefined
+            }
           />
         </Link>
+        {actor.role === "PARTNER" && (
+          <strong className="d-business-name">{actor.businessName}</strong>
+        )}
         <p>
           {actor.role === "ADMIN"
             ? "Administration"
@@ -771,7 +791,7 @@ export function DeliveryPortal({
           .map(({ key, label, icon: Icon }) => (
             <Link
               key={key}
-              href={`/delivery/${key}`}
+              href={`${workspaceBase}/${key}`}
               className={screen === key ? "active" : ""}
               aria-current={screen === key ? "page" : undefined}
               onClick={close}
@@ -966,7 +986,7 @@ export function DeliveryPortal({
                       : "Your most recently registered packages"}
                   </p>
                 </div>
-                <Link href="/delivery/packages">
+                <Link href={`${workspaceBase}/packages`}>
                   View all <ArrowUpRight size={13} />
                 </Link>
               </div>
@@ -1081,6 +1101,15 @@ export function DeliveryPortal({
               )}
             </section>
           </div>
+        </>
+      );
+    }
+    if (screen === "applications") {
+      const data = request.data as List<PartnerApplicationRecord>;
+      return (
+        <>
+          <PartnerApplications items={data.items} onRefresh={refresh} />
+          <Pager list={data} onPage={changePage} />
         </>
       );
     }
@@ -2003,7 +2032,10 @@ export function DeliveryPortal({
           </div>
           <div className="d-top-actions">
             <span className="d-mvt">Maldives · UTC+5</span>
-            <Link href="/delivery/notifications" aria-label="Notifications">
+            <Link
+              href={`${workspaceBase}/notifications`}
+              aria-label="Notifications"
+            >
               <Bell size={19} />
               {!!notices.data?.unread && <span className="d-notice-dot" />}
             </Link>
@@ -2025,6 +2057,21 @@ export function DeliveryPortal({
                   ? `Good to see you${actor.role === "PARTNER" ? `, ${actor.name.split(" ")[0]}` : ""}.`
                   : title}
               </h1>
+              {actor.role === "PARTNER" && (
+                <div className="d-partner-identity">
+                  {actor.logoAvailable && (
+                    <Image
+                      src="/api/delivery/partner-logo"
+                      width={40}
+                      height={40}
+                      alt={`${actor.businessName} logo`}
+                      unoptimized
+                    />
+                  )}
+                  <strong>{actor.businessName}</strong>
+                  <span>Partner workspace</span>
+                </div>
+              )}
               <p>{descriptions[screen]}</p>
             </div>
             <div className="d-heading-actions">
@@ -2037,7 +2084,7 @@ export function DeliveryPortal({
               </Button>
               {screen === "packages" && (
                 <>
-                  <Link href="/delivery/import">
+                  <Link href={`${workspaceBase}/import`}>
                     <Button variant="outline">
                       <Upload size={15} /> Import Excel
                     </Button>
@@ -2048,7 +2095,7 @@ export function DeliveryPortal({
                 </>
               )}
               {screen === "overview" && (
-                <Link href="/delivery/packages">
+                <Link href={`${workspaceBase}/packages`}>
                   <Button>
                     View packages <ArrowUpRight size={15} />
                   </Button>

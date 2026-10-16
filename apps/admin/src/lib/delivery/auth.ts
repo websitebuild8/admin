@@ -1,8 +1,10 @@
 import "server-only";
-import { auth } from "@clerk/nextjs/server";
+import { auth, clerkClient } from "@clerk/nextjs/server";
 import { database } from "../db";
 import { hasClerkKeys } from "../mode";
 import { DeliveryError, type Actor } from "./domain";
+import { activateApprovedPartner } from "./partner-applications";
+import { verifiedPrimaryEmail } from "./partner-application-input";
 
 export async function deliveryActor(): Promise<Actor> {
   if (!hasClerkKeys())
@@ -22,10 +24,25 @@ export async function deliveryActor(): Promise<Actor> {
       name: "Administrator",
       status: "APPROVED",
     };
-  const account = await database().deliveryAccount.findUnique({
+  let account = await database().deliveryAccount.findUnique({
     where: { clerkUserId: userId },
-    include: { partner: true },
+    include: {
+      partner: { include: { application: { select: { logoReady: true } } } },
+    },
   });
+  if (!account) {
+    const user = await (await clerkClient()).users.getUser(userId);
+    const email = verifiedPrimaryEmail(user);
+    if (email && (await activateApprovedPartner(userId, email)))
+      account = await database().deliveryAccount.findUnique({
+        where: { clerkUserId: userId },
+        include: {
+          partner: {
+            include: { application: { select: { logoReady: true } } },
+          },
+        },
+      });
+  }
   return account
     ? {
         userId,
@@ -34,6 +51,8 @@ export async function deliveryActor(): Promise<Actor> {
         partnerId: account.partner?.id ?? null,
         status: account.status,
         name: account.name,
+        businessName: account.partner?.businessName,
+        logoAvailable: account.partner?.application?.logoReady ?? false,
       }
     : {
         userId,

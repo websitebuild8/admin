@@ -21,6 +21,8 @@
     "delivery:verify": "node --import tsx scripts/setup-delivery.ts verify",
     "delivery:cron": "node --import tsx scripts/setup-delivery.ts cron",
     "delivery:storage": "node --import tsx scripts/setup-delivery.ts storage",
+    "delivery:logo-storage": "node --conditions=react-server --import tsx scripts/setup-partner-logos.ts",
+    "delivery:auth-check": "node --import tsx scripts/verify-partner-auth-config.ts",
     "delivery:integration": "NODE_ENV=test node --conditions=react-server --import tsx scripts/verify-delivery-integration.ts"
   },
   "dependencies": {

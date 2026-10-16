@@ -302,15 +302,15 @@ model DeliveryAccount {
 }
 
 model DeliveryPartner {
-  id            String                  @id @default(uuid()) @db.Uuid
-  accountId     String                  @unique @db.Uuid
-  account       DeliveryAccount         @relation(fields: [accountId], references: [id])
+  id            String                      @id @default(uuid()) @db.Uuid
+  accountId     String                      @unique @db.Uuid
+  account       DeliveryAccount             @relation(fields: [accountId], references: [id])
   businessName  String
   pageUrl       String
   pickupAddress String
   pickupArea    String
-  cutoffMinutes Int                     @default(1080)
-  nextInvoiceAt DateTime?               @db.Timestamptz(3)
+  cutoffMinutes Int                         @default(1080)
+  nextInvoiceAt DateTime?                   @db.Timestamptz(3)
   parcels       DeliveryParcel[]
   invoices      DeliveryInvoice[]
   payments      DeliveryPayment[]
@@ -318,6 +318,42 @@ model DeliveryPartner {
   receipts      DeliveryReceipt[]
   cycles        DeliveryBillingCycle[]
   remittances   DeliveryCodRemittance[]
+  applicationId String?                     @unique @db.Uuid
+  application   DeliveryPartnerApplication? @relation(fields: [applicationId], references: [id])
+}
+
+// Public applications are not login accounts. Identity is linked only after
+// admin approval and proof of ownership of the application's email address.
+model DeliveryPartnerApplication {
+  id                  String           @id @default(uuid()) @db.Uuid
+  publicId            String           @unique
+  requestKey          String           @unique @db.Uuid
+  digest              String
+  email               String           @unique
+  ownerName           String
+  phone               String
+  businessName        String
+  businessType        String
+  pageUrl             String
+  pickupAddress       String
+  pickupArea          String
+  dailyDeliveries     Int
+  logoPath            String
+  logoReady           Boolean          @default(false)
+  status              DeliveryReview   @default(PENDING)
+  reviewNote          String           @default("")
+  reviewedBy          String?
+  reviewedAt          DateTime?        @db.Timestamptz(3)
+  invitationId        String?          @unique
+  invitationState     String           @default("NOT_SENT")
+  invitationLease     String?          @db.Uuid
+  invitationStartedAt DateTime?        @db.Timestamptz(3)
+  invitationSentAt    DateTime?        @db.Timestamptz(3)
+  createdAt           DateTime         @default(now()) @db.Timestamptz(3)
+  updatedAt           DateTime         @updatedAt @db.Timestamptz(3)
+  partner             DeliveryPartner?
+
+  @@index([status, createdAt])
 }
 
 model DeliveryRate {

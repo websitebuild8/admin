@@ -13,6 +13,7 @@ import { deliveryCommand } from "../src/lib/delivery/commands";
 import { deliveryQuery } from "../src/lib/delivery/queries";
 import { packageImport } from "../src/lib/delivery/import-service";
 import { importColumns } from "../src/lib/delivery/import";
+import { verifyPartnerApplications } from "./verify-partner-applications";
 import {
   nextCutoff,
   type Actor,
@@ -46,6 +47,7 @@ async function main() {
       "20261016020000_delivery_ledger_reconciliation",
       "20261016030000_delivery_history_guards",
       "20261016040000_delivery_function_permissions",
+      "20261016050000_partner_applications",
     ]) {
       let sql = await readFile(
         `prisma/migrations/${folder}/migration.sql`,
@@ -521,6 +523,7 @@ async function main() {
     )) as { total: number };
     assert.equal(notices.total, 0);
     ok("notifications are recipient scoped");
+    await verifyPartnerApplications(db, admin, other, ok);
     console.log(
       `Verified ${checks} database integration checks in an isolated disposable schema.`,
     );

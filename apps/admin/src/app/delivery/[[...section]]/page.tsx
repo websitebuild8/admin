@@ -38,6 +38,8 @@ async function Workspace({
       </main>
     );
   const { section } = await params;
+  if (actor.role === "PARTNER")
+    redirect(`/partner${section?.length ? `/${section.join("/")}` : ""}`);
   if (actor.status !== "APPROVED") return <DeliveryApplication actor={actor} />;
   const screen =
     section?.[0] ?? (actor.role === "DRIVER" ? "collections" : "overview");
@@ -47,6 +49,7 @@ async function Workspace({
           "overview",
           "packages",
           "partners",
+          "applications",
           "drivers",
           "invoices",
           "payments",
@@ -57,18 +60,7 @@ async function Workspace({
           "notifications",
           "import",
         ]
-      : actor.role === "PARTNER"
-        ? [
-            "overview",
-            "packages",
-            "import",
-            "invoices",
-            "payments",
-            "cod",
-            "notifications",
-            "settings",
-          ]
-        : ["collections", "deliveries", "cod", "notifications"];
+      : ["collections", "deliveries", "cod", "notifications"];
   if ((section && section.length > 1) || !allowed.includes(screen)) notFound();
   return <DeliveryPortal key={screen} actor={actor} screen={screen} />;
 }

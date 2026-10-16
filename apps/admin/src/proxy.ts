@@ -10,6 +10,10 @@ const isPublic = createRouteMatcher([
   "/sign-in(.*)",
   "/delivery/sign-in(.*)",
   "/join(.*)",
+  "/partner/sign-in(.*)",
+  "/partner/activate(.*)",
+  "/driver/join(.*)",
+  "/api/partner-applications",
   "/setup",
   "/legal(.*)",
 ]);
@@ -28,6 +32,9 @@ export default function proxy(request: NextRequest, event: NextFetchEvent) {
     request.nextUrl.pathname.startsWith("/delivery") ||
     request.nextUrl.pathname.startsWith("/api/delivery/") ||
     request.nextUrl.pathname.startsWith("/join") ||
+    request.nextUrl.pathname.startsWith("/partner") ||
+    request.nextUrl.pathname.startsWith("/driver/join") ||
+    request.nextUrl.pathname === "/api/partner-applications" ||
     request.nextUrl.pathname === "/";
   if (isDemoMode() && !phaseOne) return NextResponse.next();
   // Native APIs authenticate bearer session tokens themselves and return JSON

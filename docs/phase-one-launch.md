@@ -128,9 +128,12 @@ Clerk redirects and private Storage reads on the hosted runtime.
    bank beneficiary. They intentionally start blank, not as fictional values.
 3. Confirm route fees and partner cutoffs. Fees freeze at package registration;
    later edits affect future packages only.
-4. Apply with a separate partner account; inspect page/pickup/contact details and
-   approve it. Apply and approve a separate driver. Registration alone grants no
-   operating role. Check rejected and suspended accounts too.
+4. Submit the public business form at `/join`; inspect its logo, contact and
+   pickup details under `/delivery/applications`, approve it, and explicitly
+   send its setup invitation. The owner sets a password through Clerk and opens
+   `/partner`. Test rejected and suspended accounts too. Driver registration
+   remains separate at `/driver/join`. See [partner onboarding](partner-onboarding.md)
+   for the private logo bucket, invitation configuration and verification boundaries.
 5. Use clearly identified test parcels with permission from the account owners.
    Register/import, assign, open collection list, tick a package, then explicitly
    confirm physical receipt. Ensure unselected packages remain registered.

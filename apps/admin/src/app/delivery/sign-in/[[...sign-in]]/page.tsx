@@ -15,12 +15,15 @@ export default function Page() {
         />
       </Link>
       <h1>Welcome back.</h1>
-      <p>Your deliveries, all in one place.</p>
+      <p>
+        Administrator and driver sign-in. Business owners use the separate{" "}
+        <Link href="/partner/sign-in">partner sign-in</Link>.
+      </p>
       {hasClerkKeys() ? (
         <SignIn
           routing="path"
           path="/delivery/sign-in"
-          signUpUrl="/join"
+          signUpUrl="/driver/join"
           forceRedirectUrl="/delivery"
         />
       ) : (

@@ -185,6 +185,8 @@ export type Actor = {
   partnerId: string | null;
   status: string;
   name: string;
+  businessName?: string;
+  logoAvailable?: boolean;
 };
 export function requireRole(actor: Actor, ...roles: Actor["role"][]) {
   if (!roles.includes(actor.role) || actor.status !== "APPROVED")
