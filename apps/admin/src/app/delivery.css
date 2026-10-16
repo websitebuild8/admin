@@ -47,6 +47,95 @@
   background: #f7f8f5;
   padding-bottom: 60px;
 }
+
+/* Native route snapshots animate without remounting the shared app layout. */
+::view-transition {
+  pointer-events: none;
+}
+::view-transition-group(.d-page-forward),
+::view-transition-group(.d-page-back),
+::view-transition-group(.d-page-soft),
+::view-transition-group(.d-join-header-motion),
+::view-transition-group(.d-join-intro-motion),
+::view-transition-group(.d-join-card-motion) {
+  animation-duration: 480ms;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+::view-transition-old(.d-page-forward),
+::view-transition-old(.d-page-back),
+::view-transition-old(.d-page-soft) {
+  animation: d-page-leave 160ms ease-out both;
+}
+::view-transition-new(.d-page-forward),
+::view-transition-new(.d-page-back),
+::view-transition-new(.d-page-soft) {
+  animation: d-page-arrive 420ms cubic-bezier(0.22, 1, 0.36, 1) 60ms both;
+}
+::view-transition-new(.d-page-forward) {
+  --d-page-offset: 18px;
+}
+::view-transition-new(.d-page-back) {
+  --d-page-offset: -18px;
+}
+::view-transition-new(.d-join-header-motion) {
+  animation: d-page-arrive 360ms ease-out both;
+}
+::view-transition-new(.d-join-intro-motion) {
+  animation: d-join-arrive 500ms cubic-bezier(0.22, 1, 0.36, 1) 40ms both;
+}
+::view-transition-new(.d-join-card-motion) {
+  --d-join-offset: 24px;
+  animation: d-join-arrive 560ms cubic-bezier(0.22, 1, 0.36, 1) 100ms both;
+}
+@keyframes d-page-leave {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes d-page-arrive {
+  from {
+    opacity: 0;
+    transform: translateX(var(--d-page-offset, 0px));
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+@keyframes d-join-arrive {
+  from {
+    opacity: 0;
+    transform: translateY(var(--d-join-offset, 16px));
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+/* Browsers without native transitions still get a gentle join-page entrance. */
+@supports not (view-transition-class: d-page-forward) {
+  .d-join-header {
+    animation: d-page-arrive 360ms ease-out both;
+  }
+  .d-join-intro {
+    animation: d-join-arrive 500ms cubic-bezier(0.22, 1, 0.36, 1) 40ms both;
+  }
+  .d-join-card {
+    animation: d-join-arrive 560ms cubic-bezier(0.22, 1, 0.36, 1) 100ms both;
+  }
+}
+@media (max-width: 760px) {
+  ::view-transition-new(.d-page-forward) {
+    --d-page-offset: 10px;
+  }
+  ::view-transition-new(.d-page-back) {
+    --d-page-offset: -10px;
+  }
+  ::view-transition-new(.d-join-intro-motion),
+  ::view-transition-new(.d-join-card-motion) {
+    --d-join-offset: 12px;
+  }
+}
 .d-join-header {
   max-width: 1240px;
   margin: auto;
@@ -2087,6 +2176,12 @@ html:has(.d-site) {
   }
 }
 @media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(*),
+  ::view-transition-new(*),
+  ::view-transition-group(*) {
+    animation-duration: 0s !important;
+    animation-delay: 0s !important;
+  }
   html:has(.d-site) {
     scroll-behavior: auto;
   }
@@ -2100,6 +2195,7 @@ html:has(.d-site) {
   }
   .d-app *,
   .d-site *,
+  .d-partner-join *,
   .d-modal *,
   .d-application * {
     animation: none !important;
