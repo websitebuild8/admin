@@ -22,7 +22,10 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select";
-import { partnerApplicationInput } from "@/lib/delivery/partner-application-input";
+import {
+  normalizePartnerPageUrl,
+  partnerApplicationInput,
+} from "@/lib/delivery/partner-application-input";
 
 const businessTypes = [
   { value: "FACEBOOK", label: "Facebook page" },
@@ -36,6 +39,7 @@ const areas = [
 
 export function PartnerApplicationForm() {
   const [businessType, setBusinessType] = useState("FACEBOOK");
+  const [pageUrl, setPageUrl] = useState("");
   const [pickupArea, setPickupArea] = useState("Malé");
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState("");
@@ -87,6 +91,7 @@ export function PartnerApplicationForm() {
       setError("Please check the highlighted details.");
       return;
     }
+    setPageUrl(input.data.pageUrl);
     if (
       !file ||
       !["image/jpeg", "image/png", "image/webp"].includes(file.type) ||
@@ -96,6 +101,7 @@ export function PartnerApplicationForm() {
       return;
     }
     form.set("businessType", businessType);
+    form.set("pageUrl", input.data.pageUrl);
     form.set("pickupArea", pickupArea);
     form.set("contactConsent", String(consent));
     form.set("logo", file);
@@ -300,22 +306,50 @@ export function PartnerApplicationForm() {
                       {field("businessName", "Business / page name", {
                         autoComplete: "organization",
                       })}
-                      <div className="full">
-                        {field(
-                          "pageUrl",
-                          businessType === "BUSINESS"
+                      <div className="d-field full">
+                        <Label htmlFor="application-pageUrl">
+                          {businessType === "BUSINESS"
                             ? "Website or social page (optional)"
-                            : "Facebook / Instagram page link",
-                          {
-                            type: "url",
-                            required: businessType !== "BUSINESS",
-                            placeholder:
-                              businessType === "INSTAGRAM"
-                                ? "https://www.instagram.com/yourbusiness"
-                                : "https://www.facebook.com/yourbusiness",
-                            maxLength: 500,
-                          },
-                        )}
+                            : "Facebook / Instagram page link"}
+                        </Label>
+                        <Input
+                          id="application-pageUrl"
+                          name="pageUrl"
+                          type="text"
+                          inputMode="url"
+                          autoCapitalize="none"
+                          autoCorrect="off"
+                          spellCheck={false}
+                          required={businessType !== "BUSINESS"}
+                          maxLength={500}
+                          value={pageUrl}
+                          onChange={(event) => setPageUrl(event.target.value)}
+                          onBlur={(event) =>
+                            setPageUrl(
+                              normalizePartnerPageUrl(event.target.value),
+                            )
+                          }
+                          placeholder={
+                            businessType === "INSTAGRAM"
+                              ? "instagram.com/yourbusiness"
+                              : businessType === "BUSINESS"
+                                ? "yourbusiness.mv"
+                                : "facebook.com/yourbusiness"
+                          }
+                          aria-invalid={!!fields.pageUrl}
+                          aria-describedby="page-link-hint error-pageUrl"
+                        />
+                        <p
+                          id="page-link-hint"
+                          className="text-xs leading-relaxed text-muted-foreground"
+                        >
+                          {businessType === "FACEBOOK"
+                            ? "Page links, share links and fb.me links work. We add https:// for you."
+                            : "You can leave out https:// — we’ll add it for you."}
+                        </p>
+                        <span className="d-field-error" id="error-pageUrl">
+                          {fields.pageUrl}
+                        </span>
                       </div>
                       <div className="d-field full">
                         <Label htmlFor="business-logo">Business logo</Label>

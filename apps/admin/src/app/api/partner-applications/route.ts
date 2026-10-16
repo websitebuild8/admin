@@ -5,6 +5,7 @@ import {
   completePartnerApplication,
 } from "@/lib/delivery/partner-applications";
 import {
+  partnerLogoStorage,
   preparePartnerLogo,
   uploadPartnerLogo,
 } from "@/lib/delivery/partner-logos";
@@ -20,6 +21,9 @@ export const runtime = "nodejs";
 export async function POST(request: Request) {
   try {
     originCheck(request);
+    // Reject a missing deployment configuration before reserving an email or
+    // spending database/image-processing work on an upload that cannot succeed.
+    partnerLogoStorage();
     const ip =
       process.env.NETLIFY === "true"
         ? request.headers.get("x-nf-client-connection-ip") || "unknown"

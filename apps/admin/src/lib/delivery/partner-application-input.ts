@@ -1,10 +1,35 @@
 import { z } from "zod";
 
+/** Normalize the address locally; never fetch or expand a submitted short link. */
+export function normalizePartnerPageUrl(input: string) {
+  const value = input.trim();
+  if (!value) return "";
+  const address = value.startsWith("//")
+    ? `https:${value}`
+    : /^[a-z][a-z\d+.-]*:/i.test(value)
+      ? value
+      : `https://${value}`;
+  try {
+    const url = new URL(address);
+    if (url.protocol === "http:") url.protocol = "https:";
+    return url.toString();
+  } catch {
+    // Leave invalid input for the shared validator to explain to the applicant.
+    return value;
+  }
+}
+
 export const partnerApplicationInput = z
   .object({
     businessName: z.string().trim().min(2).max(120),
     businessType: z.enum(["FACEBOOK", "INSTAGRAM", "BUSINESS"]),
-    pageUrl: z.string().trim().max(500).default(""),
+    pageUrl: z
+      .string()
+      .trim()
+      .max(500)
+      .default("")
+      .transform(normalizePartnerPageUrl)
+      .pipe(z.string().max(500)),
     ownerName: z.string().trim().min(2).max(100),
     email: z.string().trim().toLowerCase().max(254).pipe(z.email()),
     phone: z
@@ -32,7 +57,7 @@ export const partnerApplicationInput = z
       ctx.addIssue({
         code: "custom",
         path: ["pageUrl"],
-        message: "Enter your full page link, starting with https://.",
+        message: "Enter a valid website or page link.",
       });
       return;
     }
@@ -42,13 +67,13 @@ export const partnerApplicationInput = z
       url.username ||
       url.password ||
       (value.businessType === "FACEBOOK" &&
-        !["facebook.com", "fb.com"].includes(host)) ||
+        !["facebook.com", "fb.com", "fb.me", "on.fb.me"].includes(host)) ||
       (value.businessType === "INSTAGRAM" && host !== "instagram.com")
     )
       ctx.addIssue({
         code: "custom",
         path: ["pageUrl"],
-        message: "Use an https link to your selected business page.",
+        message: "Enter a valid link to your selected business page.",
       });
   });
 

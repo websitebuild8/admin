@@ -9,6 +9,14 @@ link, owner/manager name, contact number, email, pickup island and address,
 estimated daily delivery count, contact acknowledgement and a business logo.
 The future login name is the approved email address.
 
+Page links may omit `https://`. The form adds it when leaving the field, and the
+shared server validator repeats normalization before saving. Existing `http://`
+links are upgraded to HTTPS. Facebook page/share links and the explicit
+`fb.com`, `fb.me` and `on.fb.me` short domains are accepted; query strings are
+preserved. Short links are stored as supplied with HTTPS, without fetching or
+claiming to verify their destination. Other hosts still fail Facebook/Instagram
+validation, and credentials or non-web URL schemes are rejected.
+
 ## Approval and setup
 
 1. Admin opens `/delivery/applications` and reviews the complete application.
@@ -65,6 +73,30 @@ and excessive-pixel inputs are rejected.
   If absent, invitation links use the current request origin; local URLs are only
   useful on the same computer. Configure production Clerk domains before launch.
 - Rebuild/redeploy after pushing. A local build does not prove deployment.
+
+### “Business logo storage needs server configuration” on Netlify
+
+This error occurs before any Storage upload: the running server has a missing or
+invalid `SUPABASE_URL` or server key. Local `.env.local` values are intentionally
+ignored by Git and are not copied into a Netlify deployment.
+
+In the Netlify project's **Project configuration → Environment variables**, set
+`SUPABASE_URL` to the existing project's HTTPS API origin and
+`SUPABASE_SECRET_KEY` to the existing private server key. A legacy
+`SUPABASE_SERVICE_ROLE_KEY` is also supported. Use the values privately from
+`apps/admin/.env.local`, without dotenv's surrounding quotes; a database URL or
+publishable/anonymous key does not replace these settings. Include the
+**Functions** scope (or **All scopes**) and the **Production** deploy context.
+Create a new deploy after saving. Do not prefix a server key with `NEXT_PUBLIC_`
+or commit it to the repository.
+
+Run `npm run delivery:logo-storage` against the intended project to verify its
+private `igo-partner-logos` bucket. Keep the existing application form open and
+retry after the new deploy is ready: its request key resumes a reserved upload
+without creating a duplicate application. New requests check server configuration
+before reserving an application or consuming database-backed submission limits.
+
+Netlify reference: [Environment variables and functions](https://docs.netlify.com/build/functions/environment-variables/).
 
 The anonymous form uses same-origin validation, a bounded multipart body,
 server-side validation, a honeypot and shared database-backed submission limits.
