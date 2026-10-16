@@ -23,6 +23,7 @@
     "delivery:storage": "node --import tsx scripts/setup-delivery.ts storage",
     "delivery:logo-storage": "node --conditions=react-server --import tsx scripts/setup-partner-logos.ts",
     "delivery:auth-check": "node --import tsx scripts/verify-partner-auth-config.ts",
+    "delivery:verify-payouts": "node --import tsx scripts/verify-cod-receipt-ledger.ts",
     "rider:keys": "node --import tsx scripts/setup-rider-push.ts keys",
     "rider:cron": "node --import tsx scripts/setup-rider-push.ts cron",
     "rider:verify-cron": "node --import tsx scripts/setup-rider-push.ts verify-cron",

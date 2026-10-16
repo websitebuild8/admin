@@ -164,7 +164,7 @@ export default function Page() {
                   icon: Truck,
                   n: "02",
                   title: "We collect and deliver",
-                  text: "Your driver confirms physical pickup and records delivery. See each milestone from your portal.",
+                  text: "Our driver confirms physical pickup and records delivery. See each milestone from your portal.",
                 },
                 {
                   icon: ReceiptText,
@@ -192,7 +192,7 @@ export default function Page() {
                 <br />A big weight off.
               </h2>
               <p>
-                Delivery fees per package, billed to your business. Cash
+                Delivery fees per delivery location, billed to your business. Cash
                 collected for your goods stays separate.
               </p>
               <Link href="/join" transitionTypes={["igo-forward"]}>

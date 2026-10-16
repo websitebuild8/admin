@@ -396,6 +396,7 @@ model DeliveryParcel {
   @@unique([partnerId, externalReference])
   @@index([partnerId, registeredAt])
   @@index([driverId, state, registeredAt])
+  @@index([remittanceId])
   @@index([partnerId, state, deliveredAt])
 }
 
@@ -513,6 +514,14 @@ model DeliveryCodRemittance {
   verifiedBy String
   createdAt  DateTime         @default(now()) @db.Timestamptz(3)
   parcels    DeliveryParcel[]
+  receipt    DeliveryCodReceipt?
+}
+
+model DeliveryCodReceipt {
+  id         String                @id @db.Uuid
+  remittance DeliveryCodRemittance @relation(fields: [id], references: [id], onDelete: Restrict)
+  snapshot   Json
+  createdAt  DateTime              @default(now()) @db.Timestamptz(3)
 }
 
 model DeliveryCommand {

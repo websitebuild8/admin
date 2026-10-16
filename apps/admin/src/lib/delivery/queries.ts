@@ -7,6 +7,7 @@ import { riderScreens } from "./rider-contract";
 import { riderClientConfig } from "./push-settings";
 import { applicationSelection } from "./partner-applications";
 import { storageConfigurationStatus } from "../storage-configuration";
+import { codPayoutReceipt } from "./cod-receipts";
 
 export const parcelSelection = {
   id: true,
@@ -132,6 +133,8 @@ export async function deliveryQuery(
   const page = parsed.data,
     take = 10,
     skip = (page - 1) * take;
+  if (resource === "cod-receipt")
+    return codPayoutReceipt(actor, z.uuid().parse(search.get("id")), page);
   if (resource === "applications") {
     requireRole(actor, "ADMIN");
     const [items, total] = await Promise.all([

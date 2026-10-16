@@ -30,7 +30,9 @@ const secured = clerkMiddleware(async (auth, request) => {
       unauthenticatedUrl: new URL(
         request.nextUrl.pathname.startsWith("/rider")
           ? "/rider/sign-in"
-          : "/delivery/sign-in",
+          : request.nextUrl.pathname.startsWith("/partner")
+            ? "/partner/sign-in"
+            : "/delivery/sign-in",
         request.url,
       ).toString(),
     });

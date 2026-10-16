@@ -3,6 +3,7 @@
 @import "shadcn/tailwind.css";
 @import "./igo.css";
 @import "./delivery.css";
+@import "./cod-receipt.css";
 
 @custom-variant dark (&:is(.dark *));
 

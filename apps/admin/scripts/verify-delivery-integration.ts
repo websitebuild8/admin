@@ -15,6 +15,7 @@ import { packageImport } from "../src/lib/delivery/import-service";
 import { importColumns } from "../src/lib/delivery/import";
 import { verifyPartnerApplications } from "./verify-partner-applications";
 import { verifyRiderWorkflows } from "./verify-rider-workflows";
+import { verifyCodReceipts } from "./verify-cod-receipts";
 import {
   nextCutoff,
   type Actor,
@@ -50,6 +51,7 @@ async function main() {
       "20261016040000_delivery_function_permissions",
       "20261016050000_partner_applications",
       "20261016060000_rider_push",
+      "20261016070000_cod_payout_receipts",
     ]) {
       let sql = await readFile(
         `prisma/migrations/${folder}/migration.sql`,
@@ -527,6 +529,7 @@ async function main() {
     ok("notifications are recipient scoped");
     await verifyPartnerApplications(db, admin, other, ok);
     await verifyRiderWorkflows(db, admin, partner, ok);
+    await verifyCodReceipts(db, admin, partner, other, driver, final.remittanceId!, ok);
     console.log(
       `Verified ${checks} database integration checks in an isolated disposable schema.`,
     );

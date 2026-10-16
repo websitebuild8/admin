@@ -328,3 +328,35 @@ production push environment variables, deployment and installation of the retry
 schedule remain external setup steps. There is no live GPS tracking. See
 `docs/rider-web-setup.md` for credentials, setup and device checks. No Git commit,
 push or public deployment was performed.
+
+## COD payout receipts — 16 October 2026
+
+Partners see **Received** for payouts that admin sees as **Remitted to partner**.
+Both have a bill button in the COD table. The receipt modal shows the immutable
+payout reference, timestamps, issuer/partner profile, amount and included package
+lines, with ten rows per page. The authenticated print view includes every line
+and supports browser printing / Save as PDF. Admin receives the receipt preview
+after saving a payout, and the partner receives a private in-app notice.
+
+The additive `20261016070000_cod_payout_receipts` migration was applied. A deferred
+database trigger issues one frozen receipt per payout at commit; existing payouts
+were backfilled without changing their amounts or invoice balances. A real,
+read-only verification confirmed that the configured database's existing payout
+has a reconciled receipt and that receipt tables/functions deny public API roles.
+
+All **85 unit tests** and **61 disposable-schema database checks** passed. New
+checks cover partner-specific wording, reconciliation, atomic issuance, frozen
+profile details, immutable documents, cross-tenant/role rejection, concurrent
+retries and full print data versus ten-row screen pages. Lint, TypeScript and the
+single-worker production build passed.
+
+The actual receipt component was rendered with fictional fixture data and checked
+at 320, 390 and 1440 pixels. The partner's Received label, ten screen rows, twelve
+print rows, hidden print controls and mobile layout were verified. These component
+checks do not claim a signed-in admin/partner browser session was tested.
+Anonymous checks also confirmed that private receipt pages redirect to their
+respective admin/partner sign-in and the receipt API returns 401 without data.
+
+Receipts are generated from iGO's recorded payouts; no bank API or bank-issued
+proof upload was added. Setup and scope are in `docs/cod-payout-receipts.md`.
+No Git commit, push or deployment was performed.

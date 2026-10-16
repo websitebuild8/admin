@@ -6,6 +6,7 @@ import {
   DeliveryError,
   nextCutoff,
   localDate,
+  money,
   partnerScope,
   requireRole,
   reviewAmount,
@@ -654,6 +655,23 @@ export async function deliveryCommand(
           },
           handingOver ? undefined : command.partnerId,
         );
+        if (!handingOver) {
+          const partner = await tx.deliveryPartner.findUniqueOrThrow({
+            where: { id: command.partnerId },
+            select: { account: { select: { clerkUserId: true } } },
+          });
+          await notify(
+            tx,
+            partner.account.clerkUserId,
+            "COD payout received",
+            `${money(total)} recorded as received. Reference: ${command.reference}. Your payout receipt is available in Cash on delivery.`,
+          );
+          return {
+            message:
+              "COD payout and receipt recorded. Delivery invoices remain separate.",
+            remittanceId: transfer.id,
+          };
+        }
         return {
           message: handingOver
             ? "Driver cash handover verified."

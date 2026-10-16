@@ -72,6 +72,8 @@ import {
   type PartnerApplicationRecord,
 } from "./partner-applications";
 import { DeliverySkeleton } from "./skeleton";
+import { codCashLabel } from "@/lib/delivery/cod-receipt-contract";
+import { PayoutReceiptModal } from "./payout-receipt";
 
 type Parcel = {
   id: string;
@@ -674,6 +676,7 @@ export function DeliveryPortal({
     [mobileOpen, setMobileOpen] = useState(false),
     [action, setAction] = useState<Action | null>(null),
     [invoiceId, setInvoiceId] = useState<string | null>(null),
+    [payoutReceiptId, setPayoutReceiptId] = useState<string | null>(null),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [decision, setDecision] = useState("CONFIRM");
@@ -735,6 +738,7 @@ export function DeliveryPortal({
       setAction(null);
       setSelected([]);
       refresh();
+      if (result.remittanceId) setPayoutReceiptId(result.remittanceId);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Operation failed.");
     } finally {
@@ -1067,7 +1071,9 @@ export function DeliveryPortal({
                 [
                   "COD received by iGO",
                   d.companyCash,
-                  "Awaiting remittance to the partner",
+                  actor.role === "PARTNER"
+                    ? "Awaiting payment to you"
+                    : "Awaiting remittance to the partner",
                 ],
               ].map(([label, value, note]) => (
                 <div className="d-info-row" key={String(label)}>
@@ -1215,7 +1221,7 @@ export function DeliveryPortal({
                     "Partner / driver",
                     "COD collected",
                     "Cash location",
-                    "",
+                    "Actions",
                   ]}
                   rows={d.items.map((p) => [
                     <div key="id" className="d-parcel-ref">
@@ -1233,18 +1239,28 @@ export function DeliveryPortal({
                       <small>{p.driver?.name ?? "Driver"}</small>
                     </div>,
                     money(p.codAmount),
-                    p.remittanceId
-                      ? "Remitted to partner"
-                      : p.handoverId
-                        ? "Held by iGO"
-                        : "Held by driver",
-                    <Button
-                      variant="outline"
-                      key="view"
-                      onClick={() => open({ kind: "detail", parcel: p })}
-                    >
-                      Details
-                    </Button>,
+                    codCashLabel(actor.role, p.remittanceId, p.handoverId),
+                    <div className="d-row-actions" key="actions">
+                      <Button
+                        variant="outline"
+                        onClick={() => open({ kind: "detail", parcel: p })}
+                      >
+                        Details
+                      </Button>
+                      {p.remittanceId &&
+                        (actor.role === "ADMIN" ||
+                          actor.role === "PARTNER") && (
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            title="View payout receipt"
+                            aria-label={`View payout receipt for ${p.publicId}`}
+                            onClick={() => setPayoutReceiptId(p.remittanceId)}
+                          >
+                            <ReceiptText size={17} />
+                          </Button>
+                        )}
+                    </div>,
                   ])}
                 />
               </section>
@@ -2222,6 +2238,13 @@ export function DeliveryPortal({
             setInvoiceId(null);
             open({ kind: "submitPayment", invoice: i });
           }}
+        />
+      )}
+      {payoutReceiptId && (
+        <PayoutReceiptModal
+          id={payoutReceiptId}
+          actor={actor}
+          close={() => setPayoutReceiptId(null)}
         />
       )}
     </div>
