@@ -164,8 +164,8 @@ export default function Page() {
                 {
                   icon: ReceiptText,
                   n: "03",
-                  title: "Know what you owe",
-                  text: "Daily invoices contain delivered packages only. Bank transfers are credited after verification.",
+                  title: "Track your spending",
+                  text: "Know how much you will spend from the start. No hidden fees.",
                 },
               ].map(({ icon: Icon, n, title, text }) => (
                 <article key={n} data-reveal>
