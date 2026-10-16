@@ -166,6 +166,13 @@ export const commandInput = z.discriminatedUnion("type", [
   }),
   z.object({ type: z.literal("readNotice"), id: uuid }),
   z.object({
+    type: z.literal("createPartnerInvoice"),
+    partnerId: uuid,
+    expectedCount: z.number().int().min(1).max(1000000),
+    expectedTotal: z.number().int().min(1).max(2147483647),
+  }),
+  z.object({ type: z.literal("sendInvoice"), invoiceId: uuid }),
+  z.object({
     type: z.literal("settings"),
     bankName: text(0, 100),
     bankAccount: text(0, 100),

@@ -8,6 +8,7 @@ import { riderClientConfig } from "./push-settings";
 import { applicationSelection } from "./partner-applications";
 import { storageConfigurationStatus } from "../storage-configuration";
 import { codPayoutReceipt } from "./cod-receipts";
+import { partnerHistory } from "./partner-history";
 
 export const parcelSelection = {
   id: true,
@@ -133,6 +134,8 @@ export async function deliveryQuery(
   const page = parsed.data,
     take = 10,
     skip = (page - 1) * take;
+  if (resource === "partner-history")
+    return partnerHistory(actor, search, page);
   if (resource === "cod-receipt")
     return codPayoutReceipt(actor, z.uuid().parse(search.get("id")), page);
   if (resource === "applications") {
@@ -160,7 +163,14 @@ export async function deliveryQuery(
       pageSize: take,
     };
   }
-  const partnerId = actor.role === "PARTNER" ? actor.partnerId! : undefined;
+  const partnerId =
+    actor.role === "PARTNER"
+      ? actor.partnerId!
+      : actor.role === "ADMIN" &&
+          resource === "invoices" &&
+          search.get("partnerId")
+        ? z.uuid().parse(search.get("partnerId"))
+        : undefined;
   const scope: Prisma.DeliveryParcelWhereInput =
     actor.role === "DRIVER"
       ? { driverId: actor.id! }
@@ -327,6 +337,7 @@ export async function deliveryQuery(
         where,
         include: {
           cycle: true,
+          dispatch: { select: { sentAt: true } },
           partner: { select: { businessName: true } },
           _count: { select: { lines: true } },
         },
@@ -345,6 +356,7 @@ export async function deliveryQuery(
       where: { id, partnerId },
       include: {
         cycle: true,
+        dispatch: { select: { sentAt: true } },
         partner: { select: { businessName: true, pickupAddress: true } },
       },
     });

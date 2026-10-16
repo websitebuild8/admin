@@ -16,6 +16,7 @@ import { importColumns } from "../src/lib/delivery/import";
 import { verifyPartnerApplications } from "./verify-partner-applications";
 import { verifyRiderWorkflows } from "./verify-rider-workflows";
 import { verifyCodReceipts } from "./verify-cod-receipts";
+import { verifyPartnerInvoices } from "./verify-partner-invoices";
 import {
   nextCutoff,
   type Actor,
@@ -52,6 +53,7 @@ async function main() {
       "20261016050000_partner_applications",
       "20261016060000_rider_push",
       "20261016070000_cod_payout_receipts",
+      "20261016080000_partner_manual_invoices",
     ]) {
       let sql = await readFile(
         `prisma/migrations/${folder}/migration.sql`,
@@ -142,6 +144,13 @@ async function main() {
         description: "Not a real delivery",
       },
     });
+    if (process.argv.includes("--partner-invoices")) {
+      await verifyPartnerInvoices(db, admin, other, driver, ok);
+      console.log(
+        `Verified ${checks} partner invoice checks in an isolated disposable schema.`,
+      );
+      return;
+    }
     const key = randomUUID(),
       first = await cmd(partner, make("QA-ONE", "MALE", 10000), key);
     assert.deepEqual(
@@ -529,7 +538,16 @@ async function main() {
     ok("notifications are recipient scoped");
     await verifyPartnerApplications(db, admin, other, ok);
     await verifyRiderWorkflows(db, admin, partner, ok);
-    await verifyCodReceipts(db, admin, partner, other, driver, final.remittanceId!, ok);
+    await verifyCodReceipts(
+      db,
+      admin,
+      partner,
+      other,
+      driver,
+      final.remittanceId!,
+      ok,
+    );
+    await verifyPartnerInvoices(db, admin, other, driver, ok);
     console.log(
       `Verified ${checks} database integration checks in an isolated disposable schema.`,
     );

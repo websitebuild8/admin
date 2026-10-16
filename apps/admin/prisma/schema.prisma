@@ -425,18 +425,20 @@ model DeliveryBillingCycle {
 }
 
 model DeliveryInvoice {
-  id          String                      @id @default(uuid()) @db.Uuid
-  publicId    String                      @unique
-  partnerId   String                      @db.Uuid
-  partner     DeliveryPartner             @relation(fields: [partnerId], references: [id])
-  cycleId     String                      @unique @db.Uuid
-  cycle       DeliveryBillingCycle        @relation(fields: [cycleId], references: [id])
-  total       Int
-  paid        Int                         @default(0)
-  createdAt   DateTime                    @default(now()) @db.Timestamptz(3)
-  lines       DeliveryInvoiceLine[]
-  payments    DeliveryPayment[]
-  allocations DeliveryPaymentAllocation[]
+  id             String                      @id @default(uuid()) @db.Uuid
+  publicId       String                      @unique
+  partnerId      String                      @db.Uuid
+  partner        DeliveryPartner             @relation(fields: [partnerId], references: [id])
+  cycleId        String?                     @unique @db.Uuid
+  cycle          DeliveryBillingCycle?       @relation(fields: [cycleId], references: [id])
+  manualCutoffAt DateTime?                   @db.Timestamptz(3)
+  total          Int
+  paid           Int                         @default(0)
+  createdAt      DateTime                    @default(now()) @db.Timestamptz(3)
+  lines          DeliveryInvoiceLine[]
+  payments       DeliveryPayment[]
+  allocations    DeliveryPaymentAllocation[]
+  dispatch       DeliveryInvoiceDispatch?
 
   @@index([partnerId, createdAt])
 }
@@ -545,15 +547,25 @@ model DeliveryActivity {
 }
 
 model DeliveryNotification {
-  id        String    @id @default(uuid()) @db.Uuid
-  recipient String
-  title     String
-  message   String
-  readAt    DateTime? @db.Timestamptz(3)
-  createdAt DateTime  @default(now()) @db.Timestamptz(3)
-  pushMessages DeliveryPushMessage[]
+  id              String                   @id @default(uuid()) @db.Uuid
+  recipient       String
+  title           String
+  message         String
+  readAt          DateTime?                @db.Timestamptz(3)
+  createdAt       DateTime                 @default(now()) @db.Timestamptz(3)
+  pushMessages    DeliveryPushMessage[]
+  invoiceDispatch DeliveryInvoiceDispatch?
 
   @@index([recipient, createdAt])
+}
+
+model DeliveryInvoiceDispatch {
+  invoiceId      String               @id @db.Uuid
+  invoice        DeliveryInvoice      @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+  notificationId String               @unique @db.Uuid
+  notification   DeliveryNotification @relation(fields: [notificationId], references: [id], onDelete: Restrict)
+  sentBy         String
+  sentAt         DateTime             @default(now()) @db.Timestamptz(3)
 }
 
 model DeliveryPushSubscription {

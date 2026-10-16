@@ -36,23 +36,18 @@ export default function Page() {
               Delivery rates
             </a>
             <Link
-              className="d-nav-sign-in"
-              href="/partner/sign-in"
-              aria-label="Partner sign in"
-            >
-              Sign in
-            </Link>
-            <Link
               className="d-nav-rider"
               href="/rider/join"
               transitionTypes={["igo-forward"]}
             >
               Become a rider <ArrowUpRight size={14} aria-hidden="true" />
             </Link>
-            <Link href="/join" transitionTypes={["igo-forward"]}>
-              <Button>
-                Become a partner <ArrowUpRight size={16} />
-              </Button>
+            <Link
+              className="d-nav-sign-in"
+              href="/partner/sign-in"
+              aria-label="Partner sign in"
+            >
+              Sign in <ArrowRight size={15} aria-hidden="true" />
             </Link>
           </nav>
         </header>
@@ -192,8 +187,8 @@ export default function Page() {
                 <br />A big weight off.
               </h2>
               <p>
-                Delivery fees per delivery location, billed to your business. Cash
-                collected for your goods stays separate.
+                Delivery fees per delivery location, billed to your business.
+                Cash collected for your goods stays separate.
               </p>
               <Link href="/join" transitionTypes={["igo-forward"]}>
                 Apply for your partner account <ArrowUpRight size={17} />

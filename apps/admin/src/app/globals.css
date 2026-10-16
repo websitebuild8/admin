@@ -4,6 +4,7 @@
 @import "./igo.css";
 @import "./delivery.css";
 @import "./cod-receipt.css";
+@import "./partner-history.css";
 
 @custom-variant dark (&:is(.dark *));
 

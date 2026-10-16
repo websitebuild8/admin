@@ -1,5 +1,39 @@
 # Admin verification
 
+## Partner delivery history and manual invoicing — 16 October 2026
+
+87 unit tests pass. The final one-worker production build, its TypeScript check,
+ESLint and whitespace checks pass. The existing 61 delivery integration checks
+passed during the extended run; after correcting a new test's notification
+baseline, all 11 new invoice checks passed in a separate disposable-schema run
+(`npm run delivery:integration -- --partner-invoices`). All disposable schemas
+used for these checks were removed. No operational invoice, payment or notification
+was created by QA.
+
+The new checks exercise ten-row partner history, whole-history eligible totals,
+stale preview rejection, admin-only creation/sending, partner-scoped invoice and
+print data, same-key replay, concurrent different-key issuance, one notification
+per send, immutable/private send records, later daily billing, partial payment
+verification and a concurrent automatic/manual invoice race. Migration
+`20261016080000_partner_manual_invoices` was applied successfully to the configured
+Supabase database.
+
+Actual client components were exercised with fictional API fixtures: history
+icon, search focus, pagination, create → review → send, disabled sent button,
+return to history and invoice history. Dialogs fit 320/390/1440px widths. Screen
+documents show ten packages and print media includes all twelve fixture lines.
+These are component checks, not a signed-in Clerk browser workflow.
+
+The final running local website was checked anonymously at 320/390/1440px:
+partner sign-in and rider signup are visible and within the viewport, the navbar
+partner signup button is removed, and both home-page partner signup CTAs remain.
+Private invoice print routes redirect to their own portal sign-in; history,
+invoice detail and filtered invoice APIs return 401 without authentication.
+
+No Git commit, push or deployment was performed. Changes are ready for the user
+to commit and push through VS Code. This section describes the new Phase 1 work;
+older verification entries below retain their original scope and dates.
+
 Checked 3 October 2026 against the local demo.
 
 - Eight domain tests pass: schema contract, payment guard, sequential fulfilment, required rider, double assignment prevention, partner verification, refund reservation limits, and attributable immutable updates.

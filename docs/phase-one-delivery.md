@@ -40,6 +40,9 @@ moves to `/legacy`; its mobile APIs remain at their existing URLs.
   parcel reference prevents duplicates across files and manual registrations.
 - DeliveryInvoice/Cycle/Line: one cycle per partner/local day, no customer-facing
   invoice for empty cycles, and globally unique invoice line per delivered parcel.
+  Admin may also issue all completed, uninvoiced deliveries manually from a
+  partner's history without advancing their daily cutoff. InvoiceDispatch records
+  the one-time partner dashboard notification. See [manual invoices](partner-history-invoices.md).
 - DeliveryPayment/Allocation/Receipt: private evidence, independent review state,
   admin-confirmed amounts and an auditable allocation to one invoice. Partial
   confirmation never credits the unverified remainder. Reused bank references

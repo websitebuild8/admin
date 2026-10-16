@@ -63,6 +63,7 @@ export async function notify(
       })),
       skipDuplicates: true,
     });
+  return notification;
 }
 export async function notifyAdmins(tx: Tx, title: string, message: string) {
   for (const recipient of (process.env.ADMIN_CLERK_USER_IDS ?? "")
@@ -191,6 +192,121 @@ export async function deliveryCommand(
 ) {
   return serialized(actor, key, command, async (tx) => {
     switch (command.type) {
+      case "createPartnerInvoice": {
+        requireRole(actor, "ADMIN");
+        const schema = sequenceSchema();
+        const lock =
+          schema === "public"
+            ? 819201016
+            : 100000000 + parseInt(schema.slice(-6), 16);
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(${lock}::bigint)`;
+        const partner = await tx.deliveryPartner.findUnique({
+          where: { id: command.partnerId },
+          select: { id: true },
+        });
+        if (!partner) throw new DeliveryError("Partner not found.", 404);
+        const [time] = await tx.$queryRaw<
+          { cutoff: Date }[]
+        >`SELECT clock_timestamp() AS cutoff`;
+        const parcels = await tx.$queryRaw<{ id: string; fee: number }[]>(
+          Prisma.sql`SELECT p.id,p.fee FROM ${Prisma.raw(`"${schema}"."DeliveryParcel"`)} p WHERE p."partnerId"=${command.partnerId}::uuid AND p.state='DELIVERED' AND p."deliveredAt"<=${time.cutoff} AND NOT EXISTS (SELECT 1 FROM ${Prisma.raw(`"${schema}"."DeliveryInvoiceLine"`)} l WHERE l."parcelId"=p.id) ORDER BY p.id FOR UPDATE OF p`,
+        );
+        const total = parcels.reduce((sum, p) => sum + p.fee, 0);
+        if (!parcels.length)
+          throw new DeliveryError(
+            "No completed, uninvoiced deliveries are available.",
+            409,
+          );
+        if (
+          parcels.length !== command.expectedCount ||
+          total !== command.expectedTotal
+        )
+          throw new DeliveryError(
+            "Completed deliveries changed. Refresh the history and review the updated invoice total.",
+            409,
+          );
+        if (!Number.isSafeInteger(total) || total > 2147483647)
+          throw new DeliveryError(
+            "The invoice amount exceeds the supported limit. Contact iGO support.",
+          );
+        const [number] = await tx.$queryRaw<
+          { n: bigint }[]
+        >`SELECT nextval(${`${schema}.igo_delivery_invoice_number`}::regclass) AS n`;
+        const invoice = await tx.deliveryInvoice.create({
+          data: {
+            partnerId: command.partnerId,
+            manualCutoffAt: time.cutoff,
+            total,
+            publicId: `INV-${localDate(time.cutoff).replaceAll("-", "")}-${String(number.n).padStart(12, "0")}`,
+          },
+        });
+        await tx.deliveryInvoiceLine.createMany({
+          data: parcels.map((p) => ({
+            invoiceId: invoice.id,
+            parcelId: p.id,
+            amount: p.fee,
+          })),
+        });
+        await audit(
+          tx,
+          actor,
+          "MANUAL_INVOICE_ISSUED",
+          invoice.id,
+          {
+            total,
+            packageCount: parcels.length,
+            cutoff: time.cutoff.toISOString(),
+          },
+          command.partnerId,
+        );
+        return {
+          message: `Invoice ${invoice.publicId} created for ${money(total)}. Use Send invoice to notify the partner.`,
+          invoiceId: invoice.id,
+        };
+      }
+      case "sendInvoice": {
+        requireRole(actor, "ADMIN");
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`invoice-send:${command.invoiceId}`},0))`;
+        const invoice = await tx.deliveryInvoice.findUnique({
+          where: { id: command.invoiceId },
+          include: {
+            dispatch: true,
+            partner: { select: { account: { select: { clerkUserId: true } } } },
+          },
+        });
+        if (!invoice) throw new DeliveryError("Invoice not found.", 404);
+        if (invoice.dispatch)
+          return {
+            message:
+              "This invoice has already been sent to the partner dashboard.",
+            invoiceId: invoice.id,
+          };
+        const notice = await notify(
+          tx,
+          invoice.partner.account.clerkUserId,
+          "Delivery invoice received",
+          `Invoice ${invoice.publicId}: ${money(invoice.total)} for completed deliveries. View the package details and outstanding amount in Invoices. Earlier unpaid invoices remain due.`,
+        );
+        await tx.deliveryInvoiceDispatch.create({
+          data: {
+            invoiceId: invoice.id,
+            notificationId: notice.id,
+            sentBy: actor.userId,
+          },
+        });
+        await audit(
+          tx,
+          actor,
+          "INVOICE_SENT_TO_DASHBOARD",
+          invoice.id,
+          { total: invoice.total, channel: "DASHBOARD" },
+          invoice.partnerId,
+        );
+        return {
+          message: "Invoice sent to the partner dashboard with a notification.",
+          invoiceId: invoice.id,
+        };
+      }
       case "apply": {
         if (actor.role !== "APPLICANT")
           throw new DeliveryError("An application already exists.", 409);
