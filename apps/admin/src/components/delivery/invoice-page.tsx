@@ -1,16 +1,21 @@
 import { notFound, redirect } from "next/navigation";
 import { z } from "zod";
 import { deliveryActor } from "@/lib/delivery/auth";
-import { invoiceDocument } from "@/lib/delivery/invoice-document";
+import {
+  invoiceDocument,
+  paidInvoiceDocument,
+} from "@/lib/delivery/invoice-document";
 import { DeliveryError } from "@/lib/delivery/domain";
 import { InvoicePrint } from "./invoice-print";
 
 export async function InvoicePage({
   params,
   partner,
+  paid = false,
 }: {
   params: Promise<{ id: string }>;
   partner: boolean;
+  paid?: boolean;
 }) {
   let actor;
   try {
@@ -28,11 +33,18 @@ export async function InvoicePage({
   const { id } = await params;
   if (!z.uuid().safeParse(id).success) notFound();
   let document;
+  let proof;
   try {
-    document = await invoiceDocument(actor, id);
+    if (paid) {
+      const result = await paidInvoiceDocument(actor, id);
+      document = result.document;
+      proof = result.proof;
+    } else document = await invoiceDocument(actor, id);
   } catch (error) {
     if (error instanceof DeliveryError && error.status === 404) notFound();
     throw error;
   }
-  return <InvoicePrint document={document} partner={partner} />;
+  return (
+    <InvoicePrint document={document} partner={partner} paidProof={proof} />
+  );
 }

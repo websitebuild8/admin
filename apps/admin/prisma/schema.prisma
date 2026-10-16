@@ -439,6 +439,8 @@ model DeliveryInvoice {
   payments       DeliveryPayment[]
   allocations    DeliveryPaymentAllocation[]
   dispatch       DeliveryInvoiceDispatch?
+  paidInvoice    DeliveryPaidInvoice?
+  events         DeliveryInvoiceEvent[]
 
   @@index([partnerId, createdAt])
 }
@@ -555,6 +557,7 @@ model DeliveryNotification {
   createdAt       DateTime                 @default(now()) @db.Timestamptz(3)
   pushMessages    DeliveryPushMessage[]
   invoiceDispatch DeliveryInvoiceDispatch?
+  paidInvoiceDispatch DeliveryPaidInvoiceDispatch?
 
   @@index([recipient, createdAt])
 }
@@ -609,4 +612,36 @@ model DeliverySettings {
   supportPhone       String   @default("")
   supportEmail       String   @default("")
   updatedAt          DateTime @updatedAt @db.Timestamptz(3)
+}
+
+model DeliveryPaidInvoice {
+  invoiceId String @id @db.Uuid
+  invoice DeliveryInvoice @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+  snapshot Json
+  paidAt DateTime @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  dispatch DeliveryPaidInvoiceDispatch?
+}
+
+model DeliveryPaidInvoiceDispatch {
+  invoiceId String @id @db.Uuid
+  paidInvoice DeliveryPaidInvoice @relation(fields: [invoiceId], references: [invoiceId], onDelete: Restrict)
+  notificationId String @unique @db.Uuid
+  notification DeliveryNotification @relation(fields: [notificationId], references: [id], onDelete: Restrict)
+  sentBy String
+  sentAt DateTime @default(now()) @db.Timestamptz(3)
+}
+
+model DeliveryInvoiceEvent {
+  id String @id
+  invoiceId String @db.Uuid
+  invoice DeliveryInvoice @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+  kind String
+  occurredAt DateTime @db.Timestamptz(3)
+  amount Int?
+  reference String @default("")
+  note String @default("")
+  receiptId String? @db.Uuid
+
+  @@index([invoiceId, occurredAt, id])
 }

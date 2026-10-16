@@ -172,6 +172,7 @@ export const commandInput = z.discriminatedUnion("type", [
     expectedTotal: z.number().int().min(1).max(2147483647),
   }),
   z.object({ type: z.literal("sendInvoice"), invoiceId: uuid }),
+  z.object({ type: z.literal("sendPaidInvoice"), invoiceId: uuid }),
   z.object({
     type: z.literal("settings"),
     bankName: text(0, 100),

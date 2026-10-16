@@ -1,5 +1,40 @@
 # Admin verification
 
+## Paid invoice history and iGO earnings — 17 October 2026
+
+91 unit tests, the complete 80-check disposable-schema delivery integration suite,
+ESLint and the one-worker production build (including TypeScript) pass. A separate
+eight-check settlement run also verifies the admin earnings total stays unchanged
+for pending evidence, increases only by partially confirmed amounts and includes
+the remaining balance only after full confirmation. Two historical migration
+checks pass with payments created before the new migration.
+
+Migration `20261016090000_paid_invoice_history` was applied to the configured
+Supabase database. Read-only verification reconciled both existing paid copies,
+the invoice history and the received-fee earnings total against verified
+allocations. All three new tables have RLS enabled and deny public client reads.
+No operational payment or notification was created by verification. The migration
+backfilled paid documents and history for existing records, without changing debt.
+
+Two interrupted verification processes were stopped after the connection outage;
+their abandoned temporary schemas were removed. Fresh checks completed with
+connection/query limits. A final read-only check found no remaining QA schemas.
+
+Actual client components with fictional API transport exercise pending status,
+opening payment verification from an invoice, full confirmation, paid-copy
+availability, sending once, disabled sent controls, complete ten-row history,
+partner read-only controls and the admin-only earnings card. Dialogs, print views
+and overview were checked at 320/390/1440px. Paid printing includes all twelve
+fixture package lines and twelve verified payments while each screen table shows
+at most ten. The earnings card displays verified fees, independently of partner
+COD or outstanding debt. No signed-in Clerk browser session or bank API was used
+for these component checks.
+
+The rebuilt local preview is running. Anonymous paid-invoice print requests
+redirect to the correct portal sign-in, and invoice history/payment APIs return
+401. No commit, push or public deployment was performed; the user publishes
+through VS Code.
+
 ## Partner delivery history and manual invoicing — 16 October 2026
 
 87 unit tests pass. The final one-worker production build, its TypeScript check,

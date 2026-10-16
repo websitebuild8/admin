@@ -17,6 +17,8 @@ import { verifyPartnerApplications } from "./verify-partner-applications";
 import { verifyRiderWorkflows } from "./verify-rider-workflows";
 import { verifyCodReceipts } from "./verify-cod-receipts";
 import { verifyPartnerInvoices } from "./verify-partner-invoices";
+import { verifyPaidInvoices } from "./verify-paid-invoices";
+import { verifyPaidInvoiceMigration } from "./verify-paid-invoice-migration";
 import {
   nextCutoff,
   type Actor,
@@ -31,7 +33,12 @@ async function main() {
   const schema = `igo_qa_${randomBytes(8).toString("hex")}`;
   process.env.IGO_DELIVERY_TEST_SCHEMA = schema;
   const connectionString = databaseUrl(process.env.DIRECT_URL),
-    owner = new pg.Client({ connectionString, connectionTimeoutMillis: 10000 });
+    owner = new pg.Client({
+      connectionString,
+      connectionTimeoutMillis: 10000,
+      query_timeout: 30000,
+      application_name: `${schema}_owner`,
+    });
   let db: PrismaClient | undefined,
     created = false,
     checks = 0;
@@ -54,7 +61,13 @@ async function main() {
       "20261016060000_rider_push",
       "20261016070000_cod_payout_receipts",
       "20261016080000_partner_manual_invoices",
+      "20261016090000_paid_invoice_history",
     ]) {
+      if (
+        folder === "20261016090000_paid_invoice_history" &&
+        process.argv.includes("--paid-migration")
+      )
+        continue;
       let sql = await readFile(
         `prisma/migrations/${folder}/migration.sql`,
         "utf8",
@@ -69,7 +82,17 @@ async function main() {
       await owner.query(sql);
     }
     db = new PrismaClient({
-      adapter: new PrismaPg({ connectionString, max: 5 }, { schema }),
+      adapter: new PrismaPg(
+        {
+          connectionString,
+          max: 5,
+          connectionTimeoutMillis: 10000,
+          query_timeout: 30000,
+          statement_timeout: 30000,
+          application_name: schema,
+        },
+        { schema },
+      ),
     });
     (globalThis as unknown as { igoPrisma: PrismaClient }).igoPrisma = db;
     const cutoff = nextCutoff(new Date(), 1080);
@@ -144,6 +167,36 @@ async function main() {
         description: "Not a real delivery",
       },
     });
+    if (process.argv.includes("--paid-migration")) {
+      await verifyPaidInvoiceMigration(
+        db,
+        admin,
+        driver,
+        async () => {
+          const sql = await readFile(
+            "prisma/migrations/20261016090000_paid_invoice_history/migration.sql",
+            "utf8",
+          );
+          await owner.query(
+            sql
+              .replaceAll("public.", `${schema}.`)
+              .replaceAll("'public'", `'${schema}'`),
+          );
+        },
+        ok,
+      );
+      console.log(
+        `Verified ${checks} historical paid invoice migration checks in an isolated disposable schema.`,
+      );
+      return;
+    }
+    if (process.argv.includes("--paid-invoices")) {
+      await verifyPaidInvoices(db, admin, other, driver, ok);
+      console.log(
+        `Verified ${checks} paid invoice checks in an isolated disposable schema.`,
+      );
+      return;
+    }
     if (process.argv.includes("--partner-invoices")) {
       await verifyPartnerInvoices(db, admin, other, driver, ok);
       console.log(
@@ -548,12 +601,14 @@ async function main() {
       ok,
     );
     await verifyPartnerInvoices(db, admin, other, driver, ok);
+    await verifyPaidInvoices(db, admin, other, driver, ok);
     console.log(
       `Verified ${checks} database integration checks in an isolated disposable schema.`,
     );
   } finally {
     await db?.$disconnect();
     if (created) {
+      await owner.query("ROLLBACK");
       assert(/^igo_qa_[a-f0-9]+$/.test(schema));
       await owner.query(`DROP SCHEMA "${schema}" CASCADE`);
       console.log("Disposable QA schema removed.");

@@ -307,6 +307,55 @@ export async function deliveryCommand(
           invoiceId: invoice.id,
         };
       }
+      case "sendPaidInvoice": {
+        requireRole(actor, "ADMIN");
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`paid-invoice-send:${command.invoiceId}`},0))`;
+        const invoice = await tx.deliveryInvoice.findUnique({
+          where: { id: command.invoiceId },
+          include: {
+            paidInvoice: { include: { dispatch: true } },
+            partner: { select: { account: { select: { clerkUserId: true } } } },
+          },
+        });
+        if (!invoice) throw new DeliveryError("Invoice not found.", 404);
+        if (invoice.paid !== invoice.total || !invoice.paidInvoice)
+          throw new DeliveryError(
+            "Verify the full invoice payment before sending a paid invoice.",
+            409,
+          );
+        if (invoice.paidInvoice.dispatch)
+          return {
+            message:
+              "The paid invoice has already been sent to the partner dashboard.",
+            invoiceId: invoice.id,
+          };
+        const notice = await notify(
+          tx,
+          invoice.partner.account.clerkUserId,
+          "Paid invoice received",
+          `Invoice ${invoice.publicId} is fully paid: ${money(invoice.total)} verified, ${money(0)} outstanding. Your paid invoice and payment history are available in Invoices.`,
+        );
+        await tx.deliveryPaidInvoiceDispatch.create({
+          data: {
+            invoiceId: invoice.id,
+            notificationId: notice.id,
+            sentBy: actor.userId,
+          },
+        });
+        await audit(
+          tx,
+          actor,
+          "PAID_INVOICE_SENT_TO_DASHBOARD",
+          invoice.id,
+          { total: invoice.total, channel: "DASHBOARD" },
+          invoice.partnerId,
+        );
+        return {
+          message:
+            "Paid invoice sent to the partner dashboard with a notification.",
+          invoiceId: invoice.id,
+        };
+      }
       case "apply": {
         if (actor.role !== "APPLICANT")
           throw new DeliveryError("An application already exists.", 409);
@@ -594,6 +643,7 @@ export async function deliveryCommand(
         return {
           message:
             "Receipt submitted for admin verification. The invoice balance has not changed.",
+          invoiceId: invoice.id,
         };
       }
       case "reviewPayment": {
@@ -668,7 +718,8 @@ export async function deliveryCommand(
           message:
             command.decision === "REJECT"
               ? "Payment rejected. Invoice balance unchanged."
-              : "Only the verified amount was credited.",
+              : "Only the verified amount was credited. If fully paid, the paid invoice is ready to send.",
+          invoiceId: payment.invoiceId,
         };
       }
       case "cutoff": {

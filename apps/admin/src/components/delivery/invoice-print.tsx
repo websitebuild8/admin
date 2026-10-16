@@ -15,6 +15,7 @@ import {
 import { money } from "@/lib/delivery/domain";
 import type { InvoiceDocument } from "@/lib/delivery/invoice-document";
 import { HistoryPager } from "./partner-history";
+import type { PaidInvoiceProof } from "@/lib/delivery/paid-invoice-contract";
 
 const stamp = (value: string) =>
   new Intl.DateTimeFormat("en-GB", {
@@ -54,11 +55,14 @@ function Lines({ lines }: { lines: InvoiceDocument["lines"] }) {
 export function InvoicePrint({
   document,
   partner,
+  paidProof,
 }: {
   document: InvoiceDocument;
   partner: boolean;
+  paidProof?: PaidInvoiceProof;
 }) {
   const [page, setPage] = useState(1);
+  const [paymentPage, setPaymentPage] = useState(1);
   const business = document.settings;
   return (
     <main className="cod-print-page">
@@ -90,7 +94,7 @@ export function InvoicePrint({
                   ? "Partially paid"
                   : "Payment due"}
             </span>
-            <h2>Delivery invoice</h2>
+            <h2>{paidProof ? "Paid delivery invoice" : "Delivery invoice"}</h2>
             <p className="cod-receipt-number">{document.publicId}</p>
           </div>
         </header>
@@ -134,6 +138,18 @@ export function InvoicePrint({
             <dt>Packages</dt>
             <dd>{document.lines.length}</dd>
           </div>
+          {paidProof && (
+            <>
+              <div>
+                <dt>Fully paid (MVT)</dt>
+                <dd>{stamp(paidProof.paidAt)}</dd>
+              </div>
+              <div>
+                <dt>Paid copy issued (MVT)</dt>
+                <dd>{stamp(paidProof.issuedAt)}</dd>
+              </div>
+            </>
+          )}
         </dl>
         <div className="cod-screen-only">
           <Lines lines={document.lines.slice((page - 1) * 10, page * 10)} />
@@ -155,21 +171,43 @@ export function InvoicePrint({
             <strong>{money(document.total - document.paid)}</strong>
           </div>
         </div>
+        {paidProof && (
+          <section className="d-paid-invoice-payments">
+            <h3>Verified bank payments</h3>
+            <div className="cod-screen-only">
+              <PaidPayments
+                payments={paidProof.payments.slice(
+                  (paymentPage - 1) * 10,
+                  paymentPage * 10,
+                )}
+              />
+              <HistoryPager
+                page={paymentPage}
+                total={paidProof.payments.length}
+                onPage={setPaymentPage}
+              />
+            </div>
+            <div className="cod-print-only">
+              <PaidPayments payments={paidProof.payments} />
+            </div>
+          </section>
+        )}
         <footer>
           <p>
             Delivery fees only. Parcel payments and payouts are recorded
             separately. Earlier unpaid invoices remain due. A submitted bank
             receipt reduces the balance only after admin verification.
           </p>
-          {business?.bankAccount && (
+          {!paidProof && business?.bankAccount && (
             <p>
               Bank transfer: {business.bankName} · {business.beneficiary} ·{" "}
               {business.bankAccount}. Use {document.publicId} as the reference.
             </p>
           )}
           <p>
-            Generated {stamp(document.generatedAt)} MVT. Payment balances are
-            current at the time this document is opened.
+            {paidProof
+              ? `Paid copy issued ${stamp(paidProof.issuedAt)} MVT. This document preserves the verified settlement details at issuance.`
+              : `Generated ${stamp(document.generatedAt)} MVT. Payment balances are current at the time this document is opened.`}
           </p>
         </footer>
       </article>
@@ -185,5 +223,33 @@ export function InvoicePrint({
         page.
       </p>
     </main>
+  );
+}
+function PaidPayments({
+  payments,
+}: {
+  payments: PaidInvoiceProof["payments"];
+}) {
+  return (
+    <div className="cod-receipt-lines">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Bank reference</TableHead>
+            <TableHead>Verified (MVT)</TableHead>
+            <TableHead>Confirmed (MVR)</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {payments.map((payment) => (
+            <TableRow key={payment.id}>
+              <TableCell>{payment.bankReference}</TableCell>
+              <TableCell>{stamp(payment.reviewedAt)}</TableCell>
+              <TableCell>{(payment.amount / 100).toFixed(2)}</TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
   );
 }

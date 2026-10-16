@@ -28,6 +28,10 @@ import {
 import { money } from "@/lib/delivery/domain";
 import type { PartnerHistory } from "@/lib/delivery/partner-history-contract";
 import { DeliverySkeleton } from "./skeleton";
+import {
+  invoicePaymentStatus,
+  invoiceStatusLabels,
+} from "@/lib/delivery/invoice-lifecycle";
 
 type InvoiceList = {
   items: {
@@ -38,6 +42,11 @@ type InvoiceList = {
     createdAt: string;
     dispatch: { sentAt: string } | null;
     cycle: { localDate: string } | null;
+    _count?: { payments?: number };
+    paidInvoice?: {
+      paidAt: string;
+      dispatch: { sentAt: string } | null;
+    } | null;
   }[];
   total: number;
   page: number;
@@ -459,7 +468,19 @@ export function PartnerHistoryModal({
                     </TableCell>
                     <TableCell>{money(invoice.total)}</TableCell>
                     <TableCell>{money(invoice.paid)}</TableCell>
-                    <TableCell>{money(invoice.total - invoice.paid)}</TableCell>
+                    <TableCell>
+                      {money(invoice.total - invoice.paid)}
+                      <small>
+                        {invoiceStatusLabels[invoicePaymentStatus(invoice)]}
+                      </small>
+                      {invoice.paidInvoice && (
+                        <small>
+                          {invoice.paidInvoice.dispatch
+                            ? "Paid invoice sent"
+                            : "Paid invoice ready"}
+                        </small>
+                      )}
+                    </TableCell>
                     <TableCell>
                       <Button
                         variant="outline"

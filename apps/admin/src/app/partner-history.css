@@ -148,6 +148,63 @@
   border-top: 1px solid #e5e4d2;
   font-size: 16px;
 }
+.d-invoice-state {
+  padding: 12px 0;
+}
+.d-invoice-state p {
+  margin-top: 8px;
+  font-size: 11px;
+  color: #737b68;
+  line-height: 1.7;
+}
+.d-status.awaiting_verification,
+.d-status.partially_paid {
+  background: #fff5c7;
+  color: #867529;
+}
+.d-invoice-records {
+  min-width: 0;
+}
+.d-invoice-records [data-slot="table-cell"] {
+  font-size: 11px;
+  vertical-align: top;
+}
+.d-invoice-records small {
+  display: block;
+  white-space: normal;
+  max-width: 260px;
+  color: #7c836f;
+  font-size: 10px;
+  margin-top: 5px;
+}
+.d-paid-invoice-payments h3 {
+  padding: 16px 27px;
+  font-size: 13px;
+  font-weight: 700;
+}
+.d-stats-income > .d-stat:first-child {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 0 20px;
+  border-color: #e3e6c8;
+  background: #fffef1cf;
+}
+.d-stats-income > .d-stat:first-child > div {
+  justify-content: flex-start;
+  font-weight: 700;
+  color: #343927;
+}
+.d-stats-income > .d-stat:first-child strong {
+  grid-column: 2;
+  grid-row: 1 / 3;
+  margin: 0;
+  text-align: right;
+}
+.d-stats-income > .d-stat:first-child small {
+  grid-column: 1;
+}
 @media (max-width: 600px) {
   .d-history-stats {
     grid-template-columns: repeat(2, minmax(0, 1fr));

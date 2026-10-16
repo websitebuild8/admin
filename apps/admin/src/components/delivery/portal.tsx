@@ -75,6 +75,11 @@ import { DeliverySkeleton } from "./skeleton";
 import { codCashLabel } from "@/lib/delivery/cod-receipt-contract";
 import { PayoutReceiptModal } from "./payout-receipt";
 import { PartnerHistoryModal } from "./partner-history";
+import { InvoiceRecords } from "./invoice-records";
+import {
+  invoicePaymentStatus,
+  invoiceStatusLabels,
+} from "@/lib/delivery/invoice-lifecycle";
 
 type Parcel = {
   id: string;
@@ -132,9 +137,10 @@ type Invoice = {
   cycle: { localDate: string; cutoffAt: string } | null;
   manualCutoffAt: string | null;
   dispatch: { sentAt: string } | null;
-  _count?: { lines: number };
+  _count?: { lines?: number; payments?: number };
+  paidInvoice?: { paidAt: string; dispatch: { sentAt: string } | null } | null;
 };
-type Payment = {
+export type Payment = {
   id: string;
   amount: number;
   confirmedAmount: number;
@@ -142,6 +148,7 @@ type Payment = {
   bankReference: string;
   receiptId: string;
   reviewNote: string;
+  reviewedAt?: string | null;
   createdAt: string;
   invoice: { publicId: string; total: number; paid: number };
   partner: { businessName: string };
@@ -217,8 +224,7 @@ const statusLabels: Record<string, string> = {
   SUSPENDED: "Suspended",
   PARTIAL: "Partially verified",
   CONFIRMED: "Confirmed",
-  PAID: "Paid",
-  UNPAID: "Unpaid",
+  ...invoiceStatusLabels,
 };
 function Status({ value }: { value: string }) {
   return (
@@ -746,6 +752,7 @@ export function DeliveryPortal({
       setSelected([]);
       refresh();
       if (result.remittanceId) setPayoutReceiptId(result.remittanceId);
+      if (result.invoiceId) setInvoiceId(result.invoiceId);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Operation failed.");
     } finally {
@@ -965,7 +972,17 @@ export function DeliveryPortal({
       const d = request.data as Summary;
       return (
         <>
-          <div className="d-stats">
+          <div
+            className={`d-stats${actor.role === "ADMIN" ? " d-stats-income" : ""}`}
+          >
+            {actor.role === "ADMIN" && (
+              <Stat
+                label="Total earned by iGO"
+                value={money(d.confirmedPayments)}
+                note="Verified delivery-fee payments · all time · excludes COD"
+                icon={<Wallet />}
+              />
+            )}
             <Stat
               label="Invoiced balance due"
               value={money(d.outstanding)}
@@ -1366,7 +1383,11 @@ export function DeliveryPortal({
           <div className="d-card-header">
             <div>
               <h2>{title}</h2>
-              <p>Only an admin can approve or suspend access</p>
+              <p>
+                {screen === "partners"
+                  ? "Open a business’s deliveries and invoices to review its history, create an invoice and send it to that partner."
+                  : "Only an admin can approve or suspend access"}
+              </p>
             </div>
           </div>
           {d.items.length ? (
@@ -1396,12 +1417,12 @@ export function DeliveryPortal({
                   {a.partner && (
                     <Button
                       variant="outline"
-                      size="icon"
                       title="Delivery history & invoices"
                       aria-label={`Delivery history for ${a.partner.businessName}`}
                       onClick={() => setPartnerHistoryId(a.partner!.id)}
                     >
                       <History size={17} />
+                      Deliveries & invoices
                     </Button>
                   )}
                   {a.partner && (
@@ -1459,15 +1480,7 @@ export function DeliveryPortal({
                   money(i.paid),
                   <span key="due">
                     <strong>{money(i.total - i.paid)}</strong>
-                    <Status
-                      value={
-                        i.paid === i.total
-                          ? "PAID"
-                          : i.paid
-                            ? "PARTIAL"
-                            : "UNPAID"
-                      }
-                    />
+                    <Status value={invoicePaymentStatus(i)} />
                   </span>,
                   <div key="actions" className="d-row-actions">
                     <Button
@@ -2140,6 +2153,14 @@ export function DeliveryPortal({
                   </Button>
                 </>
               )}
+              {screen === "overview" && actor.role === "ADMIN" && (
+                <Button
+                  variant="outline"
+                  render={<Link href="/delivery/partners" />}
+                >
+                  <Store size={16} /> Partner deliveries & invoices
+                </Button>
+              )}
               {screen === "overview" && (
                 <Link href={`${workspaceBase}/packages`}>
                   <Button>
@@ -2274,7 +2295,12 @@ export function DeliveryPortal({
           id={invoiceId}
           close={closeInvoice}
           changed={refresh}
+          workspaceRevision={revision}
           actor={actor}
+          review={(payment) => {
+            setInvoiceId(null);
+            open({ kind: "reviewPayment", payment });
+          }}
           pay={(i) => {
             setInvoiceId(null);
             open({ kind: "submitPayment", invoice: i });
@@ -2406,25 +2432,33 @@ function InvoiceModal({
   actor,
   pay,
   changed,
+  review,
+  workspaceRevision,
 }: {
   id: string;
   close: () => void;
   actor: Actor;
   pay: (i: Invoice) => void;
   changed: () => void;
+  review: (payment: Payment) => void;
+  workspaceRevision: number;
 }) {
   const [page, setPage] = useState(1),
+    [tab, setTab] = useState<"packages" | "payments" | "history">("packages"),
     [revision, setRevision] = useState(0),
     [sending, setSending] = useState(false),
     [sendError, setSendError] = useState("");
-  const sendKey = useRef(crypto.randomUUID()),
+  const sendKeys = useRef({
+      sendInvoice: crypto.randomUUID(),
+      sendPaidInvoice: crypto.randomUUID(),
+    }),
     running = useRef(false);
   const { data, error } = useResource<InvoiceDetail>(
     "invoice",
     `id=${id}&page=${page}`,
-    revision,
+    revision + workspaceRevision,
   );
-  async function send() {
+  async function send(type: "sendInvoice" | "sendPaidInvoice") {
     if (running.current) return;
     running.current = true;
     setSending(true);
@@ -2434,9 +2468,9 @@ function InvoiceModal({
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Idempotency-Key": sendKey.current,
+          "Idempotency-Key": sendKeys.current[type],
         },
-        body: JSON.stringify({ type: "sendInvoice", invoiceId: id }),
+        body: JSON.stringify({ type, invoiceId: id }),
       });
       const result = await response.json();
       if (!response.ok)
@@ -2497,19 +2531,74 @@ function InvoiceModal({
                 </p>
               </div>
             </div>
-            <GridTable
-              headings={["Package", "Recipient", "Delivered (MVT)", "Fee"]}
-              rows={data.items.map((l) => [
-                <div key="id">
-                  <strong>{l.parcel.publicId}</strong>
-                  <small>{l.parcel.externalReference}</small>
-                </div>,
-                l.parcel.recipientName,
-                stamp(l.parcel.deliveredAt),
-                money(l.amount),
-              ])}
-            />
-            <Pager list={data} onPage={setPage} />
+            <div className="d-invoice-state">
+              <Status value={invoicePaymentStatus(data.invoice)} />
+              <p>
+                {invoicePaymentStatus(data.invoice) === "AWAITING_VERIFICATION"
+                  ? "A transfer has been submitted. Outstanding debt changes only after admin verification."
+                  : data.invoice.paid === data.invoice.total
+                    ? "Full payment verified. The paid invoice is available below."
+                    : "Submit a bank transfer for admin verification to settle this invoice."}
+              </p>
+            </div>
+            <div
+              className="d-history-tabs"
+              role="group"
+              aria-label="Invoice records"
+            >
+              {(["packages", "payments", "history"] as const).map((value) => (
+                <Button
+                  key={value}
+                  variant={tab === value ? "default" : "ghost"}
+                  aria-pressed={tab === value}
+                  onClick={() => setTab(value)}
+                >
+                  {value === "packages"
+                    ? "Packages"
+                    : value === "payments"
+                      ? "Payments"
+                      : "Full history"}
+                </Button>
+              ))}
+            </div>
+            {tab === "packages" ? (
+              <>
+                <GridTable
+                  headings={["Package", "Recipient", "Delivered (MVT)", "Fee"]}
+                  rows={data.items.map((l) => [
+                    <div key="id">
+                      <strong>{l.parcel.publicId}</strong>
+                      <small>{l.parcel.externalReference}</small>
+                    </div>,
+                    l.parcel.recipientName,
+                    stamp(l.parcel.deliveredAt),
+                    money(l.amount),
+                  ])}
+                />
+                <Pager list={data} onPage={setPage} />
+              </>
+            ) : (
+              <InvoiceRecords
+                key={tab}
+                id={id}
+                view={tab}
+                revision={revision + workspaceRevision}
+                actor={actor}
+                review={review}
+              />
+            )}
+            {data.invoice.paidInvoice && (
+              <div className="d-note">
+                <strong>
+                  Paid {stamp(data.invoice.paidInvoice.paidAt)} MVT.
+                </strong>
+                {data.invoice.paidInvoice.dispatch
+                  ? ` Paid invoice sent to the partner on ${stamp(data.invoice.paidInvoice.dispatch.sentAt)} MVT.`
+                  : actor.role === "ADMIN"
+                    ? " Paid invoice ready. Select Send paid invoice to notify the partner."
+                    : " Your paid invoice is ready to view and print."}
+              </div>
+            )}
             <div className="d-note">
               {data.invoice.dispatch
                 ? `Sent to the partner dashboard with a notification on ${stamp(data.invoice.dispatch.sentAt)} MVT.`
@@ -2535,17 +2624,48 @@ function InvoiceModal({
               >
                 Print / save invoice
               </Button>
-              {actor.role === "ADMIN" && !data.invoice.cycle && (
+              {actor.role === "ADMIN" &&
+                !data.invoice.cycle &&
+                data.invoice.paid < data.invoice.total && (
+                  <Button
+                    disabled={sending || Boolean(data.invoice.dispatch)}
+                    onClick={() => send("sendInvoice")}
+                  >
+                    <ReceiptText size={16} />
+                    {data.invoice.dispatch
+                      ? "Sent to partner"
+                      : sending
+                        ? "Sending…"
+                        : "Send invoice"}
+                  </Button>
+                )}
+              {data.invoice.paidInvoice && (
                 <Button
-                  disabled={sending || Boolean(data.invoice.dispatch)}
-                  onClick={send}
+                  variant="outline"
+                  render={
+                    <a
+                      href={`${actor.role === "PARTNER" ? "/partner" : "/delivery"}/paid-invoice/${id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    />
+                  }
+                >
+                  View paid invoice / PDF
+                </Button>
+              )}
+              {actor.role === "ADMIN" && data.invoice.paidInvoice && (
+                <Button
+                  disabled={
+                    sending || Boolean(data.invoice.paidInvoice.dispatch)
+                  }
+                  onClick={() => send("sendPaidInvoice")}
                 >
                   <ReceiptText size={16} />
-                  {data.invoice.dispatch
-                    ? "Sent to partner"
+                  {data.invoice.paidInvoice.dispatch
+                    ? "Paid invoice sent"
                     : sending
                       ? "Sending…"
-                      : "Send invoice"}
+                      : "Send paid invoice"}
                 </Button>
               )}
               {actor.role === "PARTNER" &&

@@ -26,6 +26,8 @@ moves to `/legacy`; its mobile APIs remain at their existing URLs.
   automatically deduct delivery debt.
 - Default daily invoice cutoff is 18:00 Maldives Time; admin may change it per
   partner. Existing unpaid invoices remain outstanding across all later cycles.
+- Admin's total earned card counts all-time verified delivery-fee payments received,
+  excluding unverified transfers, unpaid fees and partner COD. Salaries are outside this total.
 - This is manual seller order entry/import, not a Facebook/Instagram API integration.
 - Notifications are an authenticated in-app inbox. External email/SMS/WhatsApp or
   background push is not silently substituted or represented as implemented.

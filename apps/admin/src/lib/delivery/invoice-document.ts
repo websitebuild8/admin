@@ -2,6 +2,7 @@ import "server-only";
 import { z } from "zod";
 import { database } from "../db";
 import { DeliveryError, requireRole, type Actor } from "./domain";
+import { paidInvoiceSnapshot } from "./paid-invoice-contract";
 
 export async function invoiceDocument(actor: Actor, id: string) {
   requireRole(actor, "ADMIN", "PARTNER");
@@ -73,3 +74,33 @@ export async function invoiceDocument(actor: Actor, id: string) {
   };
 }
 export type InvoiceDocument = Awaited<ReturnType<typeof invoiceDocument>>;
+
+export async function paidInvoiceDocument(actor: Actor, id: string) {
+  requireRole(actor, "ADMIN", "PARTNER");
+  z.uuid().parse(id);
+  const record = await database().deliveryPaidInvoice.findFirst({
+    where: {
+      invoiceId: id,
+      ...(actor.role === "PARTNER"
+        ? { invoice: { partnerId: actor.partnerId! } }
+        : {}),
+    },
+  });
+  if (!record)
+    throw new DeliveryError(
+      "Paid invoice not found. Full payment must be verified first.",
+      404,
+    );
+  const snapshot = paidInvoiceSnapshot.parse(record.snapshot);
+  return {
+    document: {
+      ...snapshot,
+      generatedAt: record.createdAt.toISOString(),
+    } satisfies InvoiceDocument,
+    proof: {
+      paidAt: record.paidAt.toISOString(),
+      issuedAt: record.createdAt.toISOString(),
+      payments: snapshot.payments,
+    },
+  };
+}

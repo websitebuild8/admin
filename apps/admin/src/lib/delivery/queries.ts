@@ -9,6 +9,7 @@ import { applicationSelection } from "./partner-applications";
 import { storageConfigurationStatus } from "../storage-configuration";
 import { codPayoutReceipt } from "./cod-receipts";
 import { partnerHistory } from "./partner-history";
+import { invoiceRecords } from "./invoice-history";
 
 export const parcelSelection = {
   id: true,
@@ -134,6 +135,8 @@ export async function deliveryQuery(
   const page = parsed.data,
     take = 10,
     skip = (page - 1) * take;
+  if (resource === "invoice-history" || resource === "invoice-payments")
+    return invoiceRecords(actor, resource, search, page);
   if (resource === "partner-history")
     return partnerHistory(actor, search, page);
   if (resource === "cod-receipt")
@@ -338,8 +341,13 @@ export async function deliveryQuery(
         include: {
           cycle: true,
           dispatch: { select: { sentAt: true } },
+          paidInvoice: {
+            select: { paidAt: true, dispatch: { select: { sentAt: true } } },
+          },
           partner: { select: { businessName: true } },
-          _count: { select: { lines: true } },
+          _count: {
+            select: { lines: true, payments: { where: { status: "PENDING" } } },
+          },
         },
         orderBy: [{ createdAt: "desc" }, { id: "desc" }],
         take,
@@ -357,7 +365,11 @@ export async function deliveryQuery(
       include: {
         cycle: true,
         dispatch: { select: { sentAt: true } },
+        paidInvoice: {
+          select: { paidAt: true, dispatch: { select: { sentAt: true } } },
+        },
         partner: { select: { businessName: true, pickupAddress: true } },
+        _count: { select: { payments: { where: { status: "PENDING" } } } },
       },
     });
     if (!invoice) throw new DeliveryError("Invoice not found.", 404);
