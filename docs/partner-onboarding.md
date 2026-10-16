@@ -70,6 +70,8 @@ and excessive-pixel inputs are rejected.
   sends no messages. Email/password must be enabled in the intended Clerk instance.
 - Set `DELIVERY_PUBLIC_URL` to the final HTTPS website origin, for example
   `https://igodelivery.netlify.app`, in the hosting provider's server environment.
+  It is also an exact trusted origin for delivery API submissions behind a proxy;
+  Netlify's built-in server `URL` supplies its primary website origin as well.
   If absent, invitation links use the current request origin; local URLs are only
   useful on the same computer. Configure production Clerk domains before launch.
 - Rebuild/redeploy after pushing. A local build does not prove deployment.

@@ -61,6 +61,7 @@ instance. A real launch uses Clerk production configuration and a matching domai
 | `DATABASE_URL` | Existing Supabase transaction pooler URL, port 6543 |
 | `SUPABASE_URL` | Same project's HTTPS API URL |
 | `SUPABASE_SECRET_KEY` | Existing private Storage server key |
+| `DELIVERY_PUBLIC_URL` | `https://igodelivery.netlify.app`, or this deployment's final HTTPS website origin |
 | `IGO_DEMO_MODE` | `false` — retain admin authentication and enable shared demos |
 | `IGO_POLICIES_APPROVED` | `false` — the policies remain drafts |
 | `IGO_POLICY_VERSION` | `draft-2026-10-08` |
@@ -76,6 +77,32 @@ Only the Clerk publishable key uses `NEXT_PUBLIC_`; database, Storage and schedu
 secrets must stay private. Supabase Auth is not replacing Clerk. Generate
 `CRON_SECRET` privately with a password manager or `openssl rand -hex 32` and keep
 the same value for the later Supabase schedule. Do not print it in build commands.
+
+### Partner submission returns “Request origin is not allowed” (403)
+
+The browser submits from the public HTTPS website, while a hosting adapter may
+provide a different internal URL to the request handler. Delivery mutation APIs
+accept exact origins from `DELIVERY_PUBLIC_URL` and Netlify's server-supplied `URL`
+in addition to a request's own origin. This applies to partner submissions and
+authenticated delivery operations. Host/forwarding headers do not add trusted
+origins; missing Origin headers, cross-site requests and unrelated sites are
+rejected.
+
+Set `DELIVERY_PUBLIC_URL=https://igodelivery.netlify.app` (substitute your final
+domain if changed) through **Project configuration → Environment variables**.
+Use the Production context and All scopes, including Functions when selectable.
+The value must contain only the HTTPS origin, without a path, quotes or a
+wildcard. Commit/push the origin-check fix and create a new deployment; editing
+settings alone does not change an existing function. Netlify's read-only `URL`
+variable normally supplies the primary domain automatically, so do not create or
+override it. An additional custom domain must be explicitly configured or match
+the request's own origin. No wildcard Netlify-domain allowance is used.
+
+The Clerk development-key console warning is separate from this API's explicit
+origin-check error. Complete Clerk's production setup before the public launch;
+changing Clerk keys is not the fix for this 403.
+
+Reference: [Netlify function environment variables](https://docs.netlify.com/build/functions/environment-variables/).
 
 `DIRECT_URL` is not needed for the normal Netlify build; builds only generate
 Prisma. The existing eight migrations are already applied to our current database.

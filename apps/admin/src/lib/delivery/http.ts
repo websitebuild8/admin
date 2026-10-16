@@ -4,6 +4,7 @@ import { z } from "zod";
 import { createHash } from "node:crypto";
 import { database } from "../db";
 import { DeliveryError, type Actor } from "./domain";
+import { isAllowedDeliveryOrigin } from "./request-origin";
 export function json(value: unknown, status = 200) {
   return NextResponse.json(value, {
     status,
@@ -39,11 +40,12 @@ export function failure(error: unknown) {
   );
 }
 export function originCheck(request: Request) {
-  const origin = request.headers.get("origin");
   if (
-    !origin ||
-    origin !== new URL(request.url).origin ||
-    request.headers.get("sec-fetch-site") === "cross-site"
+    !isAllowedDeliveryOrigin(request, [
+      process.env.DELIVERY_PUBLIC_URL,
+      // Netlify supplies URL to the running function as its public site URL.
+      process.env.URL,
+    ])
   )
     throw new DeliveryError("Request origin is not allowed.", 403);
 }
