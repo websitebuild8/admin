@@ -13,6 +13,9 @@ const isPublic = createRouteMatcher([
   "/partner/sign-in(.*)",
   "/partner/activate(.*)",
   "/driver/join(.*)",
+  "/rider/join(.*)",
+  "/rider/sign-in(.*)",
+  "/rider/privacy",
   "/api/partner-applications",
   "/setup",
   "/legal(.*)",
@@ -24,7 +27,12 @@ const secured = clerkMiddleware(async (auth, request) => {
       return NextResponse.json({ error: "Please sign in." }, { status: 401 });
   } else if (!isPublic(request))
     await auth.protect({
-      unauthenticatedUrl: new URL("/delivery/sign-in", request.url).toString(),
+      unauthenticatedUrl: new URL(
+        request.nextUrl.pathname.startsWith("/rider")
+          ? "/rider/sign-in"
+          : "/delivery/sign-in",
+        request.url,
+      ).toString(),
     });
 });
 export default function proxy(request: NextRequest, event: NextFetchEvent) {
@@ -34,6 +42,7 @@ export default function proxy(request: NextRequest, event: NextFetchEvent) {
     request.nextUrl.pathname.startsWith("/join") ||
     request.nextUrl.pathname.startsWith("/partner") ||
     request.nextUrl.pathname.startsWith("/driver/join") ||
+    request.nextUrl.pathname.startsWith("/rider") ||
     request.nextUrl.pathname === "/api/partner-applications" ||
     request.nextUrl.pathname === "/";
   if (isDemoMode() && !phaseOne) return NextResponse.next();
@@ -46,9 +55,11 @@ export default function proxy(request: NextRequest, event: NextFetchEvent) {
   if (request.nextUrl.pathname.startsWith("/api/demo/mobile/"))
     return NextResponse.next();
   if (
-    ["/api/dispatch/tick", "/api/maintenance/menu-images"].includes(
-      request.nextUrl.pathname,
-    )
+    [
+      "/api/dispatch/tick",
+      "/api/maintenance/menu-images",
+      "/api/push/dispatch",
+    ].includes(request.nextUrl.pathname)
   )
     return NextResponse.next();
   if (!hasClerkKeys()) {

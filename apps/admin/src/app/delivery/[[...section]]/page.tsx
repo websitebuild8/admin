@@ -40,9 +40,12 @@ async function Workspace({
   const { section } = await params;
   if (actor.role === "PARTNER")
     redirect(`/partner${section?.length ? `/${section.join("/")}` : ""}`);
+  if (actor.role === "DRIVER" || actor.role === "APPLICANT")
+    redirect(
+      `/rider${section?.[0] === "cod" ? "/cash" : section?.length ? `/${section.join("/")}` : ""}`,
+    );
   if (actor.status !== "APPROVED") return <DeliveryApplication actor={actor} />;
-  const screen =
-    section?.[0] ?? (actor.role === "DRIVER" ? "collections" : "overview");
+  const screen = section?.[0] ?? "overview";
   const allowed =
     actor.role === "ADMIN"
       ? [

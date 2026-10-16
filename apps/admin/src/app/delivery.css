@@ -600,6 +600,7 @@
   font-size: 13px;
   font-weight: 600;
 }
+.d-nav-rider {display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
 .d-site-header a:focus-visible,
 .d-app a:focus-visible {
   outline: 3px solid #b9a900;
@@ -1936,9 +1937,12 @@ html:has(.d-site) {
   .d-site-header nav > a {
     white-space: nowrap;
   }
-  .d-site-header nav > a:nth-child(-n + 2) {
+  .d-site-header nav > a.d-nav-section {
     display: none;
   }
+  .d-site-header {flex-wrap:wrap;gap:10px}
+  .d-site-header nav {flex-wrap:wrap;justify-content:flex-end;gap:12px;font-size:11px}
+  .d-site-header .d-nav-sign-in {display:none}
   .d-site-header [data-slot="button"] {
     font-size: 11px;
     padding: 10px;

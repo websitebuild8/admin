@@ -1,21 +1,16 @@
 import 'server-only';
 import { z } from 'zod';
 import { MobileError } from './mobile-contract';
+import {storageProjectOrigin,storageServerKey} from './storage-configuration';
 
 export const menuImageBucket='igo-menu-images';
 function storageOrigin() {
-  let url:URL;
-  try {url=new URL(process.env.SUPABASE_URL??'');}catch {throw new MobileError('Food photo uploads are not connected yet.',503);}
-  if(url.protocol!=='https:' || !/^[a-z0-9-]+\.supabase\.co$/.test(url.hostname)
-      || url.username || url.password || url.search || url.hash || !['','/'].includes(url.pathname))
-    throw new MobileError('Food photo uploads are not connected yet.',503);
-  return url.origin;
+  try {return storageProjectOrigin(process.env);}catch {throw new MobileError('Food photo uploads are not connected yet.',503);}
 }
 export function storageSettings() {
   const origin=storageOrigin();
-  const key=process.env.SUPABASE_SECRET_KEY?.trim() || process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
-  if(!key || !(key.startsWith('sb_secret_') || key.startsWith('eyJ')))
-    throw new MobileError('Food photo uploads are not connected yet.',503);
+  let key:string;
+  try {key=storageServerKey(process.env);}catch {throw new MobileError('Food photo uploads are not connected yet.',503);}
   // New secret keys are not JWTs. Send them only as apikey; legacy service-role
   // JWTs also work with the Storage API's Authorization header.
   const headers:Record<string,string>={apikey:key};

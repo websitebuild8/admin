@@ -7,8 +7,10 @@ from daily delivery-fee invoices. Mobile/restaurant work is preserved for Phase 
 
 - [Phase 1 architecture and business rules](docs/phase-one-delivery.md)
 - [Phase 1 deployment, verified checks and launch gates](docs/phase-one-launch.md)
+- [Rider website, Google Maps and background alert setup](docs/rider-web-setup.md)
 
-The public website is `/`, the role-based portal is `/delivery`, and preserved
+The public website is `/`, admin uses `/delivery`, partners use `/partner`,
+and riders use `/rider` (apply at `/rider/join`). Preserved
 Phase 2 administration is `/legacy`. No deployment or legal approval is implied
 by the presence of this code. Business/legal/bank details remain launch inputs.
 

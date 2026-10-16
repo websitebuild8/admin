@@ -282,3 +282,49 @@ public-content scope, cleanup schedule and checks. Legal drafts now describe pub
 menu photos and image rights; the default draft policy version is draft-2026-10-08.
 Business placeholders and publication gates remain. No Git commit, push or public
 deployment was performed; the user will commit and push through VS Code.
+
+## Phase 1 rider website — 16 October 2026
+
+Implemented `/rider/join`, `/rider/sign-in` and a separate responsive `/rider`
+workspace using the existing Clerk identities and approved DeliveryAccount role.
+The home navigation links to rider registration. Admin approval, assignment,
+explicit physical pickup, COD-confirmed delivery, own delivery history, cash and
+notifications use the persistent delivery backend. Collections are grouped by
+partner within each page and all lists are capped at ten packages.
+
+The additive `20261016060000_rider_push` migration was applied to the configured
+Supabase database. All 20 delivery tables have RLS enabled; public API roles have
+no table privileges. Push subscriptions are bound to approved riders, and a
+durable transactional queue uses leased claims, bounded sends, backoff and
+expired-subscription cleanup. Lock-screen payloads omit customer information.
+
+All **82 unit tests** and **56 isolated database integration checks** passed.
+The latter create and remove a disposable schema and use test push senders, not
+real browser-provider endpoints. Checks cover approvals, cross-rider access,
+ten-item pagination, assignment replay, concurrent push claims, transient errors,
+expired subscriptions, abandoned leases, explicit pickup, COD confirmation,
+Clerk identity attribution, repeated delivery completion and suspended accounts.
+ESLint, TypeScript and the production build passed. The production dependency
+audit reported no vulnerabilities.
+
+Anonymous browser checks passed at 320, 390 and 1440 pixels: visible home rider
+link, navigation to Clerk registration, public rider privacy notice, rider
+workspace redirect to rider sign-in, API rejection, unsigned scheduler rejection,
+service-worker delivery and manifest availability. Registration was visually
+inspected at 390 pixels. These were public/anonymous checks; an authenticated
+rider browser session and real-device background notification display have not
+been verified.
+
+VAPID and a dedicated scheduler secret were generated into the ignored local
+environment without printing key values. Supabase pg_net was enabled. The
+scheduler's actual SQL, Vault access and matching database/server HMAC signatures
+were verified in a rolled-back transaction; no HTTP request was sent and no retry
+job was installed. The existing invoice schedule remains separate.
+
+The Google Maps Embed integration uses saved pickup/destination addresses and
+loads on demand. Keyless Google Maps directions links are implemented; boat
+deliveries use a place map. A restricted web Embed key, real-address map checks,
+production push environment variables, deployment and installation of the retry
+schedule remain external setup steps. There is no live GPS tracking. See
+`docs/rider-web-setup.md` for credentials, setup and device checks. No Git commit,
+push or public deployment was performed.

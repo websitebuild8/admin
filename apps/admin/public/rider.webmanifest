@@ -1,0 +1,11 @@
+{
+  "id": "/rider",
+  "name": "iGO Delivery Rider",
+  "short_name": "iGO Rider",
+  "start_url": "/rider/collections",
+  "scope": "/rider/",
+  "display": "standalone",
+  "background_color": "#f7f8f5",
+  "theme_color": "#f7f8f5",
+  "icons": [{"src":"/brand/igo-delivery.jpg","sizes":"1280x720","type":"image/jpeg","purpose":"any"}]
+}

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { deliveryActor } from "@/lib/delivery/auth";
@@ -24,6 +24,7 @@ import { database } from "@/lib/db";
 import { reviewPartnerApplication } from "@/lib/delivery/partner-applications";
 import { sendPartnerInvitation } from "@/lib/delivery/partner-invitations";
 import { partnerLogo } from "@/lib/delivery/partner-logos";
+import { dispatchRiderPush, savePushSubscription } from "@/lib/delivery/push";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 type Context = { params: Promise<{ resource: string }> };
@@ -86,6 +87,15 @@ export async function POST(request: Request, context: Context) {
       ["receipt", "import"].includes(resource) ? 10 : 60,
       ["receipt", "import"].includes(resource) ? 10 : 1,
     );
+    if (resource === "push-subscription") {
+      requireRole(actor, "DRIVER");
+      return json(
+        await savePushSubscription(
+          actor,
+          JSON.parse((await boundedBody(request, 6000)).toString("utf8")),
+        ),
+      );
+    }
     if (resource === "receipt") {
       const form = await formUpload(request, 5 * 1024 * 1024 + 16000),
         file = form.get("file");
@@ -162,7 +172,15 @@ export async function POST(request: Request, context: Context) {
     const command = commandInput.parse(
       JSON.parse((await boundedBody(request, 64000)).toString("utf8")),
     );
-    return json(await deliveryCommand(actor, key, command));
+    const result = await deliveryCommand(actor, key, command);
+    after(async () => {
+      try {
+        await dispatchRiderPush();
+      } catch {
+        console.error("Rider push dispatch deferred to retry queue.");
+      }
+    });
+    return json(result);
   } catch (error) {
     return failure(error);
   }

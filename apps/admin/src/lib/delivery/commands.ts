@@ -45,7 +45,23 @@ export async function notify(
   title: string,
   message: string,
 ) {
-  await tx.deliveryNotification.create({ data: { recipient, title, message } });
+  const notification = await tx.deliveryNotification.create({
+    data: { recipient, title, message },
+  });
+  const subscriptions = await tx.deliveryPushSubscription.findMany({
+    where: {
+      driver: { clerkUserId: recipient, role: "DRIVER", status: "APPROVED" },
+    },
+    select: { id: true },
+  });
+  if (subscriptions.length)
+    await tx.deliveryPushMessage.createMany({
+      data: subscriptions.map((subscription) => ({
+        notificationId: notification.id,
+        subscriptionId: subscription.id,
+      })),
+      skipDuplicates: true,
+    });
 }
 export async function notifyAdmins(tx: Tx, title: string, message: string) {
   for (const recipient of (process.env.ADMIN_CLERK_USER_IDS ?? "")

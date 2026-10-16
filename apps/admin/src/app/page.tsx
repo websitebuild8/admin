@@ -29,10 +29,25 @@ export default function Page() {
             />
           </Link>
           <nav aria-label="Main navigation">
-            <a href="#how-it-works">How it works</a>
-            <a href="#delivery-rates">Delivery rates</a>
-            <Link href="/partner/sign-in" aria-label="Partner sign in">
+            <a className="d-nav-section" href="#how-it-works">
+              How it works
+            </a>
+            <a className="d-nav-section" href="#delivery-rates">
+              Delivery rates
+            </a>
+            <Link
+              className="d-nav-sign-in"
+              href="/partner/sign-in"
+              aria-label="Partner sign in"
+            >
               Sign in
+            </Link>
+            <Link
+              className="d-nav-rider"
+              href="/rider/join"
+              transitionTypes={["igo-forward"]}
+            >
+              Become a rider <ArrowUpRight size={14} aria-hidden="true" />
             </Link>
             <Link href="/join" transitionTypes={["igo-forward"]}>
               <Button>

@@ -2,6 +2,7 @@ import "server-only";
 import sharp from "sharp";
 import { database } from "../db";
 import { storageSettings } from "../menu-image-storage";
+import { storageConfigurationStatus } from "../storage-configuration";
 import { DeliveryError, requireRole, type Actor } from "./domain";
 
 export const partnerLogoBucket = "igo-partner-logos";
@@ -9,6 +10,10 @@ export function partnerLogoStorage() {
   try {
     return storageSettings();
   } catch {
+    console.error(
+      "Partner logo storage configuration",
+      storageConfigurationStatus(process.env),
+    );
     throw new DeliveryError(
       "Business logo storage needs server configuration.",
       503,

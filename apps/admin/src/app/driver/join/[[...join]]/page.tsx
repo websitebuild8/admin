@@ -12,8 +12,8 @@ export default function Page() {
         <SignUp
           routing="path"
           path="/driver/join"
-          signInUrl="/delivery/sign-in"
-          forceRedirectUrl="/delivery"
+          signInUrl="/rider/sign-in"
+          forceRedirectUrl="/rider"
         />
       )}
       <Link href="/join">Business owners: apply as a partner</Link>

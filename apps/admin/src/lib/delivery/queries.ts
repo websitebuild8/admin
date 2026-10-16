@@ -2,8 +2,11 @@ import "server-only";
 import { z } from "zod";
 import { Prisma } from "@/generated/prisma/client";
 import { database } from "../db";
-import { DeliveryError, requireRole, type Actor } from "./domain";
+import { DeliveryError, requireRole, localDate, type Actor } from "./domain";
+import { riderScreens } from "./rider-contract";
+import { riderClientConfig } from "./push-settings";
 import { applicationSelection } from "./partner-applications";
+import { storageConfigurationStatus } from "../storage-configuration";
 
 export const parcelSelection = {
   id: true,
@@ -42,7 +45,11 @@ export async function deliveryQuery(
   actor: Actor,
   resource: string,
   search: URLSearchParams,
-) {
+): Promise<unknown> {
+  if (resource === "storage-status") {
+    requireRole(actor, "ADMIN");
+    return storageConfigurationStatus(process.env);
+  }
   const db = database();
   if (resource === "account")
     return {
@@ -55,6 +62,45 @@ export async function deliveryQuery(
         : null,
     };
   requireRole(actor, "ADMIN", "PARTNER", "DRIVER");
+  if (resource === "rider-summary") {
+    requireRole(actor, "DRIVER");
+    const where = { driverId: actor.id! };
+    const today = new Date(`${localDate(new Date())}T00:00:00+05:00`);
+    const [collections, onBoard, deliveredToday, cash] = await Promise.all([
+      db.deliveryParcel.count({ where: { ...where, state: "REGISTERED" } }),
+      db.deliveryParcel.count({ where: { ...where, state: "PICKED_UP" } }),
+      db.deliveryParcel.count({
+        where: { ...where, state: "DELIVERED", deliveredAt: { gte: today } },
+      }),
+      db.deliveryParcel.aggregate({
+        where: { ...where, state: "DELIVERED", handoverId: null },
+        _sum: { codAmount: true },
+      }),
+    ]);
+    return {
+      collections,
+      onBoard,
+      deliveredToday,
+      cashHeld: cash._sum.codAmount ?? 0,
+    };
+  }
+  if (resource === "rider-workspace") {
+    requireRole(actor, "DRIVER");
+    const screen = z
+      .enum(riderScreens)
+      .parse(search.get("screen") ?? "collections");
+    const workSearch = new URLSearchParams(search);
+    const workResource =
+      screen === "history" ? "deliveries" : screen === "cash" ? "cod" : screen;
+    if (screen === "history") workSearch.set("state", "DELIVERED");
+    if (screen === "deliveries") workSearch.set("state", "PICKED_UP");
+    const [summary, work, notices] = await Promise.all([
+      deliveryQuery(actor, "rider-summary", new URLSearchParams()),
+      deliveryQuery(actor, workResource, workSearch),
+      deliveryQuery(actor, "notifications", new URLSearchParams("page=1")),
+    ]);
+    return { summary, work, notices, config: riderClientConfig() };
+  }
   if (resource === "scheduler") {
     requireRole(actor, "ADMIN");
     const [extension] = await db.$queryRaw<
@@ -212,7 +258,12 @@ export async function deliveryQuery(
       ...(resource === "collections"
         ? { state: "REGISTERED" }
         : resource === "deliveries"
-          ? { state: { in: ["PICKED_UP", "DELIVERED"] } }
+          ? {
+              state:
+                filter === "PICKED_UP" || filter === "DELIVERED"
+                  ? filter
+                  : { in: ["PICKED_UP", "DELIVERED"] },
+            }
           : resource === "cod"
             ? { state: "DELIVERED", codAmount: { gt: 0 } }
             : filter &&

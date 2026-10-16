@@ -100,6 +100,26 @@ before reserving an application or consuming database-backed submission limits.
 
 Netlify reference: [Environment variables and functions](https://docs.netlify.com/build/functions/environment-variables/).
 
+If both variables are listed but the error continues, check the **running
+function's configuration**, not just the dashboard's list of names. After
+deploying the diagnostics change, sign in with an approved admin account and open
+`/api/delivery/storage-status` on that same website. The private, uncached report
+identifies missing settings, surrounding quotes, dashboard/database URLs used in
+place of the project API origin, and publishable/incorrectly formatted server
+keys. It never returns the URL, keys, partial values or credential hashes.
+Partners, drivers and applicants are denied access. The check does not read or
+write the database or contact Supabase; `valid-format` does not verify bucket
+permissions, credentials or upload connectivity.
+
+The same sanitized report is written to server-side function logs under
+`Partner logo storage configuration` when a logo upload fails configuration
+preflight. Share only this report if assistance is needed. Netlify's **Contains
+secret values** checkbox can remain checked; a scope summary that already
+includes **Functions** does not require upgrading or unchecking the secret flag.
+Re-enter the verified local value in the relevant Production context if the
+report identifies a bad value, then deploy again. Do not disable private Storage
+or put a server key in browser variables to work around this error.
+
 The anonymous form uses same-origin validation, a bounded multipart body,
 server-side validation, a honeypot and shared database-backed submission limits.
 The initial limits are 20 requests/hour per trusted hosting IP and 100/day in

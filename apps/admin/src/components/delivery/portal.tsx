@@ -449,7 +449,7 @@ const navItems = [
     icon: ClipboardList,
     roles: ["ADMIN"],
   },
-  { key: "drivers", label: "Drivers", icon: Bike, roles: ["ADMIN"] },
+  { key: "drivers", label: "Riders", icon: Bike, roles: ["ADMIN"] },
   {
     key: "invoices",
     label: "Invoices",
@@ -1317,7 +1317,7 @@ export function DeliveryPortal({
                     disabled={chosen.some((p) => p.state !== "REGISTERED")}
                     onClick={() => open({ kind: "assign" })}
                   >
-                    Assign driver
+                    Assign rider
                   </Button>
                 )}
               </div>
@@ -1339,7 +1339,7 @@ export function DeliveryPortal({
           {d.items.length ? (
             <GridTable
               headings={[
-                screen === "partners" ? "Business / contact" : "Driver",
+                screen === "partners" ? "Business / contact" : "Rider",
                 "Phone",
                 "Status",
                 "Registered (MVT)",
