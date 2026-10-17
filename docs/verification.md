@@ -1,5 +1,27 @@
 # Admin verification
 
+## Deployed dashboard database repair — 17 October 2026
+
+The updated Netlify dashboard displayed a generic data-loading error while both
+17 October migrations were still pending. Applied
+`20261017000000_origin_pricing_retire_cod` and
+`20261017010000_admin_access_optional_partner_assets` successfully with Prisma
+migrate deploy against the configured Supabase database.
+
+Read-only checks of the actual server query functions now pass for overview,
+notifications, packages, partners, applications, drivers, administrators, rates,
+destinations, invoices and payments. Page lists remain capped at ten. New tables
+have RLS enabled and deny public client roles direct access.
+
+Before/after record fingerprints confirm existing packages, invoices, invoice
+lines, receipts, payments, allocations, paid copies, sends and historical cash
+records are unchanged. Retired parcel cash details match the private archive.
+No operational invoice, payment, delivery, user or notification was created by
+these checks, and the invoice scheduler was not manually invoked. No signed-in
+hosted browser session was available; the user should refresh the page or select
+Retry. No source-code redeployment is required for this database alignment.
+No Git commit, push or hosted deployment was performed by the repair.
+
 ## Super admin, shared accounts and optional application assets — 17 October 2026
 
 95 unit tests and the complete 83-check database integration suite pass. The

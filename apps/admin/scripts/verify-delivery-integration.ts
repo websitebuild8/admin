@@ -22,6 +22,7 @@ import {
 } from "./verify-admin-access";
 import { verifyOriginPricing } from "./verify-origin-pricing";
 import { verifyPaidInvoices } from "./verify-paid-invoices";
+import { verifyEarnings } from "./verify-earnings";
 import { verifyPaidInvoiceMigration } from "./verify-paid-invoice-migration";
 import {
   nextCutoff,
@@ -176,6 +177,11 @@ async function main() {
         description: "Not a real delivery",
       },
     });
+    if (process.argv.includes("--earnings")) {
+      await verifyEarnings(db, admin, partner, driver, ok);
+      console.log(`Verified ${checks} earnings checks in a disposable schema.`);
+      return;
+    }
     if (process.argv.includes("--admin-access")) {
       await verifyAdminAccess(db, admin, partner, driver, ok);
       await verifyOptionalPartnerAssets(db, admin, ok);
@@ -566,6 +572,7 @@ async function main() {
     await verifyRiderWorkflows(db, admin, partner, ok);
     await verifyPartnerInvoices(db, admin, other, driver, ok);
     await verifyPaidInvoices(db, admin, other, driver, ok);
+    await verifyEarnings(db, admin, partner, driver, ok);
     await verifyOriginPricing(db, admin, driver, otherDriver, ok);
     await verifyAdminAccess(db, admin, partner, driver, ok);
     await verifyOptionalPartnerAssets(db, admin, ok);

@@ -70,12 +70,18 @@ load the new six-column template and no longer submit retired fields.
 ## Release steps
 
 Both `20261017000000_origin_pricing_retire_cod` and
-`20261017010000_admin_access_optional_partner_assets` are deliberately
-**pending on the live database**. The published
-version still reads the removed columns. The second migration adds independent
-admin grants, workspace-scoped notifications and optional application assets.
-The repository's Netlify build only
-builds the app; it does not run database migrations automatically.
+`20261017010000_admin_access_optional_partner_assets` were **applied to the live
+database on 17 October 2026**, after the new website was published and its
+dashboard encountered the old schema. Live database reads now pass for overview,
+notifications, packages, partners, applications, riders, administrators, rates,
+destinations, invoices and payments. Record fingerprints confirm existing packages
+and financial history were preserved, including retired cash details in their
+private archive. No business invoice or payment was created by verification.
+
+The second migration adds independent admin grants, workspace-scoped notifications
+and optional application assets. The repository's Netlify build only builds the
+app; it does not run database migrations automatically. The coordinated release
+procedure below is retained for deployments to another database or future changes:
 
 1. Commit and push all changes together using VS Code, as requested. Prepare the
    new Netlify deploy and confirm its build succeeds before switching traffic.
@@ -96,8 +102,10 @@ builds the app; it does not run database migrations automatically.
 5. Refresh open tabs and download the new six-column Excel template. Check the
    invoice scheduler health. Its existing delivered-only billing is retained.
 
-No live database update, commit, push or public deployment was performed during
-this implementation. Historical financial records were not edited by QA.
+The initial implementation left the migrations pending; the subsequent dashboard
+repair applied them to the configured live database. The user published the
+website separately. No commit, push or hosted deployment was performed by the
+repair, and historical financial records were not edited by QA.
 
 ## Verification
 

@@ -1,4 +1,5 @@
 import "server-only";
+import { deliveryEarnings } from "./earnings";
 import { administrators } from "./admin-access";
 import { z } from "zod";
 import { Prisma } from "@/generated/prisma/client";
@@ -48,6 +49,7 @@ export async function deliveryQuery(
   resource: string,
   search: URLSearchParams,
 ): Promise<unknown> {
+  if (resource === "earnings") return deliveryEarnings(actor, search);
   if (resource === "storage-status") {
     requireRole(actor, "ADMIN");
     return storageConfigurationStatus(process.env);

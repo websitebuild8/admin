@@ -2441,3 +2441,80 @@ html:has(.d-site) {
     gap: 12px;
   }
 }
+
+.d-stats-income > article.d-stat.d-earnings-stat {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 0 20px;
+  background: #ffffffdc;
+}
+.d-stats-income > .d-stat.d-earnings-stat > .d-earnings-heading {
+  grid-column: 1;
+  grid-row: 1;
+}
+.d-stats-income > .d-stat.d-earnings-stat > .d-earnings-controls {
+  grid-column: 2;
+  grid-row: 1 / 3;
+  align-self: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.d-earnings-controls [data-slot="select-trigger"],
+.d-earnings-controls input {
+  background: #ffffffb8;
+  border-color: #e1e3d4;
+  border-radius: 10px;
+  color: #292d20;
+  font-size: 11px;
+  min-height: 36px;
+}
+.d-earnings-controls input {
+  width: 160px;
+  max-width: 100%;
+}
+.d-stats-income > .d-stat.d-earnings-stat > .d-earnings-amount {
+  grid-column: 1;
+  grid-row: 2;
+  display: block;
+}
+.d-stats-income > .d-stat.d-earnings-stat .d-earnings-amount strong {
+  font-size: 36px;
+  letter-spacing: -1.3px;
+  margin-top: 12px;
+  text-align: left;
+}
+.d-earnings-caption {
+  grid-column: 2;
+  grid-row: 3;
+  text-align: right;
+  color: #626c54;
+  font-size: 11px;
+  margin: 8px 0 0;
+  line-height: 1.5;
+}
+.d-stats-income > .d-stat.d-earnings-stat > .d-earnings-error {
+  grid-column: 1;
+  grid-row: 2;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  color: #a02f24;
+  margin-top: 14px;
+}
+@media (max-width: 600px) {
+  .d-stats-income > article.d-stat.d-earnings-stat {
+    display: block;
+  }
+  .d-stats-income > .d-stat.d-earnings-stat > .d-earnings-controls {
+    justify-content: flex-start;
+    margin-top: 14px;
+  }
+  .d-earnings-caption {
+    text-align: left;
+  }
+  .d-stats-income > .d-stat.d-earnings-stat .d-earnings-amount strong {
+    font-size: 32px;
+  }
+}

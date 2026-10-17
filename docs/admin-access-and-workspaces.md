@@ -54,11 +54,13 @@ readiness, so a valid application without an image can be approved and activated
 
 ## Release
 
-Migration `20261017010000_admin_access_optional_partner_assets` is pending on the
-live database, alongside `20261017000000_origin_pricing_retire_cod`. Follow the
-coordinated [release steps](origin-pricing-and-rider-jobs.md#release-steps) for both
-before serving this code. A local build or disposable-schema test does not apply
-live migrations or publish the website.
+Migration `20261017010000_admin_access_optional_partner_assets` and
+`20261017000000_origin_pricing_retire_cod` were applied to the configured live
+database on 17 October 2026. Live administrator-list and dashboard reads pass.
+For another environment, follow the coordinated
+[release steps](origin-pricing-and-rider-jobs.md#release-steps) before serving this
+code. A local build or disposable-schema test does not apply live migrations or
+publish the website.
 
 Before launch, exercise the actual hosted Clerk flow with a partner/admin and
 rider/admin account, verify both workspace options, remove each grant, and verify

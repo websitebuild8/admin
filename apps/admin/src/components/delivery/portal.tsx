@@ -1,6 +1,7 @@
 "use client";
 import { WorkspaceSwitcher } from "./workspace-switcher";
 import { AdminAccessPanel } from "./admin-access-panel";
+import { EarningsCard } from "./earnings-card";
 import { deliveryFetch } from "@/lib/delivery/fetch";
 import {
   useEffect,
@@ -995,14 +996,7 @@ export function DeliveryPortal({
           <div
             className={`d-stats${actor.role === "ADMIN" ? " d-stats-income" : ""}`}
           >
-            {actor.role === "ADMIN" && (
-              <Stat
-                label="Total earned by iGO"
-                value={money(d.confirmedPayments)}
-                note="Verified delivery-fee payments · all time"
-                icon={<Wallet />}
-              />
-            )}
+            {actor.role === "ADMIN" && <EarningsCard revision={revision} />}
             <Stat
               label="Invoiced balance due"
               value={money(d.outstanding)}
@@ -1040,7 +1034,7 @@ export function DeliveryPortal({
                   </h2>
                   <p>
                     {screen === "reports"
-                      ? "All-time recorded totals. Export contains these totals."
+                      ? "Operational totals and exports cover all time. The earnings card has its own period filter."
                       : "Your most recently registered packages"}
                   </p>
                 </div>
