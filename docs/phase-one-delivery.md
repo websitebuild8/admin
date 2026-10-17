@@ -37,7 +37,10 @@ moves to `/legacy`; its mobile APIs remain at their existing URLs.
 
 ## Data model
 
-- DeliveryAccount: unique Clerk identity, approved role and application review.
+- DeliveryAccount: one profile per Clerk identity and operational role, with a
+  retained primary profile. Only active admins automatically receive both
+  Partner and Rider profiles; ordinary identities have one active role.
+  See [automatic admin workspaces](admin-workspaces.md).
 - DeliveryPartner: page URL, contact/pickup, cutoff and durable next billing time.
 - DeliveryParcel: UUID plus unique public ID, partner-scoped external reference,
   recipient, route, frozen origin, destination label and delivery fee, assigned driver and milestones.

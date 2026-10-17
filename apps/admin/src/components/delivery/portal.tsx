@@ -3,6 +3,7 @@ import { WorkspaceSwitcher } from "./workspace-switcher";
 import { AdminAccessPanel } from "./admin-access-panel";
 import { EarningsCard } from "./earnings-card";
 import { DeleteDataButton, DeletionFileCleanup } from "./delete-data-button";
+import { WorkspaceProfiles } from "./workspace-profiles";
 import { deliveryFetch } from "@/lib/delivery/fetch";
 import {
   useEffect,
@@ -470,6 +471,12 @@ const navItems = [
   },
   { key: "drivers", label: "Riders", icon: Bike, roles: ["ADMIN"] },
   {
+    key: "my-workspaces",
+    label: "Workspace details",
+    icon: Settings2,
+    roles: ["ADMIN"],
+  },
+  {
     key: "administrators",
     label: "Administrators",
     icon: ShieldCheck,
@@ -503,6 +510,8 @@ const navItems = [
   },
 ];
 const descriptions: Record<string, string> = {
+  "my-workspaces":
+    "One sign-in for Admin, Partner and Rider. No additional registration.",
   overview: "A clear view of your deliveries and what comes next.",
   packages: "Every package, from registration to doorstep.",
   collections:
@@ -706,7 +715,9 @@ export function DeliveryPortal({
   const retry = useRef<{ body: string; key: string } | null>(null);
   const workspaceBase = actor.role === "PARTNER" ? "/partner" : "/delivery";
   const resource =
-    screen === "import" || screen === "administrators"
+    screen === "import" ||
+    screen === "administrators" ||
+    screen === "my-workspaces"
       ? "account"
       : screen === "settings"
         ? "settings"
@@ -1007,6 +1018,7 @@ export function DeliveryPortal({
     );
   }
   function mainContent() {
+    if (screen === "my-workspaces") return <WorkspaceProfiles />;
     if (request.error)
       return (
         <div className="d-error" role="alert">
@@ -2604,6 +2616,21 @@ function SettingsPanel({
 }) {
   return (
     <div className="d-settings">
+      {actor.role === "PARTNER" && actor.workspaces?.includes("ADMIN") && (
+        <section className="d-card d-card-pad">
+          <h2>Your business details</h2>
+          <p>
+            Update your pickup address, contact number and operating location in
+            Workspace details.
+          </p>
+          <Button
+            variant="outline"
+            render={<Link href="/delivery/my-workspaces" />}
+          >
+            Open workspace details <ArrowUpRight size={14} />
+          </Button>
+        </section>
+      )}
       {actor.role === "ADMIN" && <ScheduleHealth revision={revision} />}
       {actor.role === "ADMIN" && actor.superAdmin && (
         <DeletionFileCleanup revision={revision} />

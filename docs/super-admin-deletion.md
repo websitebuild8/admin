@@ -23,6 +23,9 @@ to them. A rider with such retained cash history cannot be deleted until those
 test packages are deleted; suspension remains available. Rates, destinations,
 business settings, independent admin grants and Clerk identities are preserved.
 Deleting a delivery role does not delete a shared sign-in or its admin access.
+Active admins automatically receive both operational roles. Deleting one of
+their profiles recreates an empty role on their next sign-in; deleted package
+and financial data do not return. The confirmation shows this exception.
 
 The operation is permanent. Existing activity logs plus an immutable deletion
 audit remain: actor, time, reason, IDs, counts and aggregate financial effect.

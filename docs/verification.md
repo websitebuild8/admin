@@ -1,5 +1,39 @@
 # Admin verification
 
+## Automatic admin, partner and rider workspaces — 18 October 2026
+
+107 unit tests and the complete 103-check database integration suite pass. The
+suite uses an isolated disposable schema and removes it afterward. Eight new
+checks cover concurrent root initialization, immediate provisioning on staff
+grants, ordinary-user denial (including direct SQL and forged flags), own-profile
+configuration, tenant/inbox isolation, physical rider operations, role retention
+on admin revocation, stale cached commands, assignment release, regrant and
+unchanged existing account IDs. The earlier delivery, invoice, verified-payment,
+earnings, pricing and permanent-deletion checks also pass. Partner activation's
+protected transaction now allows enough time for remote database round trips;
+the full rerun confirms ordinary partner activation still works.
+
+Applied `20261018010000_admin_multiple_operational_roles` to the configured
+Supabase database. Before/after fingerprints match for all 30 existing delivery
+tables, excluding only the new primary-role metadata and intentional workspace
+classification of existing notifications. Indexes, role guards and private
+client permissions were verified. The migration did not create operational
+profiles, change Clerk users, send emails, or delete live data. Existing admins
+receive missing profiles on their first request to the updated site; new grants
+provision them in the same transaction.
+
+Actual role-switcher and workspace-details components were checked with
+fictional responses at 390px: Admin, Partner and Rider switch without signup,
+and the phone layout has no horizontal overflow. This fixture replaces Next
+navigation and authentication; it does not establish hosted Clerk session
+verification. The identity-directory transport in the database suite is also a
+test double. No live admin grant or role profile was created during QA.
+
+Source changes require the user's manual commit/push and Netlify deployment.
+The final single-worker production build (including TypeScript), ESLint for
+changed source files, and whitespace checks pass.
+See [automatic admin workspaces](admin-workspaces.md) for release and operation.
+
 ## Super-admin permanent deletion and cache cleanup — 18 October 2026
 
 103 unit tests pass. The focused eight-check deletion integration suite passes

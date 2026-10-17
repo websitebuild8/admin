@@ -2580,3 +2580,47 @@ html:has(.d-site) {
 .d-delete-warnings li + li {
   margin-top: 8px;
 }
+.d-own-workspaces {
+  display: grid;
+  gap: 20px;
+}
+.d-own-workspaces h2 {
+  font-weight: 700;
+  font-size: 18px;
+}
+.d-own-workspaces p {
+  color: #636b5c;
+  line-height: 1.7;
+  margin-top: 8px;
+}
+.d-own-workspace-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+.d-own-workspace-grid > section {
+  min-width: 0;
+}
+.d-own-workspace-grid h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.d-own-workspace-grid .d-field input {
+  min-width: 0;
+}
+.d-own-workspace-grid .d-card-header {
+  gap: 12px;
+  align-items: flex-start;
+}
+.d-own-workspaces .d-workspace-setup-note {
+  color: #64610a;
+  background: #fffce1;
+  padding: 14px;
+  border-radius: 12px;
+}
+@media (max-width: 1050px) {
+  .d-own-workspace-grid {
+    grid-template-columns: 1fr;
+  }
+}

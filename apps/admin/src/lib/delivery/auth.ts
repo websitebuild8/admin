@@ -7,6 +7,7 @@ import { hasClerkKeys } from "../mode";
 import { DeliveryError, type Actor } from "./domain";
 import { activateApprovedPartner } from "./partner-applications";
 import { verifiedPrimaryEmail } from "./partner-application-input";
+import { ensureAdminWorkspaces } from "./admin-workspaces";
 
 export async function deliveryActor(
   workspace?: DeliveryWorkspace,
@@ -22,29 +23,24 @@ export async function deliveryActor(
         where: { clerkUserId: userId },
         select: { active: true, name: true },
       });
-  let account = await database().deliveryAccount.findUnique({
-    where: { clerkUserId: userId },
-    include: {
-      partner: { include: { application: { select: { logoReady: true } } } },
-    },
-  });
-  if (
-    !account &&
-    ((!isSuperAdmin(userId) && !grant?.active) ||
-      workspace === "PARTNER" ||
-      workspace === "DRIVER")
-  ) {
+  const selection = {
+    partner: { include: { application: { select: { logoReady: true } } } },
+  } as const;
+  const load = () =>
+    database().deliveryAccount.findMany({
+      where: { clerkUserId: userId },
+      include: selection,
+      orderBy: [{ primary: "desc" }, { createdAt: "asc" }, { id: "asc" }],
+    });
+  let accounts = await load();
+  if (isSuperAdmin(userId) || grant?.active) {
+    const admin = actorForIdentity({ userId, accounts, grant }, "ADMIN");
+    if (await ensureAdminWorkspaces(admin, accounts)) accounts = await load();
+  } else if (!accounts.length) {
     const user = await (await clerkClient()).users.getUser(userId);
     const email = verifiedPrimaryEmail(user);
     if (email && (await activateApprovedPartner(userId, email)))
-      account = await database().deliveryAccount.findUnique({
-        where: { clerkUserId: userId },
-        include: {
-          partner: {
-            include: { application: { select: { logoReady: true } } },
-          },
-        },
-      });
+      accounts = await load();
   }
-  return actorForIdentity({ userId, account, grant }, workspace, strict);
+  return actorForIdentity({ userId, accounts, grant }, workspace, strict);
 }

@@ -7,6 +7,8 @@ import { adminLock } from "./admin-authorization";
 import { isSuperAdmin, requireSuperAdmin, superAdminIds } from "./admin-policy";
 import { verifiedPrimaryEmail } from "./partner-application-input";
 import { DeliveryError, type Actor } from "./domain";
+import { provisionAdminWorkspaces } from "./admin-workspaces";
+import { permitRoleIdentity, roleAccounts } from "./role-authorization";
 const reason = z.string().trim().min(3).max(500);
 export const adminAccessInput = z.discriminatedUnion("action", [
   z.strictObject({
@@ -14,7 +16,12 @@ export const adminAccessInput = z.discriminatedUnion("action", [
     email: z.string().trim().toLowerCase().max(254).pipe(z.email()),
     reason,
   }),
-  z.strictObject({ action: z.literal("REVOKE"), grantId: z.uuid(), reason }),
+  z.strictObject({
+    action: z.literal("REVOKE"),
+    grantId: z.uuid(),
+    reason,
+    retainRole: z.enum(["PARTNER", "DRIVER"]).optional(),
+  }),
 ]);
 type Input = z.output<typeof adminAccessInput>;
 export type AdminIdentity = { userId: string; email: string; name: string };
@@ -71,8 +78,13 @@ export async function manageAdministrator(
       const previous = await tx.deliveryAdminGrant.findUnique({
         where: { clerkUserId: target.userId },
       });
-      if (previous?.active)
+      if (previous?.active) {
+        await provisionAdminWorkspaces(tx, actor, {
+          userId: target.userId,
+          name: target.name,
+        });
         return { message: "This account already has administrator access." };
+      }
       const grant = await tx.deliveryAdminGrant.upsert({
         where: { clerkUserId: target.userId },
         create: {
@@ -91,6 +103,10 @@ export async function manageAdministrator(
           revokedAt: null,
         },
       });
+      await provisionAdminWorkspaces(tx, actor, {
+        userId: target.userId,
+        name: target.name,
+      });
       await audit(tx, actor, "ADMIN_ACCESS_GRANTED", grant.id, {
         targetUserId: target.userId,
         email: target.email,
@@ -101,11 +117,12 @@ export async function manageAdministrator(
         tx,
         target.userId,
         "Administrator access granted",
-        "The super admin granted administrator access. Use Switch workspace to open Admin. Your existing partner or rider access is unchanged.",
+        "The super admin granted administrator access. Admin, Partner and Rider workspaces are now available in Switch workspace without another registration.",
+        "ADMIN",
       );
       return {
         message:
-          "Administrator access granted. Existing partner or rider access is unchanged.",
+          "Administrator access granted with Partner and Rider workspaces included automatically.",
       };
     }
     const grant = await tx.deliveryAdminGrant.findUnique({
@@ -120,6 +137,57 @@ export async function manageAdministrator(
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${adminLock(grant.clerkUserId)},0))`;
     if (!grant.active)
       return { message: "Administrator access was already removed." };
+    const profiles = await roleAccounts(tx, grant.clerkUserId);
+    const rider = profiles.find((profile) => profile.role === "DRIVER");
+    const hasPickup =
+      !!rider &&
+      !!(await tx.deliveryParcel.count({
+        where: { driverId: rider.id, state: "PICKED_UP" },
+      }));
+    const retainedRole =
+      input.retainRole ?? (hasPickup ? "DRIVER" : profiles[0]?.role);
+    if (hasPickup && retainedRole !== "DRIVER")
+      throw new DeliveryError(
+        "This person has picked-up packages. Retain the Rider workspace until those deliveries are completed.",
+        409,
+      );
+    const retained = profiles.find((profile) => profile.role === retainedRole);
+    if (input.retainRole && !retained)
+      throw new DeliveryError(
+        "Choose one of this person's existing operational workspaces.",
+        409,
+      );
+    const unassigned =
+      rider && retainedRole !== "DRIVER"
+        ? await tx.deliveryParcel.updateMany({
+            where: { driverId: rider.id, state: "REGISTERED" },
+            data: { driverId: null },
+          })
+        : { count: 0 };
+    await permitRoleIdentity(tx, grant.clerkUserId);
+    // The root explicitly decides which single operational role remains.
+    await tx.deliveryAccount.updateMany({
+      where: { clerkUserId: grant.clerkUserId },
+      data: { primary: false },
+    });
+    if (retained)
+      await tx.deliveryAccount.update({
+        where: { id: retained.id },
+        data: { primary: true },
+      });
+    await tx.deliveryAccount.updateMany({
+      where: {
+        clerkUserId: grant.clerkUserId,
+        ...(retained ? { id: { not: retained.id } } : {}),
+      },
+      data: {
+        status: "SUSPENDED",
+        reviewedBy: actor.userId,
+        reviewedAt: new Date(),
+        reviewNote:
+          "Additional workspace disabled when administrator access was removed.",
+      },
+    });
     await tx.deliveryAdminGrant.update({
       where: { id: grant.id },
       data: { active: false, revokedBy: actor.userId, revokedAt: new Date() },
@@ -128,16 +196,17 @@ export async function manageAdministrator(
       targetUserId: grant.clerkUserId,
       email: grant.email,
       reason: input.reason,
+      retainedRole: retainedRole ?? null,
+      unassignedPackages: unassigned.count,
     });
     await notify(
       tx,
       grant.clerkUserId,
       "Administrator access removed",
-      "Your administrator access has been removed. Your approved partner or rider workspace remains available.",
+      `Your administrator access has been removed. ${retainedRole === "DRIVER" ? "Rider" : retainedRole === "PARTNER" ? "Partner" : "No operational"} access remains; additional workspace access has been disabled.`,
     );
     return {
-      message:
-        "Administrator access removed. Partner and rider records remain unchanged.",
+      message: `Administrator access removed. ${retainedRole === "DRIVER" ? "Rider" : retainedRole === "PARTNER" ? "Partner" : "No operational"} access retained; additional workspace suspended. History is preserved.`,
     };
   });
 }
@@ -154,7 +223,8 @@ export async function administrators(actor: Actor, page: number) {
   ]);
   const accounts = await db.deliveryAccount.findMany({
     where: { clerkUserId: { in: items.map((item) => item.clerkUserId) } },
-    select: { clerkUserId: true, role: true, status: true },
+    select: { clerkUserId: true, role: true, status: true, primary: true },
+    orderBy: [{ primary: "desc" }, { createdAt: "asc" }, { id: "asc" }],
   });
   return {
     items: items.map((item) => ({
@@ -163,6 +233,9 @@ export async function administrators(actor: Actor, page: number) {
       account:
         accounts.find((account) => account.clerkUserId === item.clerkUserId) ??
         null,
+      accounts: accounts.filter(
+        (account) => account.clerkUserId === item.clerkUserId,
+      ),
     })),
     total,
     page,

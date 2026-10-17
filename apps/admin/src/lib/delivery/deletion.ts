@@ -3,6 +3,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { Prisma } from "@/generated/prisma/client";
 import { database } from "../db";
 import { requireSuperAdmin } from "./admin-policy";
+import { multiRoleAllowed } from "./role-authorization";
 import { audit, serialized, type Tx } from "./commands";
 import { DeliveryError, type Actor } from "./domain";
 import type {
@@ -74,6 +75,14 @@ async function deletionGraph(tx: Tx, target: Target) {
       );
     graph.DeliveryAccount = [account];
     label = String(account.name);
+    const automaticRoles = await multiRoleAllowed(
+      tx,
+      String(account.clerkUserId),
+    );
+    if (automaticRoles)
+      warnings.push(
+        "Administrator access automatically includes Partner and Rider. While admin access remains, this deleted workspace will be recreated empty on the next sign-in. Deleted packages and financial records will not return.",
+      );
     if (target.kind === "PARTNER") {
       graph.DeliveryPartner = await read(
         tx,
@@ -102,9 +111,10 @@ async function deletionGraph(tx: Tx, target: Target) {
             409,
           );
       }
-      warnings.push(
-        "The business account and its application are removed, so signing in cannot reactivate the deleted partner automatically.",
-      );
+      if (!automaticRoles)
+        warnings.push(
+          "The business account and its application are removed, so signing in cannot reactivate the deleted partner automatically.",
+        );
     } else {
       graph.DeliveryParcelUnassign = await read(
         tx,

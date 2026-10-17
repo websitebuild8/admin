@@ -24,6 +24,7 @@ import { verifyOriginPricing } from "./verify-origin-pricing";
 import { verifyPaidInvoices } from "./verify-paid-invoices";
 import { verifyEarnings } from "./verify-earnings";
 import { verifyDeletion } from "./verify-deletion";
+import { verifyAdminWorkspaces } from "./verify-admin-workspaces";
 import { verifyPaidInvoiceMigration } from "./verify-paid-invoice-migration";
 import {
   nextCutoff,
@@ -73,6 +74,7 @@ async function main() {
       "20261017000000_origin_pricing_retire_cod",
       "20261017010000_admin_access_optional_partner_assets",
       "20261018000000_super_admin_deletion",
+      "20261018010000_admin_multiple_operational_roles",
     ]) {
       if (
         folder === "20261016090000_paid_invoice_history" &&
@@ -179,6 +181,13 @@ async function main() {
         description: "Not a real delivery",
       },
     });
+    if (process.argv.includes("--admin-workspaces")) {
+      await verifyAdminWorkspaces(db, admin, partner, driver, ok);
+      console.log(
+        `Verified ${checks} automatic admin workspace checks in a disposable schema.`,
+      );
+      return;
+    }
     if (process.argv.includes("--deletion")) {
       await verifyDeletion(db, admin, partner, ok);
       console.log(`Verified ${checks} deletion checks in a disposable schema.`);
@@ -584,6 +593,7 @@ async function main() {
     await verifyAdminAccess(db, admin, partner, driver, ok);
     await verifyOptionalPartnerAssets(db, admin, ok);
     await verifyDeletion(db, admin, partner, ok);
+    await verifyAdminWorkspaces(db, admin, partner, driver, ok);
     console.log(
       `Verified ${checks} database integration checks in an isolated disposable schema.`,
     );

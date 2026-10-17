@@ -93,9 +93,9 @@ test("revocation keeps approved workspaces and admin grants do not approve pendi
   );
   assert.equal(pending.status, "PENDING");
   assert.deepEqual(pending.workspaces, ["ADMIN"]);
-  const newcomer = actorForIdentity({ ...identity, account: null }, "DRIVER");
-  assert.equal(newcomer.role, "APPLICANT");
-  assert.equal(newcomer.status, "UNREGISTERED");
+  const newcomer = actorForIdentity({ ...identity, account: null });
+  assert.equal(newcomer.role, "ADMIN");
+  assert.equal(newcomer.status, "APPROVED");
   assert.deepEqual(newcomer.workspaces, ["ADMIN"]);
 });
 test("workspace selection is request-scoped, with no cross-origin referrer trust", () => {
@@ -131,5 +131,58 @@ test("workspace selection is request-scoped, with no cross-origin referrer trust
         headers: { "x-igo-workspace": "SUPER_ADMIN" },
       }),
     ),
+  );
+});
+test("current admins can select all three profiles and non-admins only their primary profile", () => {
+  const profiles = [
+    { ...account, primary: true },
+    {
+      ...account,
+      id: "rider",
+      role: "DRIVER" as const,
+      partner: null,
+      primary: false,
+    },
+  ];
+  const adminIdentity = {
+    userId: "user_staff",
+    accounts: profiles,
+    grant: { active: true, name: "Staff" },
+  };
+  assert.deepEqual(actorForIdentity(adminIdentity).workspaces, [
+    "ADMIN",
+    "PARTNER",
+    "DRIVER",
+  ]);
+  const rider = actorForIdentity(adminIdentity, "DRIVER");
+  assert.equal(rider.id, "rider");
+  assert.equal(rider.partnerId, null);
+  assert.equal(actorForIdentity(adminIdentity, "PARTNER").partnerId, "partner");
+  const revoked = {
+    ...adminIdentity,
+    grant: { ...adminIdentity.grant, active: false },
+  };
+  assert.deepEqual(actorForIdentity(revoked).workspaces, ["PARTNER"]);
+  assert.throws(() => actorForIdentity(revoked, "ADMIN"));
+  assert.throws(() => actorForIdentity(revoked, "DRIVER"));
+  assert.equal(actorForIdentity(revoked, "DRIVER", false).role, "PARTNER");
+});
+test("retained rider access cannot be used to open a historical secondary partner profile", () => {
+  const profiles = [
+    { ...account, primary: false },
+    {
+      ...account,
+      id: "retained_rider",
+      role: "DRIVER" as const,
+      partner: null,
+      primary: true,
+    },
+  ];
+  const ordinary = { userId: "user_ordinary", accounts: profiles, grant: null };
+  assert.deepEqual(actorForIdentity(ordinary).workspaces, ["DRIVER"]);
+  assert.throws(() => actorForIdentity(ordinary, "PARTNER"));
+  assert.equal(
+    actorForIdentity(ordinary, "PARTNER", false).id,
+    "retained_rider",
   );
 });

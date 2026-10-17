@@ -11,6 +11,11 @@ import {
 } from "@/lib/delivery/deletion-contract";
 import { deleteDeliveryData, previewDeletion } from "@/lib/delivery/deletion";
 import { cleanupDeletedFiles } from "@/lib/delivery/deletion-files";
+import {
+  workspaceProfiles,
+  updateWorkspaceProfile,
+} from "@/lib/delivery/workspace-profiles";
+import { workspaceProfileInput } from "@/lib/delivery/workspace-profile-input";
 import { revalidatePath } from "next/cache";
 import { NextResponse, after } from "next/server";
 import { readFile } from "node:fs/promises";
@@ -52,6 +57,8 @@ export async function GET(request: Request, context: Context) {
     if (resource === "workspaces")
       return json({ workspaces: actor.workspaces ?? [], role: actor.role });
     const params = new URL(request.url).searchParams;
+    if (resource === "workspace-profiles")
+      return json(await workspaceProfiles(actor));
     if (resource === "deletion-preview") {
       requireSuperAdmin(actor);
       return json(
@@ -138,6 +145,12 @@ export async function POST(request: Request, context: Context) {
       );
     }
     const key = z.uuid().parse(request.headers.get("idempotency-key"));
+    if (resource === "workspace-profiles") {
+      const input = workspaceProfileInput.parse(
+        JSON.parse((await boundedBody(request, 4000)).toString("utf8")),
+      );
+      return json(await updateWorkspaceProfile(actor, key, input));
+    }
     if (resource === "delete-data") {
       requireSuperAdmin(actor);
       const input = deletionInput.parse(

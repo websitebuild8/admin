@@ -65,7 +65,10 @@ No Google Maps, BML, Facebook or Instagram API key is required for Phase 1.
 
 Clerk handles identity only. Enable the sign-up methods intended for partner/driver
 applications. Becoming a Clerk user never grants administrator access. Database
-approval is required before a partner or driver can operate. Use MFA for admin
+approval is required before an ordinary partner or driver can operate. Approved
+admins automatically receive both operational workspaces without registration;
+see [admin workspaces](admin-workspaces.md). Only the configured super admin can
+grant staff admin access. Use MFA for admin
 accounts, review the allowlist, and test a non-admin login. Configure the final
 production domain and redirects in Clerk. Check `/join` and `/delivery/sign-in`
 after deploying; changing keys requires a rebuild.

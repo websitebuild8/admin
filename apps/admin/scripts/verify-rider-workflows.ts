@@ -33,7 +33,9 @@ export async function verifyRiderWorkflows(
     application: { role: "DRIVER", name: "QA Rider", phone: "7771234" },
   });
   const account = await db.deliveryAccount.findUniqueOrThrow({
-    where: { clerkUserId: applicant.userId },
+    where: {
+      clerkUserId_role: { clerkUserId: applicant.userId, role: "DRIVER" },
+    },
   });
   const rider: Actor = {
     ...applicant,

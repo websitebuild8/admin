@@ -52,6 +52,7 @@ async function Workspace({
           "partners",
           "applications",
           "drivers",
+          "my-workspaces",
           ...(actor.superAdmin ? ["administrators"] : []),
           "invoices",
           "payments",

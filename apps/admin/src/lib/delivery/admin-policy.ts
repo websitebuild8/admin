@@ -29,19 +29,22 @@ export function requireSuperAdmin(
   )
     throw new DeliveryError(`Only the super admin can ${action}.`, 403);
 }
+export type OperationalIdentity = {
+  id: string;
+  role: "PARTNER" | "DRIVER";
+  status: string;
+  name: string;
+  primary?: boolean;
+  partner?: null | {
+    id: string;
+    businessName: string;
+    application?: null | { logoReady: boolean };
+  };
+};
 export type DeliveryIdentity = {
   userId: string;
-  account: null | {
-    id: string;
-    role: "PARTNER" | "DRIVER";
-    status: string;
-    name: string;
-    partner?: null | {
-      id: string;
-      businessName: string;
-      application?: null | { logoReady: boolean };
-    };
-  };
+  account?: OperationalIdentity | null;
+  accounts?: OperationalIdentity[];
   grant: null | { active: boolean; name: string };
 };
 export function actorForIdentity(
@@ -49,13 +52,26 @@ export function actorForIdentity(
   requested?: DeliveryWorkspace,
   strict = true,
 ): Actor {
-  const { userId, account, grant } = identity;
+  const { userId, grant } = identity;
   const root = isSuperAdmin(userId),
     admin = root || !!grant?.active;
+  const all = identity.accounts ?? (identity.account ? [identity.account] : []);
+  const primary = all.find((account) => account.primary !== false) ?? all[0];
+  const eligible = admin ? all : primary ? [primary] : [];
+  const account =
+    requested && requested !== "ADMIN"
+      ? eligible.find((a) => a.role === requested)
+      : primary;
   const workspaces: DeliveryWorkspace[] = [];
   if (admin) workspaces.push("ADMIN");
-  if (account?.status === "APPROVED") workspaces.push(account.role);
-  if (requested && requested !== "ADMIN" && !account)
+  for (const role of ["PARTNER", "DRIVER"] as const)
+    if (
+      eligible.some(
+        (profile) => profile.role === role && profile.status === "APPROVED",
+      )
+    )
+      workspaces.push(role);
+  if (requested && requested !== "ADMIN" && !account && !all.length && !admin)
     return {
       userId,
       id: null,
@@ -67,7 +83,7 @@ export function actorForIdentity(
       superAdmin: false,
     };
   const ownsRequested =
-    requested && (requested === "ADMIN" ? admin : account?.role === requested);
+    requested && (requested === "ADMIN" ? admin : !!account);
   if (requested && !ownsRequested && strict)
     throw new DeliveryError(
       "This account does not have access to the requested workspace.",
@@ -77,7 +93,7 @@ export function actorForIdentity(
     ? requested!
     : admin
       ? "ADMIN"
-      : (account?.role ?? "APPLICANT");
+      : (primary?.role ?? "APPLICANT");
   if (role === "ADMIN")
     return {
       userId,
@@ -89,16 +105,17 @@ export function actorForIdentity(
       superAdmin: root,
       workspaces,
     };
-  if (account)
+  const selected = account ?? primary;
+  if (selected)
     return {
       userId,
-      id: account.id,
-      partnerId: account.partner?.id ?? null,
-      role: account.role,
-      status: account.status,
-      name: account.name,
-      businessName: account.partner?.businessName,
-      logoAvailable: account.partner?.application?.logoReady ?? false,
+      id: selected.id,
+      partnerId: selected.partner?.id ?? null,
+      role: selected.role,
+      status: selected.status,
+      name: selected.name,
+      businessName: selected.partner?.businessName,
+      logoAvailable: selected.partner?.application?.logoReady ?? false,
       workspaces,
       superAdmin: false,
     };

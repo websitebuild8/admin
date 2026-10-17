@@ -11,6 +11,7 @@ import {
   type Actor,
 } from "./domain";
 import type { PartnerApplicationInput } from "./partner-application-input";
+import { lockRoleIdentity, roleAccounts } from "./role-authorization";
 
 export const applicationSelection = {
   id: true,
@@ -227,74 +228,78 @@ export async function activateApprovedPartner(
     application.invitationState !== "SENT"
   )
     return null;
-  return db.$transaction(async (tx) => {
-    await lockApplication(tx, application.id);
-    const current = await tx.deliveryPartnerApplication.findUnique({
-      where: { id: application.id },
-      include: { partner: { include: { account: true } } },
-    });
-    if (
-      !current ||
-      current.status !== "APPROVED" ||
-      current.invitationState !== "SENT" ||
-      !current.submittedAt ||
-      (current.logoPath && !current.logoReady)
-    )
-      return null;
-    if (current.partner)
-      return current.partner.account.clerkUserId === userId
-        ? current.partner.account
-        : null;
-    const existing = await tx.deliveryAccount.findUnique({
-      where: { clerkUserId: userId },
-    });
-    if (existing) return existing;
-    const account = await tx.deliveryAccount.create({
-      data: {
-        clerkUserId: userId,
-        role: "PARTNER",
-        status: "APPROVED",
-        name: current.ownerName,
-        phone: current.phone,
-        reviewedBy: current.reviewedBy,
-        reviewedAt: current.reviewedAt,
-        reviewNote: current.reviewNote,
-        partner: {
-          create: {
-            applicationId: current.id,
-            businessName: current.businessName,
-            pageUrl: current.pageUrl,
-            pickupAddress: current.pickupAddress,
-            pickupArea: current.pickupArea,
-            operatingLocation: current.operatingLocation,
-            nextInvoiceAt: nextCutoff(new Date(), 1080),
+  return db.$transaction(
+    async (tx) => {
+      await lockRoleIdentity(tx, userId);
+      await lockApplication(tx, application.id);
+      const current = await tx.deliveryPartnerApplication.findUnique({
+        where: { id: application.id },
+        include: { partner: { include: { account: true } } },
+      });
+      if (
+        !current ||
+        current.status !== "APPROVED" ||
+        current.invitationState !== "SENT" ||
+        !current.submittedAt ||
+        (current.logoPath && !current.logoReady)
+      )
+        return null;
+      if (current.partner)
+        return current.partner.account.clerkUserId === userId
+          ? current.partner.account
+          : null;
+      const existing = await roleAccounts(tx, userId);
+      if (existing.length) return existing[0];
+      const account = await tx.deliveryAccount.create({
+        data: {
+          clerkUserId: userId,
+          role: "PARTNER",
+          primary: true,
+          status: "APPROVED",
+          name: current.ownerName,
+          phone: current.phone,
+          reviewedBy: current.reviewedBy,
+          reviewedAt: current.reviewedAt,
+          reviewNote: current.reviewNote,
+          partner: {
+            create: {
+              applicationId: current.id,
+              businessName: current.businessName,
+              pageUrl: current.pageUrl,
+              pickupAddress: current.pickupAddress,
+              pickupArea: current.pickupArea,
+              operatingLocation: current.operatingLocation,
+              nextInvoiceAt: nextCutoff(new Date(), 1080),
+            },
           },
         },
-      },
-      include: { partner: true },
-    });
-    const actor: Actor = {
-      userId,
-      role: "PARTNER",
-      id: account.id,
-      partnerId: account.partner!.id,
-      name: account.name,
-      status: "APPROVED",
-    };
-    await audit(
-      tx,
-      actor,
-      "PARTNER_ACCOUNT_ACTIVATED",
-      current.id,
-      {},
-      account.partner!.id,
-    );
-    await notify(
-      tx,
-      userId,
-      "Welcome to your partner workspace",
-      "Your business account is ready. Register your first package or import your delivery list.",
-    );
-    return account;
-  });
+        include: { partner: true },
+      });
+      const actor: Actor = {
+        userId,
+        role: "PARTNER",
+        id: account.id,
+        partnerId: account.partner!.id,
+        name: account.name,
+        status: "APPROVED",
+      };
+      await audit(
+        tx,
+        actor,
+        "PARTNER_ACCOUNT_ACTIVATED",
+        current.id,
+        {},
+        account.partner!.id,
+      );
+      await notify(
+        tx,
+        userId,
+        "Welcome to your partner workspace",
+        "Your business account is ready. Register your first package or import your delivery list.",
+        "PARTNER",
+      );
+      return account;
+    },
+    { maxWait: 10000, timeout: 20000 },
+  );
 }

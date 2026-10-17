@@ -22,6 +22,13 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { deliveryFetch } from "@/lib/delivery/fetch";
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from "@/components/ui/select";
 type AdminRecord = {
   id: string;
   name: string;
@@ -31,6 +38,7 @@ type AdminRecord = {
   grantedAt: string;
   revokedAt: string | null;
   account: null | { role: string; status: string };
+  accounts: { role: "PARTNER" | "DRIVER"; status: string; primary: boolean }[];
 };
 type Result = {
   items: AdminRecord[];
@@ -128,7 +136,8 @@ export function AdminAccessPanel({
         <p>
           Only the super admin can add or remove administrators. The current
           super admin is protected and cannot be removed here. Removing admin
-          access preserves the person’s partner or rider account.
+          access retains one operational workspace and suspends the extra one.
+          Delivery and financial history are preserved.
         </p>
       </section>
       <section className="d-card">
@@ -137,8 +146,9 @@ export function AdminAccessPanel({
             <h2>Add an administrator</h2>
             <p>
               Use the verified primary email of an existing Clerk account. A
-              partner or rider keeps their original workspace and gains an Admin
-              option.
+              approved administrator automatically receives Admin, Partner and
+              Rider workspaces with the same sign-in. No extra registration is
+              required.
             </p>
           </div>
         </div>
@@ -223,16 +233,15 @@ export function AdminAccessPanel({
                       <small className="block">{item.email}</small>
                     </TableCell>
                     <TableCell>
-                      {item.account?.role === "DRIVER"
-                        ? "Rider"
-                        : item.account?.role === "PARTNER"
-                          ? "Partner"
-                          : "Admin only"}
-                      {item.account && (
-                        <small className="block">
-                          {item.account.status.toLowerCase()}
-                        </small>
-                      )}
+                      {item.accounts?.length
+                        ? item.accounts.map((account) => (
+                            <small className="block" key={account.role}>
+                              {account.role === "DRIVER" ? "Rider" : "Partner"}{" "}
+                              · {account.status.toLowerCase()}
+                              {account.primary ? " · retained by default" : ""}
+                            </small>
+                          ))
+                        : "Workspaces initialize on sign-in"}
                     </TableCell>
                     <TableCell>
                       <span className="d-status">
@@ -310,8 +319,9 @@ export function AdminAccessPanel({
           <DialogHeader>
             <DialogTitle>Remove administrator access?</DialogTitle>
             <DialogDescription>
-              {selected?.email} will lose admin access. Their approved partner
-              or rider workspace remains available.
+              {selected?.email} will lose admin access. Keep one operational
+              workspace below; the other will be suspended. Picked-up deliveries
+              require retaining Rider access until completed.
             </DialogDescription>
           </DialogHeader>
           <form
@@ -323,9 +333,40 @@ export function AdminAccessPanel({
                 action: "REVOKE",
                 grantId: selected!.id,
                 reason: form.get("reason"),
+                ...(form.get("retainRole")
+                  ? { retainRole: form.get("retainRole") }
+                  : {}),
               });
             }}
           >
+            {selected && selected.accounts?.length > 0 && (
+              <div className="d-field full">
+                <Label htmlFor="admin-retain-role">Keep this workspace</Label>
+                <Select
+                  name="retainRole"
+                  defaultValue={
+                    selected.accounts.find((account) => account.primary)
+                      ?.role ?? selected.accounts[0].role
+                  }
+                  items={selected.accounts.map((account) => ({
+                    value: account.role,
+                    label: account.role === "DRIVER" ? "Rider" : "Partner",
+                  }))}
+                  disabled={busy}
+                >
+                  <SelectTrigger id="admin-retain-role">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {selected.accounts.map((account) => (
+                      <SelectItem key={account.role} value={account.role}>
+                        {account.role === "DRIVER" ? "Rider" : "Partner"}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div className="d-field full">
               <Label htmlFor="admin-revoke-reason">Reason for removal</Label>
               <Textarea

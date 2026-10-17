@@ -2,6 +2,10 @@ import "server-only";
 import { assertAdministrator } from "./admin-authorization";
 import { superAdminIds } from "./admin-policy";
 import { commandSubjects } from "./deletion-contract";
+import {
+  assertOperationalActor,
+  assertRoleCreation,
+} from "./role-authorization";
 import { createHash, randomUUID } from "node:crypto";
 import { Prisma } from "@/generated/prisma/client";
 import { database } from "../db";
@@ -102,6 +106,8 @@ export async function serialized<T extends Prisma.InputJsonValue>(
         async (tx) => {
           await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${id}, 0))`;
           if (actor.role === "ADMIN") await assertAdministrator(tx, actor);
+          if (actor.role === "PARTNER" || actor.role === "DRIVER")
+            await assertOperationalActor(tx, actor);
           const old = await tx.deliveryCommand.findUnique({ where: { id } });
           if (old) {
             if (old.invalidated)
@@ -115,23 +121,6 @@ export async function serialized<T extends Prisma.InputJsonValue>(
                 409,
               );
             return old.response as T;
-          }
-          if (actor.role !== "ADMIN" && actor.role !== "APPLICANT") {
-            const current = await tx.deliveryAccount.findUnique({
-              where: { clerkUserId: actor.userId },
-              include: { partner: { select: { id: true } } },
-            });
-            if (
-              !current ||
-              current.id !== actor.id ||
-              current.role !== actor.role ||
-              current.status !== "APPROVED" ||
-              (current.partner?.id ?? null) !== actor.partnerId
-            )
-              throw new DeliveryError(
-                "Your approved access has changed. Sign in again.",
-                403,
-              );
           }
           const response = await work(tx);
           await tx.deliveryCommand.create({
@@ -192,6 +181,14 @@ export async function createParcels(
   if (!partner.operatingLocation)
     throw new DeliveryError(
       "Ask iGO to set your business operating location before registering packages.",
+      409,
+    );
+  if (
+    partner.pickupAddress.trim().length < 5 ||
+    !/^(?:\+960)?[379]\d{6}$/.test(partner.account.phone)
+  )
+    throw new DeliveryError(
+      "Complete your business pickup address and contact number in Workspace details before registering deliveries.",
       409,
     );
   const rates = await tx.deliveryRate.findMany({
@@ -337,6 +334,7 @@ export async function deliveryCommand(
           invoice.partner.account.clerkUserId,
           "Delivery invoice received",
           `Invoice ${invoice.publicId}: ${money(invoice.total)} for completed deliveries. View the package details and outstanding amount in Invoices. Earlier unpaid invoices remain due.`,
+          "PARTNER",
         );
         await tx.deliveryInvoiceDispatch.create({
           data: {
@@ -385,6 +383,7 @@ export async function deliveryCommand(
           invoice.partner.account.clerkUserId,
           "Paid invoice received",
           `Invoice ${invoice.publicId} is fully paid: ${money(invoice.total)} verified, ${money(0)} outstanding. Your paid invoice and payment history are available in Invoices.`,
+          "PARTNER",
         );
         await tx.deliveryPaidInvoiceDispatch.create({
           data: {
@@ -416,10 +415,12 @@ export async function deliveryCommand(
             "Submit your business application at /join. Partner access is granted after review.",
             403,
           );
+        const primary = await assertRoleCreation(tx, actor.userId, a.role);
         const account = await tx.deliveryAccount.create({
           data: {
             clerkUserId: actor.userId,
             role: a.role,
+            primary,
             name: a.name,
             phone: a.phone,
           },
@@ -481,6 +482,7 @@ export async function deliveryCommand(
           account.clerkUserId,
           "Application update",
           `Your ${account.role.toLowerCase()} account is ${command.status.toLowerCase()}. ${command.note}`,
+          account.role,
         );
         return { message: "Account review saved." };
       }
@@ -514,6 +516,7 @@ export async function deliveryCommand(
           driver.clerkUserId,
           "Collection assigned",
           `${changed.count} packages are ready for your collection list. Confirm pickup only after physical receipt.`,
+          "DRIVER",
         );
         return {
           message: `${changed.count} packages assigned. No pickup has been recorded.`,
@@ -559,12 +562,14 @@ export async function deliveryCommand(
           parcel.partner.account.clerkUserId,
           "Rider assigned",
           `${actor.name} will collect ${parcel.publicId}. Pickup has not yet been confirmed.`,
+          "PARTNER",
         );
         await notify(
           tx,
           actor.userId,
           "Delivery added to your collections",
           `${parcel.publicId} is assigned to you. Confirm pickup only after physically receiving it.`,
+          "DRIVER",
         );
         return {
           message:
@@ -617,6 +622,7 @@ export async function deliveryCommand(
             p.partner.account.clerkUserId,
             "Package picked up",
             `${p.publicId} was physically received by ${actor.name}.`,
+            "PARTNER",
           );
         }
         return { message: `${parcels.length} physical pickups confirmed.` };
@@ -658,6 +664,7 @@ export async function deliveryCommand(
           p.partner.account.clerkUserId,
           "Package delivered",
           `${p.publicId} delivered by ${actor.name}. Delivery fees enter the next eligible invoice cycle.`,
+          "PARTNER",
         );
         return {
           message:
@@ -811,6 +818,7 @@ export async function deliveryCommand(
           payment.partner.account.clerkUserId,
           "Bank transfer reviewed",
           `Your transfer for ${payment.invoice.publicId} was ${command.decision === "REJECT" ? "rejected" : "verified"}. ${command.note}`,
+          "PARTNER",
         );
         return {
           message:
@@ -913,6 +921,7 @@ export async function deliveryCommand(
           ).clerkUserId,
           "Operating location updated",
           `Your business now operates from ${operatingLocationLabels[command.location]}. This affects new packages only.`,
+          "PARTNER",
         );
         return {
           message:

@@ -280,8 +280,9 @@ enum DeliveryPaymentState {
 
 model DeliveryAccount {
   id          String                 @id @default(uuid()) @db.Uuid
-  clerkUserId String                 @unique
+  clerkUserId String
   role        DeliveryRole
+  primary     Boolean                @default(true)
   status      DeliveryReview         @default(PENDING)
   name        String
   phone       String
@@ -292,6 +293,7 @@ model DeliveryAccount {
   partner     DeliveryPartner?
   assigned    DeliveryParcel[]       @relation("AssignedDeliveryDriver")
   pushSubscriptions DeliveryPushSubscription[]
+  @@unique([clerkUserId, role])
 }
 
 model DeliveryPartner {
