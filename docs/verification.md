@@ -1,5 +1,41 @@
 # Admin verification
 
+## Super-admin permanent deletion and cache cleanup — 18 October 2026
+
+103 unit tests pass. The focused eight-check deletion integration suite passes
+in a disposable schema, including configured-root authorization, forged flags,
+stale previews, exact-name confirmation, direct SQL deletion denial, paid-ledger
+removal, simultaneous retries, cache erasure/tombstones, earnings reconciliation,
+private-file retry jobs, completed rider attribution, in-transit protection,
+partner application removal, preserved admin grants and private table/function
+permissions. The Storage transport is simulated; no real uploaded file was
+deleted during QA. All disposable schemas were removed.
+
+The wider regression run passed the existing delivery, payment, invoicing,
+earnings, origin pricing, admin access and optional-application checks. Its last
+deletion fixture used an invalid business type; that fixture was corrected to
+`BUSINESS`, and the final focused deletion run passed all eight checks. The
+single-worker production build (including TypeScript), ESLint and whitespace
+checks pass.
+
+Applied additive migration `20261018000000_super_admin_deletion` to the configured
+Supabase database. Before/after fingerprints of 28 existing delivery tables
+match (excluding only the newly added default cache metadata). New deletion and
+file-outbox tables have RLS and remain empty. No live record or Storage object
+was deleted. Actual read-only partner, invoice and package deletion previews
+also pass against the configured database; no deletion was executed. Source
+changes still require the user's manual commit/push and
+Netlify redeployment.
+
+The actual client confirmation component was checked with fictional responses
+at mobile width 390px. It fits without horizontal overflow, requires both the
+record name and a reason before enabling deletion, and preserves the row when
+cancelled. The trash button has a transparent background, red border and red
+icon. This fixture does not establish hosted Clerk session verification.
+
+See [super-admin deletion](super-admin-deletion.md) for operation, linked-record
+scope, file retry behavior and currency-label editing instructions.
+
 ## Deployed dashboard database repair — 17 October 2026
 
 The updated Netlify dashboard displayed a generic data-loading error while both

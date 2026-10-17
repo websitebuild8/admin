@@ -18,16 +18,16 @@ export function superAdminIds(
 export function isSuperAdmin(userId: string) {
   return superAdminIds().includes(userId);
 }
-export function requireSuperAdmin(actor: Actor) {
+export function requireSuperAdmin(
+  actor: Actor,
+  action = "manage administrator access",
+) {
   if (
     actor.role !== "ADMIN" ||
     actor.status !== "APPROVED" ||
     !isSuperAdmin(actor.userId)
   )
-    throw new DeliveryError(
-      "Only the super admin can manage administrator access.",
-      403,
-    );
+    throw new DeliveryError(`Only the super admin can ${action}.`, 403);
 }
 export type DeliveryIdentity = {
   userId: string;

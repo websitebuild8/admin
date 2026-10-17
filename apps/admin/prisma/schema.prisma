@@ -504,6 +504,34 @@ model DeliveryCommand {
   hash      String
   response  Json
   createdAt DateTime @default(now()) @db.Timestamptz(3)
+  subjects String[] @default([])
+  invalidated Boolean @default(false)
+}
+
+// A transaction-bound permit and permanent, minimal deletion audit. It contains
+// IDs/counts, never copies of deleted profiles, receipts or invoice documents.
+model DeliveryDeletion {
+  id String @id @db.Uuid
+  actor String
+  kind String
+  targetId String @db.Uuid
+  reason String
+  manifest Json
+  transactionId BigInt
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+}
+
+// Durable outbox: rows disappear only after Supabase confirms object removal.
+model DeliveryDeletedFile {
+  id String @id @default(uuid()) @db.Uuid
+  deletionId String @db.Uuid
+  bucket String
+  path String
+  attempts Int @default(0)
+  lastError String @default("")
+  notBefore DateTime @default(now()) @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@unique([bucket, path])
 }
 
 model DeliveryActivity {

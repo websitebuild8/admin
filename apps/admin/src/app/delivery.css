@@ -2518,3 +2518,65 @@ html:has(.d-site) {
     font-size: 32px;
   }
 }
+.d-row-actions [data-slot="button"].d-delete-button {
+  color: #c82727;
+  border: 1px solid #e33b3b;
+  background: transparent;
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  padding: 0;
+  border-radius: 12px;
+}
+.d-row-actions [data-slot="button"].d-delete-button:hover {
+  background: #fff0ef;
+  border-color: #b92020;
+}
+.d-delete-button svg {
+  color: #c82727;
+}
+.d-delete-modal .d-delete-confirm[data-slot="button"] {
+  background: #bc2020;
+  color: white;
+}
+.d-delete-modal form.d-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.d-delete-modal form.d-form > .d-error {
+  color: #b42318;
+  font-size: 13px;
+}
+.d-delete-modal strong {
+  overflow-wrap: anywhere;
+}
+.d-delete-modal .d-delete-confirm[data-slot="button"]:hover {
+  background: #a71919;
+}
+.d-delete-counts {
+  margin: 12px 0;
+  border: 1px solid #e8e6e0;
+  border-radius: 14px;
+  padding: 6px 16px;
+}
+.d-delete-counts > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 8px 0;
+}
+.d-delete-counts dd {
+  font-weight: 700;
+  margin: 0;
+}
+.d-delete-warnings {
+  list-style: disc;
+  padding-left: 20px;
+  color: #66675f;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.d-delete-warnings li + li {
+  margin-top: 8px;
+}

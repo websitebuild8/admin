@@ -1,6 +1,7 @@
 import "server-only";
 import { assertAdministrator } from "./admin-authorization";
 import { superAdminIds } from "./admin-policy";
+import { commandSubjects } from "./deletion-contract";
 import { createHash, randomUUID } from "node:crypto";
 import { Prisma } from "@/generated/prisma/client";
 import { database } from "../db";
@@ -103,6 +104,11 @@ export async function serialized<T extends Prisma.InputJsonValue>(
           if (actor.role === "ADMIN") await assertAdministrator(tx, actor);
           const old = await tx.deliveryCommand.findUnique({ where: { id } });
           if (old) {
+            if (old.invalidated)
+              throw new DeliveryError(
+                "This saved request refers to deleted data. Refresh the page and start a new request.",
+                409,
+              );
             if (old.hash !== hash)
               throw new DeliveryError(
                 "This request key was used for a different action.",
@@ -128,7 +134,20 @@ export async function serialized<T extends Prisma.InputJsonValue>(
               );
           }
           const response = await work(tx);
-          await tx.deliveryCommand.create({ data: { id, hash, response } });
+          await tx.deliveryCommand.create({
+            data: {
+              id,
+              hash,
+              response,
+              subjects: commandSubjects(
+                actor.userId,
+                actor.id,
+                actor.partnerId,
+                payload,
+                response,
+              ),
+            },
+          });
           return response;
         },
         {

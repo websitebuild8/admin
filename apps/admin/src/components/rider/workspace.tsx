@@ -200,6 +200,17 @@ export function RiderWorkspace({
       if (event.data?.type === "IGO_RIDER_UPDATE") refresh();
     };
     const interval = setInterval(refresh, 30000);
+    const deleted = () => {
+      setSelected([]);
+      setAction(null);
+      void load(abort.signal);
+    };
+    window.addEventListener("igo:delivery-data-changed", deleted);
+    const channel =
+      typeof BroadcastChannel !== "undefined"
+        ? new BroadcastChannel("igo-delivery-data")
+        : null;
+    if (channel) channel.onmessage = deleted;
     document.addEventListener("visibilitychange", refresh);
     window.addEventListener("focus", refresh);
     window.addEventListener("online", refresh);
@@ -208,6 +219,8 @@ export function RiderWorkspace({
       abort.abort();
       clearTimeout(initial);
       clearInterval(interval);
+      window.removeEventListener("igo:delivery-data-changed", deleted);
+      channel?.close();
       document.removeEventListener("visibilitychange", refresh);
       window.removeEventListener("focus", refresh);
       window.removeEventListener("online", refresh);

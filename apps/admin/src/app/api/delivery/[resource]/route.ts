@@ -5,6 +5,13 @@ import {
 } from "@/lib/delivery/admin-access";
 import { assertAdministrator } from "@/lib/delivery/admin-authorization";
 import { requireSuperAdmin } from "@/lib/delivery/admin-policy";
+import {
+  deletionInput,
+  deletionTarget,
+} from "@/lib/delivery/deletion-contract";
+import { deleteDeliveryData, previewDeletion } from "@/lib/delivery/deletion";
+import { cleanupDeletedFiles } from "@/lib/delivery/deletion-files";
+import { revalidatePath } from "next/cache";
 import { NextResponse, after } from "next/server";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -45,6 +52,19 @@ export async function GET(request: Request, context: Context) {
     if (resource === "workspaces")
       return json({ workspaces: actor.workspaces ?? [], role: actor.role });
     const params = new URL(request.url).searchParams;
+    if (resource === "deletion-preview") {
+      requireSuperAdmin(actor);
+      return json(
+        await previewDeletion(
+          actor,
+          deletionTarget.parse(Object.fromEntries(params)),
+        ),
+      );
+    }
+    if (resource === "deletion-cleanup") {
+      requireSuperAdmin(actor);
+      return json({ pending: await database().deliveryDeletedFile.count() });
+    }
     if (resource === "partner-logo") {
       const applicationId = params.get("id");
       const logo = await partnerLogo(
@@ -118,6 +138,29 @@ export async function POST(request: Request, context: Context) {
       );
     }
     const key = z.uuid().parse(request.headers.get("idempotency-key"));
+    if (resource === "delete-data") {
+      requireSuperAdmin(actor);
+      const input = deletionInput.parse(
+        JSON.parse((await boundedBody(request, 4000)).toString("utf8")),
+      );
+      const result = await deleteDeliveryData(actor, key, input);
+      for (const path of [
+        "/delivery/[[...section]]",
+        "/partner/[[...section]]",
+        "/delivery/invoice/[id]",
+        "/delivery/paid-invoice/[id]",
+        "/partner/invoice/[id]",
+        "/partner/paid-invoice/[id]",
+      ])
+        revalidatePath(path, "page");
+      revalidatePath("/rider", "layout");
+      const files = await cleanupDeletedFiles();
+      return json({ ...result, files });
+    }
+    if (resource === "deletion-cleanup") {
+      requireSuperAdmin(actor);
+      return json(await cleanupDeletedFiles());
+    }
     if (resource === "admin-access") {
       requireSuperAdmin(actor);
       const input = adminAccessInput.parse(

@@ -39,7 +39,7 @@ export const destinationCode = z
     "Use an uppercase destination code, such as VILLIMALE.",
   );
 export const money = (value: number) =>
-  new Intl.NumberFormat("en-MV", { style: "currency", currency: "MVR" }).format(
+  new Intl.NumberFormat("en-MV", { style: "currency", currency: "MVR", currencyDisplay: "code" }).format(
     value / 100,
   );
 export const localDate = (date: Date) =>

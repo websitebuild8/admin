@@ -171,7 +171,9 @@ Clerk redirects and private Storage reads on the hosted runtime.
 - [ ] Decide retention for recipient addresses/phones, receipts, audit and financial
       evidence. Unsubmitted receipt uploads currently remain private; there is no
       automatic retention/deletion job for them. Review them operationally until an
-      approved retention policy is implemented. Do not delete financial history.
+      approved retention policy is implemented. Super-admin permanent deletion
+      is explicitly enabled by the owner; review its full financial impact and
+      reason before confirming. See [deletion controls](super-admin-deletion.md).
 - [ ] Confirm available hosting/database/Storage quotas and domain costs. Free
       plans are not a capacity guarantee; monitor errors, storage and scheduler runs.
 - [x] Complete actual Clerk admin sign-in and admin browser acceptance checks.

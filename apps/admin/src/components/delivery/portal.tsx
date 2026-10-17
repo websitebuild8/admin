@@ -2,6 +2,7 @@
 import { WorkspaceSwitcher } from "./workspace-switcher";
 import { AdminAccessPanel } from "./admin-access-panel";
 import { EarningsCard } from "./earnings-card";
+import { DeleteDataButton, DeletionFileCleanup } from "./delete-data-button";
 import { deliveryFetch } from "@/lib/delivery/fetch";
 import {
   useEffect,
@@ -262,7 +263,9 @@ function useResource<T>(
           throw new Error(value.error ?? "Could not load records.");
         return value as T;
       })
-      .then((data) => setState({ key, data, error: null }))
+      .then((data) => {
+        if (!controller.signal.aborted) setState({ key, data, error: null });
+      })
       .catch((e) => {
         if (!controller.signal.aborted)
           setState({
@@ -731,6 +734,30 @@ export function DeliveryPortal({
     return () => clearInterval(interval);
   }, []);
   const refresh = () => setRevision((v) => v + 1);
+  useEffect(() => {
+    const updated = () => {
+      setSelected([]);
+      setAction(null);
+      setInvoiceId(null);
+      setPartnerHistoryId(null);
+      setInvoiceReturnPartnerId(null);
+      setRevision((v) => v + 1);
+    };
+    window.addEventListener("igo:delivery-data-changed", updated);
+    const channel =
+      typeof BroadcastChannel !== "undefined"
+        ? new BroadcastChannel("igo-delivery-data")
+        : null;
+    if (channel) channel.onmessage = updated;
+    return () => {
+      window.removeEventListener("igo:delivery-data-changed", updated);
+      channel?.close();
+    };
+  }, []);
+  const deleted = () => {
+    setPage(1);
+    refresh();
+  };
   function open(value: Action) {
     setAction(value);
     setError("");
@@ -894,6 +921,14 @@ export function DeliveryPortal({
         >
           Details
         </Button>
+        {actor.role === "ADMIN" && actor.superAdmin && (
+          <DeleteDataButton
+            kind="PACKAGE"
+            id={p.id}
+            label={p.publicId}
+            changed={deleted}
+          />
+        )}
         {p.state === "REGISTERED" && actor.role !== "DRIVER" && (
           <Button
             variant="ghost"
@@ -1371,6 +1406,14 @@ export function DeliveryPortal({
                       Invoice cutoff
                     </Button>
                   )}
+                  {actor.superAdmin && (
+                    <DeleteDataButton
+                      kind={screen === "partners" ? "PARTNER" : "RIDER"}
+                      id={a.id}
+                      label={a.partner?.businessName ?? a.name}
+                      changed={deleted}
+                    />
+                  )}
                 </div>,
               ])}
             />
@@ -1427,6 +1470,14 @@ export function DeliveryPortal({
                     >
                       View packages
                     </Button>
+                    {actor.role === "ADMIN" && actor.superAdmin && (
+                      <DeleteDataButton
+                        kind="INVOICE"
+                        id={i.id}
+                        label={i.publicId}
+                        changed={deleted}
+                      />
+                    )}
                     {actor.role === "PARTNER" && i.paid < i.total && (
                       <Button
                         onClick={() =>
@@ -2554,6 +2605,9 @@ function SettingsPanel({
   return (
     <div className="d-settings">
       {actor.role === "ADMIN" && <ScheduleHealth revision={revision} />}
+      {actor.role === "ADMIN" && actor.superAdmin && (
+        <DeletionFileCleanup revision={revision} />
+      )}
       {actor.role === "ADMIN" ? (
         <PricingManager
           revision={revision}
