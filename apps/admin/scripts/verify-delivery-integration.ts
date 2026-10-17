@@ -15,8 +15,12 @@ import { packageImport } from "../src/lib/delivery/import-service";
 import { importColumns } from "../src/lib/delivery/import";
 import { verifyPartnerApplications } from "./verify-partner-applications";
 import { verifyRiderWorkflows } from "./verify-rider-workflows";
-import { verifyCodReceipts } from "./verify-cod-receipts";
 import { verifyPartnerInvoices } from "./verify-partner-invoices";
+import {
+  verifyAdminAccess,
+  verifyOptionalPartnerAssets,
+} from "./verify-admin-access";
+import { verifyOriginPricing } from "./verify-origin-pricing";
 import { verifyPaidInvoices } from "./verify-paid-invoices";
 import { verifyPaidInvoiceMigration } from "./verify-paid-invoice-migration";
 import {
@@ -30,6 +34,8 @@ async function main() {
     throw new Error("Run this isolated check with NODE_ENV=test.");
   if (!process.env.DIRECT_URL)
     throw new Error("DIRECT_URL is required for isolated schema verification.");
+  const originalAdminIds = process.env.ADMIN_CLERK_USER_IDS;
+  const originalSuperIds = process.env.SUPER_ADMIN_CLERK_USER_IDS;
   const schema = `igo_qa_${randomBytes(8).toString("hex")}`;
   process.env.IGO_DELIVERY_TEST_SCHEMA = schema;
   const connectionString = databaseUrl(process.env.DIRECT_URL),
@@ -62,6 +68,8 @@ async function main() {
       "20261016070000_cod_payout_receipts",
       "20261016080000_partner_manual_invoices",
       "20261016090000_paid_invoice_history",
+      "20261017000000_origin_pricing_retire_cod",
+      "20261017010000_admin_access_optional_partner_assets",
     ]) {
       if (
         folder === "20261016090000_paid_invoice_history" &&
@@ -112,6 +120,7 @@ async function main() {
                     pageUrl: "https://example.com/qa",
                     pickupAddress: "Disposable QA pickup",
                     pickupArea: "Malé",
+                    operatingLocation: "MALE",
                     nextInvoiceAt: cutoff,
                   },
                 },
@@ -146,6 +155,8 @@ async function main() {
         status: "APPROVED",
         name: "QA Admin",
       };
+    process.env.ADMIN_CLERK_USER_IDS = admin.userId;
+    delete process.env.SUPER_ADMIN_CLERK_USER_IDS;
     const cmd = (
       who: Actor,
       command: DeliveryCommandInput,
@@ -154,7 +165,6 @@ async function main() {
     const make = (
       ref: string,
       zone: "MALE" | "HULHUMALE_1" | "HULHUMALE_2" = "MALE",
-      codAmount = 0,
     ) => ({
       type: "register" as const,
       parcel: {
@@ -163,10 +173,17 @@ async function main() {
         recipientPhone: "7771234",
         destination: "Disposable QA destination",
         zone,
-        codAmount,
         description: "Not a real delivery",
       },
     });
+    if (process.argv.includes("--admin-access")) {
+      await verifyAdminAccess(db, admin, partner, driver, ok);
+      await verifyOptionalPartnerAssets(db, admin, ok);
+      console.log(
+        `Verified ${checks} administrator and optional-application checks in a disposable schema.`,
+      );
+      return;
+    }
     if (process.argv.includes("--paid-migration")) {
       await verifyPaidInvoiceMigration(
         db,
@@ -205,11 +222,8 @@ async function main() {
       return;
     }
     const key = randomUUID(),
-      first = await cmd(partner, make("QA-ONE", "MALE", 10000), key);
-    assert.deepEqual(
-      await cmd(partner, make("QA-ONE", "MALE", 10000), key),
-      first,
-    );
+      first = await cmd(partner, make("QA-ONE", "MALE"), key);
+    assert.deepEqual(await cmd(partner, make("QA-ONE", "MALE"), key), first);
     ok("registration replay is idempotent");
     await assert.rejects(cmd(partner, make("DIFFERENT"), key));
     ok("same key rejects changed request");
@@ -258,19 +272,15 @@ async function main() {
       "REGISTERED",
     );
     ok("unselected collection packages remain registered");
-    await assert.rejects(
-      cmd(driver, { type: "deliver", parcelId: p1.id, codReceived: false }),
-    );
-    ok("COD must be explicitly confirmed");
-    await cmd(driver, { type: "deliver", parcelId: p1.id, codReceived: true });
+    await cmd(driver, { type: "deliver", parcelId: p1.id });
     await cmd(driver, { type: "pickup", parcelIds: [p2.id] });
-    await cmd(driver, { type: "deliver", parcelId: p2.id, codReceived: false });
+    await cmd(driver, { type: "deliver", parcelId: p2.id });
     const delivered = await db.deliveryParcel.findUniqueOrThrow({
       where: { id: p1.id },
     });
     assert.equal(delivered.deliveredBy, d.clerkUserId);
-    assert(delivered.deliveredAt && delivered.codCollectedAt);
-    ok("delivery records driver, server timestamp and COD");
+    assert(delivered.deliveredAt);
+    ok("delivery records driver and server timestamp");
     const run = () =>
       db!.$queryRawUnsafe(
         `SELECT ${schema}.igo_invoice_due($1::timestamptz) AS result`,
@@ -304,7 +314,7 @@ async function main() {
     ok("SQL rejects invoice lines for unpicked packages");
     await cmd(admin, { type: "assign", driverId: d.id, parcelIds: [p3.id] });
     await cmd(driver, { type: "pickup", parcelIds: [p3.id] });
-    await cmd(driver, { type: "deliver", parcelId: p3.id, codReceived: false });
+    await cmd(driver, { type: "deliver", parcelId: p3.id });
     await db.$queryRawUnsafe(
       `SELECT ${schema}.igo_invoice_due($1::timestamptz) AS result`,
       new Date(cutoff.getTime() + 86401000),
@@ -461,42 +471,6 @@ async function main() {
       }),
     );
     ok("database rejects balances that do not reconcile to allocations");
-    await assert.rejects(
-      cmd(admin, {
-        type: "remit",
-        partnerId: a.partner!.id,
-        parcelIds: [p1.id],
-        reference: "QA-TOO-EARLY",
-      }),
-    );
-    ok("COD payout requires cash received from driver");
-    await cmd(admin, {
-      type: "handover",
-      driverId: d.id,
-      parcelIds: [p1.id],
-      reference: "QA-HANDOVER",
-    });
-    await cmd(admin, {
-      type: "remit",
-      partnerId: a.partner!.id,
-      parcelIds: [p1.id],
-      reference: "QA-PAYOUT",
-    });
-    const final = await db.deliveryParcel.findUniqueOrThrow({
-      where: { id: p1.id },
-    });
-    assert(final.handoverId && final.remittanceId);
-    assert.equal(
-      (
-        await db.deliveryInvoice.findUniqueOrThrow({
-          where: { id: invoice.id },
-        })
-      ).paid,
-      6000,
-    );
-    ok(
-      "COD handover and remittance reconcile separately from delivery payments",
-    );
     const activity = await db.deliveryActivity.findFirstOrThrow();
     await assert.rejects(
       db.deliveryActivity.update({
@@ -522,7 +496,6 @@ async function main() {
         "7771234",
         "Disposable QA address",
         "MALE",
-        "0",
         "",
       ]);
     const bytes = Buffer.from(await wb.xlsx.writeBuffer()),
@@ -591,17 +564,11 @@ async function main() {
     ok("notifications are recipient scoped");
     await verifyPartnerApplications(db, admin, other, ok);
     await verifyRiderWorkflows(db, admin, partner, ok);
-    await verifyCodReceipts(
-      db,
-      admin,
-      partner,
-      other,
-      driver,
-      final.remittanceId!,
-      ok,
-    );
     await verifyPartnerInvoices(db, admin, other, driver, ok);
     await verifyPaidInvoices(db, admin, other, driver, ok);
+    await verifyOriginPricing(db, admin, driver, otherDriver, ok);
+    await verifyAdminAccess(db, admin, partner, driver, ok);
+    await verifyOptionalPartnerAssets(db, admin, ok);
     console.log(
       `Verified ${checks} database integration checks in an isolated disposable schema.`,
     );
@@ -615,6 +582,11 @@ async function main() {
     }
     await owner.end();
     delete process.env.IGO_DELIVERY_TEST_SCHEMA;
+    if (originalAdminIds === undefined) delete process.env.ADMIN_CLERK_USER_IDS;
+    else process.env.ADMIN_CLERK_USER_IDS = originalAdminIds;
+    if (originalSuperIds === undefined)
+      delete process.env.SUPER_ADMIN_CLERK_USER_IDS;
+    else process.env.SUPER_ADMIN_CLERK_USER_IDS = originalSuperIds;
   }
 }
 main().catch((error) => {

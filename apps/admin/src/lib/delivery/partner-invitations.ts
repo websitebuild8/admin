@@ -1,4 +1,5 @@
 import "server-only";
+import { assertAdministrator } from "./admin-authorization";
 import { randomUUID } from "node:crypto";
 import { createClerkClient } from "@clerk/backend";
 import { database } from "../db";
@@ -33,18 +34,14 @@ function gateway(): InvitationGateway {
         limit: 10,
       });
       const ids = users.data.map((user) => user.id);
-      const admins = (process.env.ADMIN_CLERK_USER_IDS ?? "")
-        .split(",")
-        .map((id) => id.trim());
       if (
-        ids.some((id) => admins.includes(id)) ||
-        (ids.length &&
-          (await database().deliveryAccount.count({
-            where: { clerkUserId: { in: ids } },
-          })))
+        ids.length &&
+        (await database().deliveryAccount.count({
+          where: { clerkUserId: { in: ids } },
+        }))
       )
         throw new DeliveryError(
-          "This email already belongs to an administrator, partner or driver account. Resolve that existing account before inviting another business.",
+          "This email already belongs to a partner or rider. Resolve that existing account before inviting another business.",
           409,
         );
       const invitations = await client.invitations.getInvitationList({
@@ -106,12 +103,17 @@ export async function sendPartnerInvitation(
     );
   const lease = randomUUID();
   const application = await database().$transaction(async (tx) => {
+    await assertAdministrator(tx, actor);
     await lockApplication(tx, applicationId);
     const current = await tx.deliveryPartnerApplication.findUnique({
       where: { id: applicationId },
       include: { partner: true },
     });
-    if (!current?.logoReady || current.status !== "APPROVED")
+    if (
+      !current?.submittedAt ||
+      (current.logoPath && !current.logoReady) ||
+      current.status !== "APPROVED"
+    )
       throw new DeliveryError(
         "Approve the complete business application before sending an invitation.",
         409,
@@ -163,6 +165,7 @@ export async function sendPartnerInvitation(
       ));
     if (!invitation.id) throw new Error("Missing invitation reference");
     await database().$transaction(async (tx) => {
+      await assertAdministrator(tx, actor);
       await lockApplication(tx, applicationId);
       const current = await tx.deliveryPartnerApplication.findUniqueOrThrow({
         where: { id: applicationId },

@@ -120,6 +120,7 @@ export async function dispatchRiderPush(sender?: PushSender) {
       subscription.driver.status !== "APPROVED" ||
       subscription.driver.role !== "DRIVER" ||
       job.notification.recipient !== subscription.driver.clerkUserId ||
+      !["ACCOUNT", "DRIVER"].includes(job.notification.workspace) ||
       job.notification.readAt ||
       job.createdAt.getTime() < Date.now() - 86400000 ||
       !allowedPushEndpoint(subscription.endpoint)

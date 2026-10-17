@@ -21,9 +21,6 @@ export const runtime = "nodejs";
 export async function POST(request: Request) {
   try {
     originCheck(request);
-    // Reject a missing deployment configuration before reserving an email or
-    // spending database/image-processing work on an upload that cannot succeed.
-    partnerLogoStorage();
     const ip =
       process.env.NETLIFY === "true"
         ? request.headers.get("x-nf-client-connection-ip") || "unknown"
@@ -50,8 +47,13 @@ export async function POST(request: Request) {
     if (form.get("website"))
       throw new DeliveryError("The application could not be submitted.");
     const file = form.get("logo");
-    if (!(file instanceof File))
-      throw new DeliveryError("Upload your business logo.");
+    const supplied =
+      file instanceof File && (file.size > 0 || file.name !== "");
+    if (file !== null && !(file instanceof File) && file !== "")
+      throw new DeliveryError(
+        "Choose an image file or leave the optional logo empty.",
+      );
+    if (supplied) partnerLogoStorage();
     const names = [
       "businessName",
       "businessType",
@@ -60,7 +62,7 @@ export async function POST(request: Request) {
       "email",
       "phone",
       "pickupAddress",
-      "pickupArea",
+      "operatingLocation",
       "dailyDeliveries",
     ];
     const input = partnerApplicationInput.parse({
@@ -69,11 +71,13 @@ export async function POST(request: Request) {
       ),
       contactConsent: form.get("contactConsent") === "true",
     });
-    const logo = await preparePartnerLogo(
-      Buffer.from(await file.arrayBuffer()),
-    );
+    const logo = supplied
+      ? await preparePartnerLogo(
+          Buffer.from(await (file as File).arrayBuffer()),
+        )
+      : null;
     const application = await reservePartnerApplication(key, input, logo);
-    if (!application.logoReady)
+    if (logo && application.logoPath && !application.logoReady)
       await uploadPartnerLogo(application.logoPath, logo);
     return json(
       await completePartnerApplication(application.id, application.digest),

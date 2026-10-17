@@ -1,4 +1,5 @@
 import "server-only";
+import { administrators } from "./admin-access";
 import { z } from "zod";
 import { Prisma } from "@/generated/prisma/client";
 import { database } from "../db";
@@ -7,7 +8,6 @@ import { riderScreens } from "./rider-contract";
 import { riderClientConfig } from "./push-settings";
 import { applicationSelection } from "./partner-applications";
 import { storageConfigurationStatus } from "../storage-configuration";
-import { codPayoutReceipt } from "./cod-receipts";
 import { partnerHistory } from "./partner-history";
 import { invoiceRecords } from "./invoice-history";
 
@@ -19,17 +19,16 @@ export const parcelSelection = {
   recipientPhone: true,
   destination: true,
   zone: true,
+  origin: true,
+  destinationLabel: true,
   description: true,
   fee: true,
-  codAmount: true,
   state: true,
   registeredAt: true,
   pickedUpAt: true,
   deliveredAt: true,
   pickedUpBy: true,
   deliveredBy: true,
-  handoverId: true,
-  remittanceId: true,
   driverId: true,
   partnerId: true,
   partner: {
@@ -69,22 +68,27 @@ export async function deliveryQuery(
     requireRole(actor, "DRIVER");
     const where = { driverId: actor.id! };
     const today = new Date(`${localDate(new Date())}T00:00:00+05:00`);
-    const [collections, onBoard, deliveredToday, cash] = await Promise.all([
-      db.deliveryParcel.count({ where: { ...where, state: "REGISTERED" } }),
-      db.deliveryParcel.count({ where: { ...where, state: "PICKED_UP" } }),
-      db.deliveryParcel.count({
-        where: { ...where, state: "DELIVERED", deliveredAt: { gte: today } },
-      }),
-      db.deliveryParcel.aggregate({
-        where: { ...where, state: "DELIVERED", handoverId: null },
-        _sum: { codAmount: true },
-      }),
-    ]);
+    const [collections, onBoard, deliveredToday, available] = await Promise.all(
+      [
+        db.deliveryParcel.count({ where: { ...where, state: "REGISTERED" } }),
+        db.deliveryParcel.count({ where: { ...where, state: "PICKED_UP" } }),
+        db.deliveryParcel.count({
+          where: { ...where, state: "DELIVERED", deliveredAt: { gte: today } },
+        }),
+        db.deliveryParcel.count({
+          where: {
+            state: "REGISTERED",
+            driverId: null,
+            partner: { account: { status: "APPROVED" } },
+          },
+        }),
+      ],
+    );
     return {
       collections,
       onBoard,
       deliveredToday,
-      cashHeld: cash._sum.codAmount ?? 0,
+      available,
     };
   }
   if (resource === "rider-workspace") {
@@ -93,8 +97,7 @@ export async function deliveryQuery(
       .enum(riderScreens)
       .parse(search.get("screen") ?? "collections");
     const workSearch = new URLSearchParams(search);
-    const workResource =
-      screen === "history" ? "deliveries" : screen === "cash" ? "cod" : screen;
+    const workResource = screen === "history" ? "deliveries" : screen;
     if (screen === "history") workSearch.set("state", "DELIVERED");
     if (screen === "deliveries") workSearch.set("state", "PICKED_UP");
     const [summary, work, notices] = await Promise.all([
@@ -135,23 +138,24 @@ export async function deliveryQuery(
   const page = parsed.data,
     take = 10,
     skip = (page - 1) * take;
+  if (resource === "administrators") return administrators(actor, page);
   if (resource === "invoice-history" || resource === "invoice-payments")
     return invoiceRecords(actor, resource, search, page);
   if (resource === "partner-history")
     return partnerHistory(actor, search, page);
-  if (resource === "cod-receipt")
-    return codPayoutReceipt(actor, z.uuid().parse(search.get("id")), page);
   if (resource === "applications") {
     requireRole(actor, "ADMIN");
     const [items, total] = await Promise.all([
       db.deliveryPartnerApplication.findMany({
-        where: { logoReady: true },
+        where: { submittedAt: { not: null } },
         select: applicationSelection,
         orderBy: [{ createdAt: "desc" }, { id: "desc" }],
         take,
         skip,
       }),
-      db.deliveryPartnerApplication.count({ where: { logoReady: true } }),
+      db.deliveryPartnerApplication.count({
+        where: { submittedAt: { not: null } },
+      }),
     ]);
     return {
       items: items.map((item) => ({
@@ -188,9 +192,6 @@ export async function deliveryQuery(
       pending,
       unbilled,
       invoices,
-      cod,
-      driverCash,
-      companyCash,
       latest,
       awaitingApproval,
       paymentReview,
@@ -212,23 +213,6 @@ export async function deliveryQuery(
             where: { partnerId },
             _sum: { total: true, paid: true },
           }),
-      db.deliveryParcel.aggregate({
-        where: { ...scope, state: "DELIVERED", remittanceId: null },
-        _sum: { codAmount: true },
-      }),
-      db.deliveryParcel.aggregate({
-        where: { ...scope, state: "DELIVERED", handoverId: null },
-        _sum: { codAmount: true },
-      }),
-      db.deliveryParcel.aggregate({
-        where: {
-          ...scope,
-          state: "DELIVERED",
-          handoverId: { not: null },
-          remittanceId: null,
-        },
-        _sum: { codAmount: true },
-      }),
       db.deliveryParcel.findMany({
         where: scope,
         select: parcelSelection,
@@ -239,7 +223,7 @@ export async function deliveryQuery(
         ? Promise.all([
             db.deliveryAccount.count({ where: { status: "PENDING" } }),
             db.deliveryPartnerApplication.count({
-              where: { status: "PENDING", logoReady: true },
+              where: { status: "PENDING", submittedAt: { not: null } },
             }),
           ]).then((counts) => counts[0] + counts[1])
         : 0,
@@ -256,15 +240,69 @@ export async function deliveryQuery(
       invoiced: invoices?._sum.total ?? 0,
       confirmedPayments: invoices?._sum.paid ?? 0,
       outstanding: (invoices?._sum.total ?? 0) - (invoices?._sum.paid ?? 0),
-      codOwed: cod._sum.codAmount ?? 0,
-      driverCash: driverCash._sum.codAmount ?? 0,
-      companyCash: companyCash._sum.codAmount ?? 0,
       latest,
       awaitingApproval,
       paymentReview,
     };
   }
-  if (["packages", "collections", "deliveries", "cod"].includes(resource)) {
+  if (resource === "available") {
+    requireRole(actor, "DRIVER");
+    const where: Prisma.DeliveryParcelWhereInput = {
+      state: "REGISTERED",
+      driverId: null,
+      partner: { account: { status: "APPROVED" } },
+    };
+    // Recipient identity and phone are disclosed only after an approved rider claims the job.
+    const [items, total] = await Promise.all([
+      db.deliveryParcel.findMany({
+        where,
+        select: {
+          id: true,
+          publicId: true,
+          zone: true,
+          destinationLabel: true,
+          destination: true,
+          registeredAt: true,
+          partner: {
+            select: {
+              businessName: true,
+              pickupAddress: true,
+              pickupArea: true,
+            },
+          },
+        },
+        orderBy: [{ registeredAt: "asc" }, { id: "asc" }],
+        take,
+        skip,
+      }),
+      db.deliveryParcel.count({ where }),
+    ]);
+    return { items, total, page, pageSize: take };
+  }
+  if (resource === "quote-options") {
+    requireRole(actor, "ADMIN", "PARTNER");
+    const id =
+      actor.role === "PARTNER"
+        ? actor.partnerId!
+        : z.uuid().parse(search.get("partnerId"));
+    const partner = await db.deliveryPartner.findUnique({
+      where: { id },
+      select: { operatingLocation: true, businessName: true },
+    });
+    if (!partner) throw new DeliveryError("Partner not found.", 404);
+    const rates = partner.operatingLocation
+      ? await db.deliveryRate.findMany({
+          where: {
+            origin: partner.operatingLocation,
+            destination: { active: true },
+          },
+          include: { destination: true },
+          orderBy: { zone: "asc" },
+        })
+      : [];
+    return { partner, rates };
+  }
+  if (["packages", "collections", "deliveries"].includes(resource)) {
     if (resource === "collections" || resource === "deliveries")
       requireRole(actor, "DRIVER");
     const query = search.get("q")?.trim().slice(0, 100);
@@ -280,14 +318,12 @@ export async function deliveryQuery(
                   ? filter
                   : { in: ["PICKED_UP", "DELIVERED"] },
             }
-          : resource === "cod"
-            ? { state: "DELIVERED", codAmount: { gt: 0 } }
-            : filter &&
-                ["REGISTERED", "PICKED_UP", "DELIVERED", "CANCELLED"].includes(
-                  filter,
-                )
-              ? { state: filter as "REGISTERED" }
-              : {}),
+          : filter &&
+              ["REGISTERED", "PICKED_UP", "DELIVERED", "CANCELLED"].includes(
+                filter,
+              )
+            ? { state: filter as "REGISTERED" }
+            : {}),
       ...(query
         ? {
             OR: [
@@ -426,7 +462,10 @@ export async function deliveryQuery(
     return { items, total, page, pageSize: take };
   }
   if (resource === "notifications") {
-    const where = { recipient: actor.userId };
+    const where = {
+      recipient: actor.userId,
+      workspace: { in: ["ACCOUNT", actor.role] },
+    };
     const [items, total, unread] = await Promise.all([
       db.deliveryNotification.findMany({
         where,
@@ -452,8 +491,25 @@ export async function deliveryQuery(
     return { items, total, page, pageSize: take };
   }
   if (resource === "rates") {
-    requireRole(actor, "ADMIN", "PARTNER");
-    return { items: await db.deliveryRate.findMany() };
+    requireRole(actor, "ADMIN");
+    const [items, total] = await Promise.all([
+      db.deliveryRate.findMany({
+        include: { destination: true },
+        orderBy: [{ origin: "asc" }, { zone: "asc" }],
+        take,
+        skip,
+      }),
+      db.deliveryRate.count(),
+    ]);
+    return { items, total, page, pageSize: take };
+  }
+  if (resource === "destinations") {
+    requireRole(actor, "ADMIN");
+    const [items, total] = await Promise.all([
+      db.deliveryDestination.findMany({ orderBy: { code: "asc" }, take, skip }),
+      db.deliveryDestination.count(),
+    ]);
+    return { items, total, page, pageSize: take };
   }
   if (resource === "settings") {
     requireRole(actor, "ADMIN", "PARTNER");

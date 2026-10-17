@@ -3,7 +3,13 @@ import { createHash, randomUUID } from "node:crypto";
 import { Prisma } from "@/generated/prisma/client";
 import { database } from "../db";
 import { audit, notify, notifyAdmins, serialized, type Tx } from "./commands";
-import { DeliveryError, nextCutoff, requireRole, type Actor } from "./domain";
+import {
+  DeliveryError,
+  operatingLocationLabels,
+  nextCutoff,
+  requireRole,
+  type Actor,
+} from "./domain";
 import type { PartnerApplicationInput } from "./partner-application-input";
 
 export const applicationSelection = {
@@ -17,6 +23,9 @@ export const applicationSelection = {
   pageUrl: true,
   pickupAddress: true,
   pickupArea: true,
+  operatingLocation: true,
+  logoReady: true,
+  submittedAt: true,
   dailyDeliveries: true,
   status: true,
   reviewNote: true,
@@ -34,11 +43,12 @@ export async function lockApplication(tx: Tx, id: string) {
 export async function reservePartnerApplication(
   key: string,
   input: PartnerApplicationInput,
-  logo: Buffer,
+  logo: Buffer | null,
 ) {
   const digest = createHash("sha256")
     .update(JSON.stringify(input))
-    .update(logo)
+    .update(logo ? "logo:" : "no-logo")
+    .update(logo ?? Buffer.alloc(0))
     .digest("hex");
   try {
     return await database().$transaction(async (tx) => {
@@ -68,9 +78,10 @@ export async function reservePartnerApplication(
           businessType: input.businessType,
           pageUrl: input.pageUrl,
           pickupAddress: input.pickupAddress,
-          pickupArea: input.pickupArea,
+          pickupArea: operatingLocationLabels[input.operatingLocation],
+          operatingLocation: input.operatingLocation,
           dailyDeliveries: input.dailyDeliveries,
-          logoPath: `${id}/logo.webp`,
+          logoPath: logo ? `${id}/logo.webp` : null,
         },
       });
     });
@@ -95,10 +106,10 @@ export async function completePartnerApplication(id: string, digest: string) {
     });
     if (application.digest !== digest)
       throw new DeliveryError("Application upload did not match.", 409);
-    if (!application.logoReady) {
+    if (!application.submittedAt) {
       await tx.deliveryPartnerApplication.update({
         where: { id },
-        data: { logoReady: true },
+        data: { logoReady: !!application.logoPath, submittedAt: new Date() },
       });
       const actor: Actor = {
         userId: "public:partner-application",
@@ -130,24 +141,42 @@ export async function reviewPartnerApplication(
   id: string,
   status: "APPROVED" | "REJECTED",
   note: string,
+  operatingLocation?: string,
 ) {
   requireRole(actor, "ADMIN");
   return serialized(
     actor,
     key,
-    { type: "reviewPartnerApplication", id, status, note },
+    {
+      type: "reviewPartnerApplication",
+      id,
+      status,
+      note,
+      operatingLocation: operatingLocation ?? null,
+    },
     async (tx) => {
       await lockApplication(tx, id);
       const application = await tx.deliveryPartnerApplication.findUnique({
         where: { id },
         include: { partner: true },
       });
-      if (!application?.logoReady)
+      if (
+        !application?.submittedAt ||
+        (application.logoPath && !application.logoReady)
+      )
         throw new DeliveryError("A complete application was not found.", 404);
       if (application.partner)
         throw new DeliveryError(
           "This partner is already activated. Manage their access under Partner pages.",
           409,
+        );
+      const location = operatingLocation ?? application.operatingLocation;
+      if (
+        status === "APPROVED" &&
+        (!location || !operatingLocationLabels[location])
+      )
+        throw new DeliveryError(
+          "Choose the business operating location before approving this application.",
         );
       if (application.status === status)
         throw new DeliveryError("This decision is already saved.", 409);
@@ -155,6 +184,12 @@ export async function reviewPartnerApplication(
         where: { id },
         data: {
           status,
+          ...(location
+            ? {
+                operatingLocation: location,
+                pickupArea: operatingLocationLabels[location],
+              }
+            : {}),
           reviewNote: note,
           reviewedBy: actor.userId,
           reviewedAt: new Date(),
@@ -164,6 +199,7 @@ export async function reviewPartnerApplication(
         from: application.status,
         to: status,
         note,
+        operatingLocation: location,
       });
       return {
         message:
@@ -201,7 +237,8 @@ export async function activateApprovedPartner(
       !current ||
       current.status !== "APPROVED" ||
       current.invitationState !== "SENT" ||
-      !current.logoReady
+      !current.submittedAt ||
+      (current.logoPath && !current.logoReady)
     )
       return null;
     if (current.partner)
@@ -229,6 +266,7 @@ export async function activateApprovedPartner(
             pageUrl: current.pageUrl,
             pickupAddress: current.pickupAddress,
             pickupArea: current.pickupArea,
+            operatingLocation: current.operatingLocation,
             nextInvoiceAt: nextCutoff(new Date(), 1080),
           },
         },

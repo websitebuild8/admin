@@ -5,7 +5,7 @@ import ExcelJS from "exceljs";
 import {
   applicationInput,
   commandInput,
-  defaultRates,
+  defaultRateMatrix,
   localDate,
   nextCutoff,
   parcelInput,
@@ -35,7 +35,6 @@ const row = [
   "7771234",
   "Building, street, Malé",
   "MALE",
-  "120.25",
   "Fragile",
 ];
 async function workbook(rows: unknown[][], headings = importColumns) {
@@ -61,7 +60,7 @@ test("MVR uses exact integer laari and rejects unsafe or fractional input", () =
     "1000000",
   ])
     assert.throws(() => parseMoney(v));
-  assert.deepEqual(defaultRates, {
+  assert.deepEqual(defaultRateMatrix.MALE, {
     BOAT: 2500,
     MALE: 2500,
     HULHUMALE_1: 3500,
@@ -137,9 +136,11 @@ test("application and parcel validation cannot grant roles or accept arbitrary p
     recipientPhone: "+9607771234",
     destination: "Building Malé",
     zone: "MALE",
-    codAmount: "12.50",
   };
-  assert.equal(parcelInput.parse(input).codAmount, 1250);
+  assert.equal(
+    parcelInput.safeParse({ ...input, codAmount: "12.50" }).success,
+    false,
+  );
   assert.equal(parcelInput.parse(input).externalReference, "REF-1");
   assert.equal(
     parcelInput.safeParse({ ...input, codAmount: "-3" }).success,
@@ -182,7 +183,7 @@ test("Excel import parses plain values, normalizes references, and detects dupli
     ]),
   );
   assert.equal(data.rows.length, 1);
-  assert.equal(data.rows[0].codAmount, 12025);
+  assert.equal(data.rows[0].description, "Fragile");
   assert.equal(data.errors[0].row, 3);
   assert.match(data.errors[0].message, /Duplicate/);
 });
@@ -222,4 +223,24 @@ test("Excel archive validation reads streams and rejects forged expanded sizes",
   assert(central >= 0);
   bytes.writeUInt32LE(1, central + 24);
   await assert.rejects(inspectWorkbookArchive(bytes), /archive/);
+});
+
+test("origin prices cover all twelve routes and reject retired cash commands", () => {
+  assert.deepEqual(defaultRateMatrix, {
+    MALE: { MALE: 2500, HULHUMALE_1: 3500, HULHUMALE_2: 4500, BOAT: 2500 },
+    HULHUMALE_1: {
+      MALE: 3500,
+      HULHUMALE_1: 2500,
+      HULHUMALE_2: 3000,
+      BOAT: 3500,
+    },
+    HULHUMALE_2: {
+      MALE: 4500,
+      HULHUMALE_1: 3000,
+      HULHUMALE_2: 2500,
+      BOAT: 4500,
+    },
+  });
+  for (const type of ["handover", "remit"])
+    assert.equal(commandInput.safeParse({ type }).success, false);
 });

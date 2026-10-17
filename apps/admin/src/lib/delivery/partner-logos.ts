@@ -80,15 +80,23 @@ export async function partnerLogo(actor: Actor, applicationId?: string) {
   const application =
     actor.role === "ADMIN" && applicationId
       ? await database().deliveryPartnerApplication.findFirst({
-          where: { id: applicationId, logoReady: true },
+          where: {
+            id: applicationId,
+            logoReady: true,
+            logoPath: { not: null },
+          },
         })
       : actor.role === "PARTNER"
         ? await database().deliveryPartnerApplication.findFirst({
-            where: { partner: { id: actor.partnerId! }, logoReady: true },
+            where: {
+              partner: { id: actor.partnerId! },
+              logoReady: true,
+              logoPath: { not: null },
+            },
           })
         : null;
   if (
-    !application ||
+    !application?.logoPath ||
     (actor.role === "PARTNER" &&
       applicationId &&
       application.id !== applicationId)

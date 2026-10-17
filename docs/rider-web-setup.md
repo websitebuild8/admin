@@ -9,8 +9,9 @@ The seller delivery platform now has a separate rider website at `/rider`, with 
 3. Admin selects registered packages in **Packages**, then **Assign rider**. Only approved riders appear in the selector.
 4. The rider sees their own assigned packages, grouped by business. Each package shows pickup and destination contacts, the recipient amount to collect, and the separate fee billed to the partner. Lists contain at most 10 packages per page.
 5. Checkboxes are local selections. **Confirm pickup**, followed by the explicit physical-receipt confirmation, records pickup for only those selected packages.
-6. **Deliver** shows packages already picked up. Completing a delivery requires explicit confirmation; cash-on-delivery packages additionally require confirmation that the full recipient amount was received. Completion records the rider and server time. It does not verify cash handover to iGO.
-7. **History**, **Cash** and **Notifications** contain only that rider's information. Admin verifies cash handover in the existing admin COD screen. Delivery invoices and partner payouts remain separate.
+6. **Find jobs** lists registered, unassigned packages (10 per page). Take delivery claims one atomically; recipient contact details then appear in the rider’s private collection list. A claim is not pickup.
+7. **Deliver** shows picked-up packages. Confirm delivery only after the recipient physically receives the package. Server time and rider attribution are recorded; no recipient payment is collected.
+8. **History** and **Notifications** contain only that rider’s information.
 
 There is no live GPS tracking. Directions open in the rider's Google Maps application/browser; iGO does not request or store their device location. Addresses are the partner's saved pickup address and the package's saved destination, rather than surveyed coordinates. Riders should confirm building/entrance details when necessary. Boat packages show the destination on a place map, without inventing a ferry route.
 
@@ -71,7 +72,7 @@ Vault stores the signing secret encrypted at rest. The scheduler puts a timestam
 - Keep existing Clerk, database and storage variables. Clerk must allow rider account registration with the identity verification method you choose; admin access remains controlled by `ADMIN_CLERK_USER_IDS`. A newly created identity grants no admin or delivery access by itself.
 - Use real, separate admin, partner and rider accounts to review the complete browser flow. Verify pending and suspended riders cannot access work; verify two riders cannot see each other's packages.
 - Test two browsers/devices: enable rider alerts, close the rider page, assign a package as admin, receive the alert, then open the assigned work. Do not treat a provider HTTP success as proof of device display.
-- Check selected versus unselected pickup, repeated confirmations, COD collection confirmation, separate delivery fee, timestamps and admin-verified handover.
+- Check selected versus unselected pickup, repeated confirmations, rider claim races, separate physical pickup, delivery-fee display and timestamps.
 - Check route accuracy with real local addresses and check boat handover instructions. There is no live tracking or guaranteed automatic entrance-pin placement.
 - Update the rider privacy notice's business/contact placeholders and review the operational rider agreement before public launch.
 - Run `npm test`, `npm run lint`, `npm run typecheck`, `npm run delivery:integration` and `npm run build`. Integration tests use a disposable database schema, test push senders and fictional delivery data; they do not send real push messages or create real deliveries.

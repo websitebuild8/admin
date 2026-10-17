@@ -1,12 +1,20 @@
 import { z } from "zod";
+import {
+  adminAccessInput,
+  manageAdministrator,
+} from "@/lib/delivery/admin-access";
+import { assertAdministrator } from "@/lib/delivery/admin-authorization";
+import { requireSuperAdmin } from "@/lib/delivery/admin-policy";
 import { NextResponse, after } from "next/server";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { workspaceFromRequest } from "@/lib/delivery/workspace-contract";
 import { deliveryActor } from "@/lib/delivery/auth";
 import { deliveryQuery } from "@/lib/delivery/queries";
 import { deliveryCommand } from "@/lib/delivery/commands";
 import {
   commandInput,
+  operatingLocations,
   DeliveryError,
   requireRole,
 } from "@/lib/delivery/domain";
@@ -30,8 +38,12 @@ export const dynamic = "force-dynamic";
 type Context = { params: Promise<{ resource: string }> };
 export async function GET(request: Request, context: Context) {
   try {
-    const actor = await deliveryActor(),
-      { resource } = await context.params;
+    const { resource } = await context.params;
+    const actor = await deliveryActor(
+      resource === "workspaces" ? undefined : workspaceFromRequest(request),
+    );
+    if (resource === "workspaces")
+      return json({ workspaces: actor.workspaces ?? [], role: actor.role });
     const params = new URL(request.url).searchParams;
     if (resource === "partner-logo") {
       const applicationId = params.get("id");
@@ -79,7 +91,7 @@ export async function GET(request: Request, context: Context) {
 export async function POST(request: Request, context: Context) {
   try {
     originCheck(request);
-    const actor = await deliveryActor(),
+    const actor = await deliveryActor(workspaceFromRequest(request)),
       { resource } = await context.params;
     await limitRequests(
       actor,
@@ -106,6 +118,13 @@ export async function POST(request: Request, context: Context) {
       );
     }
     const key = z.uuid().parse(request.headers.get("idempotency-key"));
+    if (resource === "admin-access") {
+      requireSuperAdmin(actor);
+      const input = adminAccessInput.parse(
+        JSON.parse((await boundedBody(request, 4000)).toString("utf8")),
+      );
+      return json(await manageAdministrator(actor, key, input));
+    }
     if (resource === "partner-review" || resource === "partner-invitation") {
       requireRole(actor, "ADMIN");
       const body = JSON.parse(
@@ -129,6 +148,7 @@ export async function POST(request: Request, context: Context) {
           applicationId: z.uuid(),
           status: z.enum(["APPROVED", "REJECTED"]),
           note: z.string().trim().min(3).max(500),
+          operatingLocation: z.enum(operatingLocations).optional(),
         })
         .strict()
         .parse(body);
@@ -139,6 +159,7 @@ export async function POST(request: Request, context: Context) {
           input.applicationId,
           input.status,
           input.note,
+          input.operatingLocation,
         ),
       );
     }
@@ -159,9 +180,12 @@ export async function POST(request: Request, context: Context) {
     }
     if (resource === "invoice-run") {
       requireRole(actor, "ADMIN");
-      const [result] = await database().$queryRaw<
-        { result: unknown }[]
-      >`SELECT public.igo_invoice_due() AS result`;
+      const [result] = await database().$transaction(async (tx) => {
+        await assertAdministrator(tx, actor);
+        return tx.$queryRaw<
+          { result: unknown }[]
+        >`SELECT public.igo_invoice_due() AS result`;
+      });
       return json({
         message: "Due invoice cycles processed.",
         result: result.result,

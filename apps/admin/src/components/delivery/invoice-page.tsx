@@ -19,7 +19,7 @@ export async function InvoicePage({
 }) {
   let actor;
   try {
-    actor = await deliveryActor();
+    actor = await deliveryActor(partner ? "PARTNER" : "ADMIN", false);
   } catch (error) {
     if (error instanceof DeliveryError && error.status === 401)
       redirect(partner ? "/partner/sign-in" : "/delivery/sign-in");

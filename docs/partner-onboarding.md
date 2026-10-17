@@ -5,8 +5,8 @@ application, including when the browser already has an administrator session.
 It does not create a Clerk account or grant any operating role.
 
 The form collects the page/business name and type, Facebook/Instagram/website
-link, owner/manager name, contact number, email, pickup island and address,
-estimated daily delivery count, contact acknowledgement and a business logo.
+link (optional), owner/manager name, contact number, email, pickup island and address,
+estimated daily delivery count, contact acknowledgement and an optional business logo.
 The future login name is the approved email address.
 
 Page links may omit `https://`. The form adds it when leaving the field, and the
@@ -36,22 +36,27 @@ validation, and credentials or non-web URL schemes are rejected.
 Passwords are handled by Clerk. iGO does not generate, store or email plaintext
 passwords. Partners use their account menu → Manage account → Security to change
 their own password. Existing Clerk users keep their existing identity. An email
-already bound to an admin, delivery partner or driver is rejected by invitation
-preflight instead of being silently reassigned to another business.
+already bound to a delivery partner or driver is rejected by invitation preflight
+instead of being silently reassigned to another business. An admin-only account
+can activate an approved partner application without losing its admin access.
+An existing partner or rider can also receive an independent admin grant and
+[switch workspaces](admin-access-and-workspaces.md).
 
 ## Partner privacy
 
 Approved partners use `/partner`, not the admin workspace. Links inside their
 dashboard stay under `/partner`. Old `/delivery` links redirect a partner to
-their own workspace. Administrator sessions do not turn into partner sessions.
+their own workspace. An account with both kinds of access must select its Partner
+workspace to use the business-scoped dashboard; admin access never bypasses
+partner approval.
 
 Only the partner's own package counts, recipient/delivery details, package
-history, invoices, transfers and cash-on-delivery balances are returned. Partner
+history, invoices and delivery-fee transfers are returned. Partner
 selectors, business/driver lists, applications, system audit logs and scheduler
 health are admin-only. Bank beneficiary details and published delivery rates
 remain visible so the partner can understand and pay their own invoices.
 
-The approved business name and logo appear in its sidebar and page header,
+The approved business name and any uploaded logo appear in its sidebar and page header,
 including mobile layouts. Other partners cannot fetch the logo by changing an
 application ID. Business logos are private Supabase objects, served through an
 authenticated, role-scoped endpoint. Images are decoded, stripped of metadata,
@@ -60,8 +65,8 @@ and excessive-pixel inputs are rejected.
 
 ## Configuration and deployment
 
-- Apply the additive migration `20261016050000_partner_applications` with
-  `npm run db:deploy`. Existing accounts and financial records are retained.
+- Follow the coordinated [release steps](origin-pricing-and-rider-jobs.md#release-steps)
+  for the currently pending migrations, including optional-assets/admin access.
 - Run `npm run delivery:logo-storage` once to create/verify the private
   `igo-partner-logos` bucket. It uploads and removes only its own temporary probe.
   Use the existing Supabase server secret; never put it in browser settings.
@@ -78,7 +83,8 @@ and excessive-pixel inputs are rejected.
 
 ### “Business logo storage needs server configuration” on Netlify
 
-This error occurs before any Storage upload: the running server has a missing or
+This error occurs only when a logo is supplied. An application without a logo
+does not need Storage configuration. It occurs before upload: the running server has a missing or
 invalid `SUPABASE_URL` or server key. Local `.env.local` values are intentionally
 ignored by Git and are not copied into a Netlify deployment.
 
@@ -95,8 +101,9 @@ or commit it to the repository.
 Run `npm run delivery:logo-storage` against the intended project to verify its
 private `igo-partner-logos` bucket. Keep the existing application form open and
 retry after the new deploy is ready: its request key resumes a reserved upload
-without creating a duplicate application. New requests check server configuration
-before reserving an application or consuming database-backed submission limits.
+without creating a duplicate application. Requests with a supplied logo check
+Storage configuration before reserving an application. Public rate limits apply
+to submissions with or without a logo.
 
 Netlify reference: [Environment variables and functions](https://docs.netlify.com/build/functions/environment-variables/).
 
@@ -172,3 +179,7 @@ walkthrough passed from the database tests or the read-only Clerk check.
 - A real invited owner's email acceptance and signed-in partner browser
   walkthrough remain unverified. Set the final deployed website origin before
   inviting live businesses. The user will commit/push and deploy separately.
+
+The application now requires Malé, Hulhumalé Phase 1 or Phase 2 as the operating
+location. Admin can change this later under Partner pages, with a recorded reason.
+See [current pricing and rider jobs](origin-pricing-and-rider-jobs.md).

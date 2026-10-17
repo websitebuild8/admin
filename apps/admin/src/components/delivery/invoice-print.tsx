@@ -25,7 +25,7 @@ const stamp = (value: string) =>
   }).format(new Date(value));
 function Lines({ lines }: { lines: InvoiceDocument["lines"] }) {
   return (
-    <div className="cod-receipt-lines">
+    <div className="invoice-document-lines">
       <Table>
         <TableHeader>
           <TableRow>
@@ -65,8 +65,8 @@ export function InvoicePrint({
   const [paymentPage, setPaymentPage] = useState(1);
   const business = document.settings;
   return (
-    <main className="cod-print-page">
-      <div className="cod-print-toolbar">
+    <main className="invoice-print-page">
+      <div className="invoice-print-toolbar">
         <Link href={partner ? "/partner/invoices" : "/delivery/invoices"}>
           ← Back to invoices
         </Link>
@@ -74,7 +74,7 @@ export function InvoicePrint({
           <Printer size={16} /> Print / save PDF
         </Button>
       </div>
-      <article className="cod-receipt d-invoice-document">
+      <article className="invoice-document d-invoice-document">
         <header>
           <div>
             <Image
@@ -87,7 +87,7 @@ export function InvoicePrint({
             <p>You order. I go.</p>
           </div>
           <div>
-            <span className="cod-receipt-status">
+            <span className="invoice-document-status">
               {document.paid === document.total
                 ? "Paid"
                 : document.paid
@@ -95,10 +95,10 @@ export function InvoicePrint({
                   : "Payment due"}
             </span>
             <h2>{paidProof ? "Paid delivery invoice" : "Delivery invoice"}</h2>
-            <p className="cod-receipt-number">{document.publicId}</p>
+            <p className="invoice-document-number">{document.publicId}</p>
           </div>
         </header>
-        <div className="cod-receipt-parties">
+        <div className="invoice-document-parties">
           <section>
             <span>ISSUED BY</span>
             <h3>{business?.businessLegalName || "iGO Delivery"}</h3>
@@ -117,7 +117,7 @@ export function InvoicePrint({
             <p>{document.partner.pickupAddress}</p>
           </section>
         </div>
-        <dl className="cod-receipt-facts">
+        <dl className="invoice-document-facts">
           <div>
             <dt>Issued (MVT)</dt>
             <dd>{stamp(document.createdAt)}</dd>
@@ -151,10 +151,10 @@ export function InvoicePrint({
             </>
           )}
         </dl>
-        <div className="cod-screen-only">
+        <div className="invoice-screen-only">
           <Lines lines={document.lines.slice((page - 1) * 10, page * 10)} />
         </div>
-        <div className="cod-print-only">
+        <div className="invoice-print-only">
           <Lines lines={document.lines} />
         </div>
         <div className="d-invoice-document-totals">
@@ -174,7 +174,7 @@ export function InvoicePrint({
         {paidProof && (
           <section className="d-paid-invoice-payments">
             <h3>Verified bank payments</h3>
-            <div className="cod-screen-only">
+            <div className="invoice-screen-only">
               <PaidPayments
                 payments={paidProof.payments.slice(
                   (paymentPage - 1) * 10,
@@ -187,7 +187,7 @@ export function InvoicePrint({
                 onPage={setPaymentPage}
               />
             </div>
-            <div className="cod-print-only">
+            <div className="invoice-print-only">
               <PaidPayments payments={paidProof.payments} />
             </div>
           </section>
@@ -211,14 +211,14 @@ export function InvoicePrint({
           </p>
         </footer>
       </article>
-      <div className="cod-screen-only">
+      <div className="invoice-screen-only">
         <HistoryPager
           page={page}
           total={document.lines.length}
           onPage={setPage}
         />
       </div>
-      <p className="cod-receipt-print-hint">
+      <p className="invoice-document-print-hint">
         Printing includes all {document.lines.length} packages, across every
         page.
       </p>
@@ -231,7 +231,7 @@ function PaidPayments({
   payments: PaidInvoiceProof["payments"];
 }) {
   return (
-    <div className="cod-receipt-lines">
+    <div className="invoice-document-lines">
       <Table>
         <TableHeader>
           <TableRow>

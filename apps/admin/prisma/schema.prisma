@@ -271,13 +271,6 @@ enum ParcelState {
   CANCELLED
 }
 
-enum DeliveryZone {
-  BOAT
-  MALE
-  HULHUMALE_1
-  HULHUMALE_2
-}
-
 enum DeliveryPaymentState {
   PENDING
   REJECTED
@@ -298,7 +291,6 @@ model DeliveryAccount {
   createdAt   DateTime               @default(now()) @db.Timestamptz(3)
   partner     DeliveryPartner?
   assigned    DeliveryParcel[]       @relation("AssignedDeliveryDriver")
-  handovers   DeliveryCashHandover[]
   pushSubscriptions DeliveryPushSubscription[]
 }
 
@@ -310,6 +302,7 @@ model DeliveryPartner {
   pageUrl       String
   pickupAddress String
   pickupArea    String
+  operatingLocation String?
   cutoffMinutes Int                         @default(1080)
   nextInvoiceAt DateTime?                   @db.Timestamptz(3)
   parcels       DeliveryParcel[]
@@ -318,7 +311,6 @@ model DeliveryPartner {
   imports       DeliveryImport[]
   receipts      DeliveryReceipt[]
   cycles        DeliveryBillingCycle[]
-  remittances   DeliveryCodRemittance[]
   applicationId String?                     @unique @db.Uuid
   application   DeliveryPartnerApplication? @relation(fields: [applicationId], references: [id])
 }
@@ -338,8 +330,10 @@ model DeliveryPartnerApplication {
   pageUrl             String
   pickupAddress       String
   pickupArea          String
+  operatingLocation   String?
   dailyDeliveries     Int
-  logoPath            String
+  logoPath            String?
+  submittedAt         DateTime?        @db.Timestamptz(3)
   logoReady           Boolean          @default(false)
   status              DeliveryReview   @default(PENDING)
   reviewNote          String           @default("")
@@ -357,10 +351,21 @@ model DeliveryPartnerApplication {
   @@index([status, createdAt])
 }
 
+model DeliveryDestination {
+  code String @id
+  label String
+  active Boolean @default(true)
+  rates DeliveryRate[]
+  parcels DeliveryParcel[]
+}
+
 model DeliveryRate {
-  zone      DeliveryZone @id
-  fee       Int
-  updatedAt DateTime     @updatedAt @db.Timestamptz(3)
+  origin String
+  zone String
+  destination DeliveryDestination @relation(fields: [zone], references: [code])
+  fee Int
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+  @@id([origin, zone])
 }
 
 model DeliveryParcel {
@@ -372,10 +377,12 @@ model DeliveryParcel {
   recipientName     String
   recipientPhone    String
   destination       String
-  zone              DeliveryZone
+  zone              String
+  destinationZone   DeliveryDestination @relation(fields: [zone], references: [code])
+  destinationLabel  String
+  origin            String?
   description       String                 @default("")
   fee               Int
-  codAmount         Int                    @default(0)
   state             ParcelState            @default(REGISTERED)
   driverId          String?                @db.Uuid
   driver            DeliveryAccount?       @relation("AssignedDeliveryDriver", fields: [driverId], references: [id])
@@ -384,11 +391,6 @@ model DeliveryParcel {
   pickedUpBy        String?
   deliveredAt       DateTime?              @db.Timestamptz(3)
   deliveredBy       String?
-  codCollectedAt    DateTime?              @db.Timestamptz(3)
-  handoverId        String?                @db.Uuid
-  handover          DeliveryCashHandover?  @relation(fields: [handoverId], references: [id])
-  remittanceId      String?                @db.Uuid
-  remittance        DeliveryCodRemittance? @relation(fields: [remittanceId], references: [id])
   importId          String?                @db.Uuid
   batch             DeliveryImport?        @relation(fields: [importId], references: [id])
   invoiceLine       DeliveryInvoiceLine?
@@ -396,7 +398,6 @@ model DeliveryParcel {
   @@unique([partnerId, externalReference])
   @@index([partnerId, registeredAt])
   @@index([driverId, state, registeredAt])
-  @@index([remittanceId])
   @@index([partnerId, state, deliveredAt])
 }
 
@@ -498,36 +499,6 @@ model DeliveryPaymentAllocation {
   amount    Int
 }
 
-model DeliveryCashHandover {
-  id         String           @id @default(uuid()) @db.Uuid
-  driverId   String           @db.Uuid
-  driver     DeliveryAccount  @relation(fields: [driverId], references: [id])
-  amount     Int
-  reference  String           @unique
-  verifiedBy String
-  createdAt  DateTime         @default(now()) @db.Timestamptz(3)
-  parcels    DeliveryParcel[]
-}
-
-model DeliveryCodRemittance {
-  id         String           @id @default(uuid()) @db.Uuid
-  partnerId  String           @db.Uuid
-  partner    DeliveryPartner  @relation(fields: [partnerId], references: [id])
-  amount     Int
-  reference  String           @unique
-  verifiedBy String
-  createdAt  DateTime         @default(now()) @db.Timestamptz(3)
-  parcels    DeliveryParcel[]
-  receipt    DeliveryCodReceipt?
-}
-
-model DeliveryCodReceipt {
-  id         String                @id @db.Uuid
-  remittance DeliveryCodRemittance @relation(fields: [id], references: [id], onDelete: Restrict)
-  snapshot   Json
-  createdAt  DateTime              @default(now()) @db.Timestamptz(3)
-}
-
 model DeliveryCommand {
   id        String   @id
   hash      String
@@ -551,6 +522,7 @@ model DeliveryActivity {
 model DeliveryNotification {
   id              String                   @id @default(uuid()) @db.Uuid
   recipient       String
+  workspace       String                   @default("ACCOUNT")
   title           String
   message         String
   readAt          DateTime?                @db.Timestamptz(3)
@@ -644,4 +616,19 @@ model DeliveryInvoiceEvent {
   receiptId String? @db.Uuid
 
   @@index([invoiceId, occurredAt, id])
+}
+
+// Separate privileges preserve the account's approved partner/rider identity.
+model DeliveryAdminGrant {
+  id String @id @default(uuid()) @db.Uuid
+  clerkUserId String @unique
+  email String
+  name String
+  active Boolean @default(true)
+  grantedBy String
+  grantedAt DateTime @default(now()) @db.Timestamptz(3)
+  revokedBy String?
+  revokedAt DateTime? @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+  @@index([active, grantedAt])
 }

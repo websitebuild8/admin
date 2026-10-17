@@ -24,6 +24,31 @@ export async function packageImport(
       row: 0,
       message: `Parcel reference ${existing.externalReference} is already registered.`,
     });
+  const partner = await database().deliveryPartner.findUnique({
+    where: { id: partnerId },
+    select: { operatingLocation: true },
+  });
+  const rates = partner?.operatingLocation
+    ? await database().deliveryRate.findMany({
+        where: {
+          origin: partner.operatingLocation,
+          destination: { active: true },
+        },
+        select: { zone: true },
+      })
+    : [];
+  if (!partner?.operatingLocation)
+    result.errors.push({
+      row: 0,
+      message:
+        "Ask iGO to set your business operating location before importing packages.",
+    });
+  for (const zone of new Set(result.rows.map((row) => row.zone)))
+    if (!rates.some((rate) => rate.zone === zone))
+      result.errors.push({
+        row: 0,
+        message: `No active rate is configured for destination ${zone} from your business location.`,
+      });
   if (mode === "preview")
     return {
       count: result.rows.length,

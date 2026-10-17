@@ -1,4 +1,6 @@
 "use client";
+import { WorkspaceSwitcher } from "@/components/delivery/workspace-switcher";
+import { deliveryFetch } from "@/lib/delivery/fetch";
 import { useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -45,7 +47,7 @@ export function RiderApplication({ actor }: { actor: Actor }) {
     setBusy(true);
     setError("");
     try {
-      const response = await fetch("/api/delivery/commands", {
+      const response = await deliveryFetch("/api/delivery/commands", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -79,6 +81,7 @@ export function RiderApplication({ actor }: { actor: Actor }) {
               priority
             />
           </Link>
+          <WorkspaceSwitcher actor={actor} />
           <UserButton />
         </div>
         <span className="r-eyebrow">IGO RIDER / YOUR APPLICATION</span>
@@ -113,7 +116,7 @@ export function RiderApplication({ actor }: { actor: Actor }) {
             </h1>
             <p>
               {sent || actor.status === "PENDING"
-                ? "Your application is saved. iGO will review it before assigning any collections. Sign in here with this same account to check your status."
+                ? "Your application is saved. iGO will review it before you can take or receive delivery assignments. Sign in here with this same account to check your status."
                 : "Contact iGO to discuss your application or access. Your delivery records are retained."}
             </p>
             <div className="r-status">
@@ -164,8 +167,7 @@ export function RiderApplication({ actor }: { actor: Actor }) {
               </div>
               <Label className="r-check">
                 <Checkbox required name="responsibility" />I will confirm pickup
-                only after receiving packages, and record delivery and cash
-                collection accurately.
+                only after receiving packages, and record delivery accurately.
               </Label>
               <p className="r-fine">
                 Your name and contact number are used to review your application

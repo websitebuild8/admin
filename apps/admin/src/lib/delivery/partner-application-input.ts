@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { operatingLocations } from "./domain";
 
 /** Normalize the address locally; never fetch or expand a submitted short link. */
 export function normalizePartnerPageUrl(input: string) {
@@ -40,7 +41,7 @@ export const partnerApplicationInput = z
         "Use a seven-digit Maldives phone number.",
       ),
     pickupAddress: z.string().trim().min(5).max(500),
-    pickupArea: z.enum(["Malé", "Hulhumalé"]),
+    operatingLocation: z.enum(operatingLocations),
     dailyDeliveries: z
       .union([z.number(), z.string().regex(/^\d+$/)])
       .transform(Number)
@@ -49,7 +50,7 @@ export const partnerApplicationInput = z
   })
   .strict()
   .superRefine((value, ctx) => {
-    if (!value.pageUrl && value.businessType === "BUSINESS") return;
+    if (!value.pageUrl) return;
     let url: URL;
     try {
       url = new URL(value.pageUrl);

@@ -37,7 +37,7 @@ export async function verifyPartnerApplications(
     email: "qa-owner@example.test",
     phone: "7771234",
     pickupAddress: "QA building, QA street",
-    pickupArea: "Malé",
+    operatingLocation: "MALE",
     dailyDeliveries: "12",
     contactConsent: true,
   });
@@ -275,7 +275,7 @@ export async function verifyPartnerApplications(
   assert.equal(summary.outstanding, 0);
   assert.equal(summary.awaitingApproval, 0);
   assert.equal(summary.latest.length, 0);
-  for (const resource of ["packages", "invoices", "payments", "cod"]) {
+  for (const resource of ["packages", "invoices", "payments"]) {
     const result = (await deliveryQuery(
       actor,
       resource,
@@ -284,7 +284,7 @@ export async function verifyPartnerApplications(
     assert.equal(result.total, 0);
   }
   ok(
-    "new partner dashboards see only their own counts, packages, invoices, payments and COD",
+    "new partner dashboards see only their own counts, packages, invoices and payments",
   );
   const failed = await reservePartnerApplication(
     randomUUID(),

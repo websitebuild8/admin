@@ -13,7 +13,7 @@ const input = {
   email: "OWNER@EXAMPLE.COM",
   phone: "7771234",
   pickupAddress: "Building, street, first floor",
-  pickupArea: "Malé",
+  operatingLocation: "MALE",
   dailyDeliveries: "10",
   contactConsent: true,
 };
@@ -99,7 +99,6 @@ test("business applications enforce social-page hosts and safe URLs", () => {
     "data:text/html,facebook.com",
     "not a valid page link",
     "https://instagram.com/shop",
-    "",
   ])
     assert.equal(
       partnerApplicationInput.safeParse({ ...input, pageUrl }).success,
@@ -169,4 +168,30 @@ test("activation uses only Clerk's verified primary email", () => {
     verifiedPrimaryEmail({ primaryEmailAddressId: null, emailAddresses: [] }),
     null,
   );
+});
+
+test("business registration requires an explicit operating phase", () => {
+  for (const operatingLocation of ["MALE", "HULHUMALE_1", "HULHUMALE_2"])
+    assert.equal(
+      partnerApplicationInput.safeParse({ ...input, operatingLocation })
+        .success,
+      true,
+    );
+  for (const operatingLocation of ["", "Hulhumalé", "BOAT", undefined])
+    assert.equal(
+      partnerApplicationInput.safeParse({ ...input, operatingLocation })
+        .success,
+      false,
+    );
+});
+
+test("social business links are optional for every business type", () => {
+  for (const businessType of ["FACEBOOK", "INSTAGRAM", "BUSINESS"]) {
+    for (const pageUrl of ["", "   ", undefined])
+      assert.equal(
+        partnerApplicationInput.parse({ ...input, businessType, pageUrl })
+          .pageUrl,
+        "",
+      );
+  }
 });

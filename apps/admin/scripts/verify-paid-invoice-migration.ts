@@ -24,6 +24,7 @@ export async function verifyPaidInvoiceMigration(
           pageUrl: "https://example.com/qa",
           pickupAddress: "QA address",
           pickupArea: "Malé",
+          operatingLocation: "MALE",
         },
       },
     },
@@ -49,6 +50,8 @@ export async function verifyPaidInvoiceMigration(
         recipientPhone: "7771234",
         destination: "QA address",
         zone: "MALE",
+        origin: "MALE",
+        destinationLabel: "Malé",
         fee: 2500,
       },
     });
@@ -61,7 +64,6 @@ export async function verifyPaidInvoiceMigration(
     await cmd(driver, {
       type: "deliver",
       parcelId: parcel.id,
-      codReceived: false,
     });
     const invoice = await cmd(admin, {
       type: "createPartnerInvoice",

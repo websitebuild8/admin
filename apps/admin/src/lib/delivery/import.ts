@@ -8,7 +8,6 @@ export const importColumns = [
   "Recipient phone",
   "Destination",
   "Delivery zone",
-  "COD amount (MVR)",
   "Description",
 ];
 export async function inspectWorkbookArchive(bytes: Buffer) {
@@ -109,11 +108,11 @@ export async function parsePackagesWorkbook(bytes: Buffer) {
   if (
     !sheet ||
     sheet.rowCount > 501 ||
-    sheet.columnCount > 7 ||
+    sheet.columnCount > 6 ||
     wb.worksheets.length > 2
   )
     throw new DeliveryError(
-      "Use the Packages sheet with at most 500 packages and the seven template columns.",
+      "Use the Packages sheet with at most 500 packages and the six template columns.",
     );
   if (
     importColumns.some(
@@ -131,7 +130,7 @@ export async function parsePackagesWorkbook(bytes: Buffer) {
     errors: { row: number; message: string }[] = [],
     references = new Set<string>();
   for (let row = 2; row <= sheet.rowCount; row++) {
-    const cells = Array.from({ length: 7 }, (_, i) =>
+    const cells = Array.from({ length: 6 }, (_, i) =>
       sheet.getRow(row).getCell(i + 1),
     );
     if (cells.every((c) => c.value == null || c.text.trim() === "")) continue;
@@ -156,8 +155,7 @@ export async function parsePackagesWorkbook(bytes: Buffer) {
       recipientPhone: values[2],
       destination: values[3],
       zone: values[4],
-      codAmount: values[5] || "0",
-      description: values[6],
+      description: values[5],
     });
     if (!parsed.success) {
       errors.push({

@@ -65,7 +65,6 @@ export async function partnerHistory(
         destination: true,
         state: true,
         fee: true,
-        codAmount: true,
         deliveredAt: true,
         registeredAt: true,
         driver: { select: { name: true } },

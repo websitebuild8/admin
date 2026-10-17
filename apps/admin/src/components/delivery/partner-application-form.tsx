@@ -33,14 +33,20 @@ const businessTypes = [
   { value: "BUSINESS", label: "Other business" },
 ];
 const areas = [
-  { value: "Malé", label: "Malé" },
-  { value: "Hulhumalé", label: "Hulhumalé" },
+  { value: "MALE", label: "Malé" },
+  { value: "HULHUMALE_1", label: "Hulhumalé Phase 1" },
+  { value: "HULHUMALE_2", label: "Hulhumalé Phase 2" },
 ];
 
-export function PartnerApplicationForm() {
+export function PartnerApplicationForm({
+  registrationRequired = false,
+}: {
+  registrationRequired?: boolean;
+}) {
   const [businessType, setBusinessType] = useState("FACEBOOK");
   const [pageUrl, setPageUrl] = useState("");
-  const [pickupArea, setPickupArea] = useState("Malé");
+  const [operatingLocation, setOperatingLocation] = useState("");
+  const fileInput = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState("");
   const [consent, setConsent] = useState(false);
@@ -74,7 +80,7 @@ export function PartnerApplicationForm() {
         ].map((name) => [name, String(form.get(name) ?? "")]),
       ),
       businessType,
-      pickupArea,
+      operatingLocation,
       contactConsent: consent,
     });
     setError("");
@@ -93,18 +99,20 @@ export function PartnerApplicationForm() {
     }
     setPageUrl(input.data.pageUrl);
     if (
-      !file ||
-      !["image/jpeg", "image/png", "image/webp"].includes(file.type) ||
-      file.size > 3 * 1024 * 1024
+      file &&
+      (!["image/jpeg", "image/png", "image/webp"].includes(file.type) ||
+        file.size === 0 ||
+        file.size > 3 * 1024 * 1024)
     ) {
       setError("Choose a JPG, PNG or WebP business logo up to 3 MB.");
       return;
     }
     form.set("businessType", businessType);
     form.set("pageUrl", input.data.pageUrl);
-    form.set("pickupArea", pickupArea);
+    form.set("operatingLocation", operatingLocation);
     form.set("contactConsent", String(consent));
-    form.set("logo", file);
+    if (file) form.set("logo", file);
+    else form.delete("logo");
     setBusy(true);
     retry.current ??= crypto.randomUUID();
     try {
@@ -208,7 +216,10 @@ export function PartnerApplicationForm() {
                 <span>01</span>
                 <div>
                   <strong>Tell us about your business</strong>
-                  <p>A few details, your logo, and where we collect.</p>
+                  <p>
+                    Your business details and where we collect. Add a logo if
+                    you have one.
+                  </p>
                 </div>
               </li>
               <li>
@@ -273,6 +284,19 @@ export function PartnerApplicationForm() {
                   No login needed to apply. Your dashboard opens after review
                   and invitation.
                 </p>
+                {registrationRequired && (
+                  <div className="d-note" role="status">
+                    <strong>Let’s register your business first.</strong>
+                    <p>
+                      We couldn’t find a partner account ready to sign in.
+                      Complete this application with your business and contact
+                      details. Your page link and logo are optional. iGO will
+                      review it and, after approval, email you a secure account
+                      setup link. Already applied? Wait for your approval
+                      invitation or contact iGO before applying again.
+                    </p>
+                  </div>
+                )}
                 <form
                   onSubmit={submit}
                   onChange={changed}
@@ -310,7 +334,7 @@ export function PartnerApplicationForm() {
                         <Label htmlFor="application-pageUrl">
                           {businessType === "BUSINESS"
                             ? "Website or social page (optional)"
-                            : "Facebook / Instagram page link"}
+                            : "Facebook / Instagram page link (optional)"}
                         </Label>
                         <Input
                           id="application-pageUrl"
@@ -320,7 +344,7 @@ export function PartnerApplicationForm() {
                           autoCapitalize="none"
                           autoCorrect="off"
                           spellCheck={false}
-                          required={businessType !== "BUSINESS"}
+                          required={false}
                           maxLength={500}
                           value={pageUrl}
                           onChange={(event) => setPageUrl(event.target.value)}
@@ -352,7 +376,9 @@ export function PartnerApplicationForm() {
                         </span>
                       </div>
                       <div className="d-field full">
-                        <Label htmlFor="business-logo">Business logo</Label>
+                        <Label htmlFor="business-logo">
+                          Business logo (optional)
+                        </Label>
                         <div className="d-logo-upload">
                           {preview ? (
                             <Image
@@ -369,11 +395,11 @@ export function PartnerApplicationForm() {
                           )}
                           <div>
                             <Input
+                              ref={fileInput}
                               id="business-logo"
                               name="logo"
                               type="file"
                               accept="image/jpeg,image/png,image/webp"
-                              required
                               onChange={(event) => {
                                 const image = event.target.files?.[0] ?? null;
                                 setFile(image);
@@ -392,8 +418,23 @@ export function PartnerApplicationForm() {
                             />
                             <p>
                               JPG, PNG or WebP · up to 3 MB · at least 64 × 64
-                              pixels. We resize it to fit your dashboard.
+                              pixels. You can submit without a logo.
                             </p>
+                            {file && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                onClick={() => {
+                                  setFile(null);
+                                  setPreview("");
+                                  if (fileInput.current)
+                                    fileInput.current.value = "";
+                                  changed();
+                                }}
+                              >
+                                Remove logo
+                              </Button>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -424,17 +465,27 @@ export function PartnerApplicationForm() {
                     <legend>03 — Your deliveries</legend>
                     <div className="d-form">
                       <div className="d-field">
-                        <Label htmlFor="pickup-area">Pickup island</Label>
+                        <Label htmlFor="pickup-area">
+                          Business operating location
+                        </Label>
                         <Select
                           items={areas}
-                          value={pickupArea}
+                          value={operatingLocation}
                           onValueChange={(value) => {
-                            setPickupArea(String(value));
+                            setOperatingLocation(String(value));
                             changed();
                           }}
                         >
-                          <SelectTrigger id="pickup-area">
-                            <SelectValue />
+                          <SelectTrigger
+                            id="pickup-area"
+                            aria-invalid={!!fields.operatingLocation}
+                            aria-describedby={
+                              fields.operatingLocation
+                                ? "operating-location-error"
+                                : undefined
+                            }
+                          >
+                            <SelectValue placeholder="Choose where your business operates" />
                           </SelectTrigger>
                           <SelectContent>
                             {areas.map((item) => (
@@ -444,6 +495,19 @@ export function PartnerApplicationForm() {
                             ))}
                           </SelectContent>
                         </Select>
+                        {fields.operatingLocation && (
+                          <p
+                            id="operating-location-error"
+                            className="d-error"
+                            role="alert"
+                          >
+                            Choose the location your business operates from.
+                          </p>
+                        )}
+                        <p className="d-fine">
+                          Your delivery fees use this location. Contact iGO if
+                          your business moves.
+                        </p>
                       </div>
                       <div className="d-field">
                         <Label htmlFor="application-dailyDeliveries">
@@ -510,9 +574,10 @@ export function PartnerApplicationForm() {
                     about this application.
                   </Label>
                   <p className="d-join-privacy">
-                    Your contact details and logo are saved privately for iGO’s
-                    review and your future partner workspace. Applying does not
-                    create a login or approve your business.
+                    Your contact details and any logo provided are saved
+                    privately for iGO’s review and your future partner
+                    workspace. Applying does not create a login or approve your
+                    business.
                   </p>
                   {error && (
                     <div className="d-error" role="alert">

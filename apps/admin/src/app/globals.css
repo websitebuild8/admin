@@ -3,7 +3,7 @@
 @import "shadcn/tailwind.css";
 @import "./igo.css";
 @import "./delivery.css";
-@import "./cod-receipt.css";
+@import "./invoice-document.css";
 @import "./partner-history.css";
 
 @custom-variant dark (&:is(.dark *));

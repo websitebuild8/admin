@@ -1,9 +1,12 @@
 import "server-only";
+import { assertAdministrator } from "./admin-authorization";
+import { superAdminIds } from "./admin-policy";
 import { createHash, randomUUID } from "node:crypto";
 import { Prisma } from "@/generated/prisma/client";
 import { database } from "../db";
 import {
   DeliveryError,
+  operatingLocationLabels,
   nextCutoff,
   localDate,
   money,
@@ -45,16 +48,24 @@ export async function notify(
   recipient: string,
   title: string,
   message: string,
+  workspace: "ACCOUNT" | "ADMIN" | "PARTNER" | "DRIVER" = "ACCOUNT",
 ) {
   const notification = await tx.deliveryNotification.create({
-    data: { recipient, title, message },
+    data: { recipient, title, message, workspace },
   });
-  const subscriptions = await tx.deliveryPushSubscription.findMany({
-    where: {
-      driver: { clerkUserId: recipient, role: "DRIVER", status: "APPROVED" },
-    },
-    select: { id: true },
-  });
+  const subscriptions =
+    workspace === "ADMIN" || workspace === "PARTNER"
+      ? []
+      : await tx.deliveryPushSubscription.findMany({
+          where: {
+            driver: {
+              clerkUserId: recipient,
+              role: "DRIVER",
+              status: "APPROVED",
+            },
+          },
+          select: { id: true },
+        });
   if (subscriptions.length)
     await tx.deliveryPushMessage.createMany({
       data: subscriptions.map((subscription) => ({
@@ -66,11 +77,15 @@ export async function notify(
   return notification;
 }
 export async function notifyAdmins(tx: Tx, title: string, message: string) {
-  for (const recipient of (process.env.ADMIN_CLERK_USER_IDS ?? "")
-    .split(",")
-    .map((v) => v.trim())
-    .filter(Boolean))
-    await notify(tx, recipient, title, message);
+  const grants = await tx.deliveryAdminGrant.findMany({
+    where: { active: true },
+    select: { clerkUserId: true },
+  });
+  for (const recipient of new Set([
+    ...superAdminIds(),
+    ...grants.map((grant) => grant.clerkUserId),
+  ]))
+    await notify(tx, recipient, title, message, "ADMIN");
 }
 export async function serialized<T extends Prisma.InputJsonValue>(
   actor: Actor,
@@ -78,13 +93,14 @@ export async function serialized<T extends Prisma.InputJsonValue>(
   payload: unknown,
   work: (tx: Tx) => Promise<T>,
 ): Promise<T> {
-  const id = `${actor.userId}:${key}`,
+  const id = `${actor.userId}:${actor.role}:${key}`,
     hash = createHash("sha256").update(JSON.stringify(payload)).digest("hex");
   for (let attempt = 0; attempt < 5; attempt++) {
     try {
       return await database().$transaction(
         async (tx) => {
           await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${id}, 0))`;
+          if (actor.role === "ADMIN") await assertAdministrator(tx, actor);
           const old = await tx.deliveryCommand.findUnique({ where: { id } });
           if (old) {
             if (old.hash !== hash)
@@ -154,21 +170,37 @@ export async function createParcels(
   });
   if (!partner || partner.account.status !== "APPROVED")
     throw new DeliveryError("Choose an approved partner.", 409);
-  const rates = await tx.deliveryRate.findMany();
+  if (!partner.operatingLocation)
+    throw new DeliveryError(
+      "Ask iGO to set your business operating location before registering packages.",
+      409,
+    );
+  const rates = await tx.deliveryRate.findMany({
+    where: { origin: partner.operatingLocation },
+    include: { destination: true },
+  });
   const values = [];
   const counters = await tx.$queryRaw<
     { n: bigint }[]
   >`SELECT nextval(${`${sequenceSchema()}.igo_delivery_parcel_number`}::regclass) AS n FROM generate_series(1, ${parcels.length})`;
   for (const [index, parcel] of parcels.entries()) {
-    const fee = rates.find((r) => r.zone === parcel.zone)?.fee;
-    if (!fee)
-      throw new DeliveryError("Delivery rates have not been configured.", 503);
+    const rate = rates.find(
+      (r) => r.zone === parcel.zone && r.destination.active,
+    );
+    if (!rate)
+      throw new DeliveryError(
+        "This route has no active delivery rate. Ask iGO to configure it before registering.",
+        409,
+      );
+    const fee = rate.fee;
     const counter = counters[index];
     values.push({
       ...parcel,
       id: randomUUID(),
       publicId: `IGO-${localDate(new Date()).replaceAll("-", "")}-${String(counter.n).padStart(6, "0")}`,
       partnerId,
+      origin: partner.operatingLocation,
+      destinationLabel: rate.destination.label,
       fee,
       importId,
     });
@@ -468,6 +500,58 @@ export async function deliveryCommand(
           message: `${changed.count} packages assigned. No pickup has been recorded.`,
         };
       }
+      case "claim": {
+        requireRole(actor, "DRIVER");
+        const parcel = await tx.deliveryParcel.findFirst({
+          where: {
+            id: command.parcelId,
+            state: "REGISTERED",
+            driverId: null,
+            partner: { account: { status: "APPROVED" } },
+          },
+          include: {
+            partner: { select: { account: { select: { clerkUserId: true } } } },
+          },
+        });
+        if (!parcel)
+          throw new DeliveryError(
+            "This delivery has already been taken or is no longer available. Refresh available jobs.",
+            409,
+          );
+        const changed = await tx.deliveryParcel.updateMany({
+          where: { id: parcel.id, state: "REGISTERED", driverId: null },
+          data: { driverId: actor.id! },
+        });
+        if (changed.count !== 1)
+          throw new DeliveryError(
+            "Another rider has taken this delivery. Refresh available jobs.",
+            409,
+          );
+        await audit(
+          tx,
+          actor,
+          "RIDER_SELF_ASSIGNED",
+          parcel.id,
+          { publicId: parcel.publicId, driverId: actor.id! },
+          parcel.partnerId,
+        );
+        await notify(
+          tx,
+          parcel.partner.account.clerkUserId,
+          "Rider assigned",
+          `${actor.name} will collect ${parcel.publicId}. Pickup has not yet been confirmed.`,
+        );
+        await notify(
+          tx,
+          actor.userId,
+          "Delivery added to your collections",
+          `${parcel.publicId} is assigned to you. Confirm pickup only after physically receiving it.`,
+        );
+        return {
+          message:
+            "Delivery added to your collection list. Confirm pickup after physical receipt.",
+        };
+      }
       case "pickup": {
         requireRole(actor, "DRIVER");
         const parcels = await tx.deliveryParcel.findMany({
@@ -533,10 +617,6 @@ export async function deliveryCommand(
             "This package is not picked up and assigned to you.",
             409,
           );
-        if (p.codAmount > 0 && !command.codReceived)
-          throw new DeliveryError(
-            "Confirm receipt of the full cash-on-delivery amount before completing delivery.",
-          );
         const now = new Date();
         await tx.deliveryParcel.update({
           where: { id: p.id },
@@ -544,7 +624,6 @@ export async function deliveryCommand(
             state: "DELIVERED",
             deliveredAt: now,
             deliveredBy: actor.userId,
-            codCollectedAt: p.codAmount > 0 ? now : null,
           },
         });
         await audit(
@@ -552,7 +631,7 @@ export async function deliveryCommand(
           actor,
           "DELIVERY_COMPLETED",
           p.id,
-          { codCollected: p.codAmount, publicId: p.publicId },
+          { publicId: p.publicId },
           p.partnerId,
         );
         await notify(
@@ -746,15 +825,33 @@ export async function deliveryCommand(
       }
       case "rate": {
         requireRole(actor, "ADMIN");
+        if (
+          !(await tx.deliveryDestination.findUnique({
+            where: { code: command.zone },
+          }))
+        )
+          throw new DeliveryError(
+            "Add this destination before configuring its route price.",
+            404,
+          );
         const old = await tx.deliveryRate.findUnique({
-          where: { zone: command.zone },
+          where: {
+            origin_zone: { origin: command.origin, zone: command.zone },
+          },
         });
         await tx.deliveryRate.upsert({
-          where: { zone: command.zone },
-          create: { zone: command.zone, fee: command.fee },
+          where: {
+            origin_zone: { origin: command.origin, zone: command.zone },
+          },
+          create: {
+            origin: command.origin,
+            zone: command.zone,
+            fee: command.fee,
+          },
           update: { fee: command.fee },
         });
         await audit(tx, actor, "DELIVERY_RATE_CHANGED", command.zone, {
+          origin: command.origin,
           previous: old?.fee ?? null,
           fee: command.fee,
         });
@@ -763,91 +860,77 @@ export async function deliveryCommand(
             "Rate saved for new packages. Registered package fees are unchanged.",
         };
       }
-      case "handover":
-      case "remit": {
+      case "operatingLocation": {
         requireRole(actor, "ADMIN");
-        const handingOver = command.type === "handover";
-        const parcels = await tx.deliveryParcel.findMany({
-          where: {
-            id: { in: command.parcelIds },
-            state: "DELIVERED",
-            codAmount: { gt: 0 },
-            ...(handingOver
-              ? { driverId: command.driverId, handoverId: null }
-              : {
-                  partnerId: command.partnerId,
-                  handoverId: { not: null },
-                  remittanceId: null,
-                }),
-          },
+        const old = await tx.deliveryPartner.findUnique({
+          where: { id: command.partnerId },
         });
-        if (parcels.length !== command.parcelIds.length)
-          throw new DeliveryError(
-            "Selected COD packages are not eligible. Refresh before recording the transfer.",
-            409,
-          );
-        const total = parcels.reduce((sum, p) => sum + p.codAmount, 0);
-        const transfer = handingOver
-          ? await tx.deliveryCashHandover.create({
-              data: {
-                driverId: command.driverId,
-                amount: total,
-                reference: command.reference,
-                verifiedBy: actor.userId,
-              },
-            })
-          : await tx.deliveryCodRemittance.create({
-              data: {
-                partnerId: command.partnerId,
-                amount: total,
-                reference: command.reference,
-                verifiedBy: actor.userId,
-              },
-            });
-        await tx.deliveryParcel.updateMany({
-          where: { id: { in: parcels.map((p) => p.id) } },
-          data: handingOver
-            ? { handoverId: transfer.id }
-            : { remittanceId: transfer.id },
+        if (!old) throw new DeliveryError("Partner not found.", 404);
+        await tx.deliveryPartner.update({
+          where: { id: old.id },
+          data: {
+            operatingLocation: command.location,
+            pickupArea: operatingLocationLabels[command.location],
+          },
         });
         await audit(
           tx,
           actor,
-          handingOver ? "DRIVER_CASH_RECEIVED" : "COD_SENT_TO_PARTNER",
-          transfer.id,
+          "PARTNER_OPERATING_LOCATION_CHANGED",
+          old.id,
           {
-            amount: total,
-            parcelIds: command.parcelIds,
-            reference: command.reference,
+            previous: old.operatingLocation,
+            location: command.location,
+            reason: command.reason,
           },
-          handingOver ? undefined : command.partnerId,
+          old.id,
         );
-        if (!handingOver) {
-          const partner = await tx.deliveryPartner.findUniqueOrThrow({
-            where: { id: command.partnerId },
-            select: { account: { select: { clerkUserId: true } } },
-          });
-          await notify(
-            tx,
-            partner.account.clerkUserId,
-            "COD payout received",
-            `${money(total)} recorded as received. Reference: ${command.reference}. Your payout receipt is available in Cash on delivery.`,
-          );
-          return {
-            message:
-              "COD payout and receipt recorded. Delivery invoices remain separate.",
-            remittanceId: transfer.id,
-          };
-        }
+        await notify(
+          tx,
+          (
+            await tx.deliveryAccount.findUniqueOrThrow({
+              where: { id: old.accountId },
+            })
+          ).clerkUserId,
+          "Operating location updated",
+          `Your business now operates from ${operatingLocationLabels[command.location]}. This affects new packages only.`,
+        );
         return {
-          message: handingOver
-            ? "Driver cash handover verified."
-            : "COD remittance recorded. Delivery invoice balances remain separate.",
+          message:
+            "Operating location updated. Existing package routes and fees are unchanged.",
+        };
+      }
+      case "destination": {
+        requireRole(actor, "ADMIN");
+        const old = await tx.deliveryDestination.findUnique({
+          where: { code: command.code },
+        });
+        await tx.deliveryDestination.upsert({
+          where: { code: command.code },
+          create: {
+            code: command.code,
+            label: command.label,
+            active: command.active,
+          },
+          update: { label: command.label, active: command.active },
+        });
+        await audit(tx, actor, "DELIVERY_DESTINATION_CHANGED", command.code, {
+          previous: old ? { label: old.label, active: old.active } : null,
+          label: command.label,
+          active: command.active,
+        });
+        return {
+          message:
+            "Destination saved. Configure a rate for each operating location before using it.",
         };
       }
       case "readNotice": {
         const changed = await tx.deliveryNotification.updateMany({
-          where: { id: command.id, recipient: actor.userId },
+          where: {
+            id: command.id,
+            recipient: actor.userId,
+            workspace: { in: ["ACCOUNT", actor.role] },
+          },
           data: { readAt: new Date() },
         });
         if (!changed.count)

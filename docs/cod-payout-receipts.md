@@ -1,3 +1,5 @@
+> Historical reference only. This feature was retired on 17 October 2026. Its API, portal screens, package fields and mutation commands have been removed. Stored financial records and receipts remain private and read-only. See origin-pricing-and-rider-jobs.md for current operations.
+
 # COD payout receipts
 
 In **Cash on delivery**, a completed partner payout appears as **Remitted to partner** for admin and **Received** for that partner. This status reflects the outgoing payout verified and recorded by admin; it does not introduce a separate partner acknowledgement step.

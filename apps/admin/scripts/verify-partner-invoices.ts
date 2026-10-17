@@ -34,6 +34,7 @@ export async function verifyPartnerInvoices(
           pageUrl: "https://example.com/qa",
           pickupAddress: "QA address",
           pickupArea: "Malé",
+          operatingLocation: "MALE",
           nextInvoiceAt: cutoff,
         },
       },
@@ -66,7 +67,9 @@ export async function verifyPartnerInvoices(
     recipientPhone: "7771234",
     destination: "QA destination",
     zone: "MALE" as const,
-    fee: 2500 + n * 100,
+    origin: "MALE",
+    destinationLabel: "Malé",
+    fee: 2500,
   }));
   await db.deliveryParcel.createMany({ data: fixtures });
   await cmd(admin, {
@@ -289,7 +292,6 @@ export async function verifyPartnerInvoices(
   await cmd(driver, {
     type: "deliver",
     parcelId: fixtures[12].id,
-    codReceived: false,
   });
   const eligible = await history();
   const nextIssue = {
@@ -317,7 +319,6 @@ export async function verifyPartnerInvoices(
   await cmd(driver, {
     type: "deliver",
     parcelId: fixtures[13].id,
-    codReceived: false,
   });
   await db.$queryRawUnsafe(
     `SELECT ${schema}.igo_invoice_due($1::timestamptz)`,
@@ -409,7 +410,6 @@ export async function verifyPartnerInvoices(
   await cmd(driver, {
     type: "deliver",
     parcelId: extra.id,
-    codReceived: false,
   });
   const countBefore = await db.deliveryInvoice.count({ where: { partnerId } });
   const race = await Promise.allSettled([

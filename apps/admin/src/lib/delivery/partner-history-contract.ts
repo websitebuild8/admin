@@ -23,7 +23,6 @@ export type PartnerHistory = {
     destination: string;
     state: string;
     fee: number;
-    codAmount: number;
     deliveredAt: string | null;
     registeredAt: string;
     driver: { name: string } | null;

@@ -1,4 +1,6 @@
 "use client";
+import { deliveryFetch } from "@/lib/delivery/fetch";
+import { operatingLocationLabels } from "@/lib/delivery/domain";
 import { useRef, useState, type FormEvent } from "react";
 import Image from "next/image";
 import { toast } from "sonner";
@@ -31,6 +33,8 @@ export type PartnerApplicationRecord = {
   pageUrl: string;
   pickupAddress: string;
   pickupArea: string;
+  operatingLocation: string | null;
+  logoReady: boolean;
   dailyDeliveries: number;
   status: string;
   reviewNote: string;
@@ -67,7 +71,7 @@ export function PartnerApplications({
     setBusy(true);
     setError("");
     try {
-      const response = await fetch(`/api/delivery/${resource}`, {
+      const response = await deliveryFetch(`/api/delivery/${resource}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -95,6 +99,9 @@ export function PartnerApplications({
       applicationId: selected!.id,
       status: decision,
       note: String(new FormData(event.currentTarget).get("note") ?? ""),
+      operatingLocation: String(
+        new FormData(event.currentTarget).get("operatingLocation") ?? "",
+      ),
     });
   }
   return (
@@ -118,13 +125,7 @@ export function PartnerApplications({
           {items.map((application) => (
             <article className="d-review-card" key={application.id}>
               <div className="d-review-business">
-                <Image
-                  src={`/api/delivery/partner-logo?id=${application.id}`}
-                  alt={`${application.businessName} logo`}
-                  width={56}
-                  height={56}
-                  unoptimized
-                />
+                <ApplicationLogo application={application} size={56} />
                 <div>
                   <h3>{application.businessName}</h3>
                   <p>
@@ -218,13 +219,7 @@ export function PartnerApplications({
           {selected && (
             <>
               <div className="d-review-business">
-                <Image
-                  src={`/api/delivery/partner-logo?id=${selected.id}`}
-                  alt={`${selected.businessName} logo`}
-                  width={80}
-                  height={80}
-                  unoptimized
-                />
+                <ApplicationLogo application={selected} size={80} />
                 <div>
                   <strong>{selected.businessName}</strong>
                   <p>{selected.publicId}</p>
@@ -296,6 +291,31 @@ export function PartnerApplications({
                     </Select>
                   </div>
                   <div className="d-field full">
+                    <Label htmlFor="partner-operating-location">
+                      Business operating location
+                    </Label>
+                    <Select
+                      name="operatingLocation"
+                      defaultValue={selected.operatingLocation ?? undefined}
+                      items={Object.entries(operatingLocationLabels).map(
+                        ([value, label]) => ({ value, label }),
+                      )}
+                    >
+                      <SelectTrigger id="partner-operating-location">
+                        <SelectValue placeholder="Choose the operating location" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(operatingLocationLabels).map(
+                          ([value, label]) => (
+                            <SelectItem value={value} key={value}>
+                              {label}
+                            </SelectItem>
+                          ),
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="d-field full">
                     <Label htmlFor="partner-review-note">Review note</Label>
                     <Textarea
                       id="partner-review-note"
@@ -323,5 +343,32 @@ export function PartnerApplications({
         </DialogContent>
       </Dialog>
     </section>
+  );
+}
+
+function ApplicationLogo({
+  application,
+  size,
+}: {
+  application: PartnerApplicationRecord;
+  size: number;
+}) {
+  return application.logoReady ? (
+    <Image
+      src={`/api/delivery/partner-logo?id=${application.id}`}
+      alt={`${application.businessName} logo`}
+      width={size}
+      height={size}
+      unoptimized
+    />
+  ) : (
+    <div
+      className="d-business-initials"
+      role="img"
+      aria-label={`${application.businessName} — no logo provided`}
+      style={{ width: size, height: size }}
+    >
+      {application.businessName.trim().slice(0, 2).toUpperCase()}
+    </div>
   );
 }

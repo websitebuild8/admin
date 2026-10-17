@@ -2,13 +2,15 @@
 
 Phase 1 is the responsive seller delivery website for Facebook/Instagram businesses,
 with approved partner, driver and admin workspaces. Next.js, Clerk, Prisma and
-Supabase remain the shared stack. COD collection and partner payouts are separate
-from daily delivery-fee invoices. Mobile/restaurant work is preserved for Phase 2.
+Supabase remain the shared stack. Delivery fees use the partner operating location
+and package destination, and are invoiced after delivery. No recipient payment
+collection is offered. Mobile/restaurant work is preserved for Phase 2.
 
 - [Phase 1 architecture and business rules](docs/phase-one-delivery.md)
 - [Phase 1 deployment, verified checks and launch gates](docs/phase-one-launch.md)
 - [Rider website, Google Maps and background alert setup](docs/rider-web-setup.md)
-- [COD payouts, partner receipts and print documents](docs/cod-payout-receipts.md)
+- [Operating locations, route pricing and rider self-assignment](docs/origin-pricing-and-rider-jobs.md)
+- [Super admin controls, role switching and optional application assets](docs/admin-access-and-workspaces.md)
 
 The public website is `/`, admin uses `/delivery`, partners use `/partner`,
 and riders use `/rider` (apply at `/rider/join`). Preserved
@@ -18,7 +20,7 @@ by the presence of this code. Business/legal/bank details remain launch inputs.
 ## Preserved Phase 2 references
 
 The following documents describe the earlier restaurant/mobile product. Its
-card-only checkout rules do not apply to Phase 1 seller COD and bank invoices.
+card-only checkout rules do not apply to Phase 1 delivery-fee bank invoices.
 
 - [Admin setup and capabilities](apps/admin/README.md)
 - [Shared demo purchases and simulated bank gateway](docs/demo-purchases.md)

@@ -1,4 +1,7 @@
 "use client";
+import { WorkspaceSwitcher } from "./workspace-switcher";
+import { AdminAccessPanel } from "./admin-access-panel";
+import { deliveryFetch } from "@/lib/delivery/fetch";
 import {
   useEffect,
   useRef,
@@ -66,14 +69,17 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { money, zoneLabels, type Actor } from "@/lib/delivery/domain";
+import {
+  money,
+  zoneLabels,
+  operatingLocationLabels,
+  type Actor,
+} from "@/lib/delivery/domain";
 import {
   PartnerApplications,
   type PartnerApplicationRecord,
 } from "./partner-applications";
 import { DeliverySkeleton } from "./skeleton";
-import { codCashLabel } from "@/lib/delivery/cod-receipt-contract";
-import { PayoutReceiptModal } from "./payout-receipt";
 import { PartnerHistoryModal } from "./partner-history";
 import { InvoiceRecords } from "./invoice-records";
 import {
@@ -89,17 +95,16 @@ type Parcel = {
   recipientPhone: string;
   destination: string;
   zone: string;
+  destinationLabel: string;
+  origin: string | null;
   description: string;
   fee: number;
-  codAmount: number;
   state: string;
   partnerId: string;
   driverId: string | null;
   pickedUpAt: string | null;
   deliveredAt: string | null;
   registeredAt: string;
-  handoverId: string | null;
-  remittanceId: string | null;
   partner: {
     businessName: string;
     pickupAddress: string;
@@ -124,6 +129,7 @@ type Account = {
     pickupAddress: string;
     pickupArea: string;
     cutoffMinutes: number;
+    operatingLocation: string | null;
     nextInvoiceAt: string | null;
   } | null;
 };
@@ -178,9 +184,6 @@ type Summary = {
   invoiced: number;
   confirmedPayments: number;
   outstanding: number;
-  codOwed: number;
-  driverCash: number;
-  companyCash: number;
   latest: Parcel[];
   awaitingApproval: number;
   paymentReview: number;
@@ -248,7 +251,7 @@ function useResource<T>(
   useEffect(() => {
     if (!enabled) return;
     const controller = new AbortController();
-    fetch(`/api/delivery/${resource}?${query}`, {
+    deliveryFetch(`/api/delivery/${resource}?${query}`, {
       cache: "no-store",
       signal: controller.signal,
     })
@@ -324,6 +327,7 @@ function Pick({
       <Label htmlFor={`select-${name}`}>{label}</Label>
       <Select
         name={name}
+        required
         items={options.map((option) => ({
           value: option.id,
           label: option.name,
@@ -462,6 +466,12 @@ const navItems = [
   },
   { key: "drivers", label: "Riders", icon: Bike, roles: ["ADMIN"] },
   {
+    key: "administrators",
+    label: "Administrators",
+    icon: ShieldCheck,
+    roles: ["ADMIN"],
+  },
+  {
     key: "invoices",
     label: "Invoices",
     icon: ReceiptText,
@@ -472,12 +482,6 @@ const navItems = [
     label: "Bank transfers",
     icon: Wallet,
     roles: ["ADMIN", "PARTNER"],
-  },
-  {
-    key: "cod",
-    label: "Cash on delivery",
-    icon: Wallet,
-    roles: ["ADMIN", "PARTNER", "DRIVER"],
   },
   { key: "reports", label: "Reports", icon: ClipboardList, roles: ["ADMIN"] },
   { key: "audit", label: "Activity log", icon: History, roles: ["ADMIN"] },
@@ -500,15 +504,16 @@ const descriptions: Record<string, string> = {
   collections:
     "Select only the packages physically handed to you, then confirm pickup.",
   deliveries:
-    "Your picked-up packages. Confirm delivery and any cash received.",
+    "Your picked-up packages. Confirm delivery after physical handover.",
   partners: "Review the businesses joining your delivery network.",
   applications:
     "Review business details and send invitations to approved page owners.",
   drivers: "Approve and manage your delivery team.",
+  administrators:
+    "Manage administrator access without changing partner or rider accounts.",
   invoices: "Daily delivery invoices. Older unpaid balances stay outstanding.",
   payments:
     "Bank evidence stays pending until an authorized admin verifies it.",
-  cod: "Recipient money stays separate from delivery-fee invoices.",
   reports: "Operational totals from your actual delivery records.",
   audit: "An append-only record of operational and financial changes.",
   settings: "Business details, bank information and delivery rates.",
@@ -540,7 +545,7 @@ export function DeliveryApplication({ actor }: { actor: Actor }) {
             }
           : {}),
       };
-      const response = await fetch("/api/delivery/commands", {
+      const response = await deliveryFetch("/api/delivery/commands", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -562,6 +567,7 @@ export function DeliveryApplication({ actor }: { actor: Actor }) {
   return (
     <main className="d-application">
       <div className="d-application-card">
+        <WorkspaceSwitcher actor={actor} />
         <Image
           src="/brand/igo-delivery.jpg"
           width={180}
@@ -637,8 +643,8 @@ export function DeliveryApplication({ actor }: { actor: Actor }) {
               )}
               <Label className="d-check-label full">
                 <Checkbox required name="understood" />I understand delivery
-                fees are invoiced separately from money collected for my goods,
-                and my account requires approval.
+                fees are invoiced only for completed deliveries, and my account
+                requires approval.
               </Label>
               {error && (
                 <div className="d-error" role="alert">
@@ -668,6 +674,7 @@ type Action = {
   payment?: Payment;
   zone?: string;
   fee?: number;
+  origin?: string;
 };
 export function DeliveryPortal({
   actor,
@@ -689,14 +696,17 @@ export function DeliveryPortal({
     [invoiceReturnPartnerId, setInvoiceReturnPartnerId] = useState<
       string | null
     >(null),
-    [payoutReceiptId, setPayoutReceiptId] = useState<string | null>(null),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [decision, setDecision] = useState("CONFIRM");
   const retry = useRef<{ body: string; key: string } | null>(null);
   const workspaceBase = actor.role === "PARTNER" ? "/partner" : "/delivery";
   const resource =
-    screen === "import" ? "rates" : screen === "settings" ? "settings" : screen;
+    screen === "import" || screen === "administrators"
+      ? "account"
+      : screen === "settings"
+        ? "settings"
+        : screen;
   const query = `page=${page}&q=${encodeURIComponent(q)}&state=${filter}`;
   const request = useResource<unknown>(resource, query, revision);
   const notices = useResource<List<Notice> & { unread: number }>(
@@ -730,7 +740,7 @@ export function DeliveryPortal({
     const body = JSON.stringify(value);
     if (retry.current?.body !== body)
       retry.current = { body, key: crypto.randomUUID() };
-    const response = await fetch("/api/delivery/commands", {
+    const response = await deliveryFetch("/api/delivery/commands", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -751,7 +761,6 @@ export function DeliveryPortal({
       setAction(null);
       setSelected([]);
       refresh();
-      if (result.remittanceId) setPayoutReceiptId(result.remittanceId);
       if (result.invoiceId) setInvoiceId(result.invoiceId);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Operation failed.");
@@ -815,7 +824,11 @@ export function DeliveryPortal({
       </div>
       <nav aria-label="Workspace navigation">
         {navItems
-          .filter((i) => i.roles.includes(actor.role))
+          .filter(
+            (i) =>
+              i.roles.includes(actor.role) &&
+              (i.key !== "administrators" || actor.superAdmin),
+          )
           .map(({ key, label, icon: Icon }) => (
             <Link
               key={key}
@@ -861,7 +874,7 @@ export function DeliveryPortal({
         <small>{p.recipientPhone}</small>
       </div>,
       <div key="place">
-        <strong>{zoneLabels[p.zone]}</strong>
+        <strong>{p.destinationLabel ?? zoneLabels[p.zone] ?? p.zone}</strong>
         <small>{p.partner.businessName}</small>
       </div>,
       <Status key="state" value={p.state} />,
@@ -918,17 +931,18 @@ export function DeliveryPortal({
               {p.recipientPhone} <ArrowUpRight size={12} />
             </a>
             <dl>
+              <dt>Operating from</dt>
+              <dd>
+                {operatingLocationLabels[p.origin ?? ""] ??
+                  "Historic location not recorded"}
+              </dd>
               <dt>Delivery area</dt>
-              <dd>{zoneLabels[p.zone]}</dd>
+              <dd>{p.destinationLabel ?? zoneLabels[p.zone] ?? p.zone}</dd>
               <dt>Parcel reference</dt>
               <dd>{p.externalReference}</dd>
-              <dt>Collect from recipient</dt>
+              <dt>Delivery fee</dt>
               <dd>
-                <strong>
-                  {p.codAmount > 0
-                    ? money(p.codAmount)
-                    : "Prepaid · no collection"}
-                </strong>
+                <strong>{money(p.fee)}</strong>
               </dd>
               {p.deliveredAt && (
                 <>
@@ -967,6 +981,12 @@ export function DeliveryPortal({
           </Button>
         </div>
       );
+    if (screen === "administrators")
+      return actor.superAdmin ? (
+        <AdminAccessPanel workspaceRevision={revision} />
+      ) : (
+        <p>Only the super admin can manage administrator access.</p>
+      );
     if (!request.data) return <DeliverySkeleton />;
     if (screen === "overview" || screen === "reports") {
       const d = request.data as Summary;
@@ -979,7 +999,7 @@ export function DeliveryPortal({
               <Stat
                 label="Total earned by iGO"
                 value={money(d.confirmedPayments)}
-                note="Verified delivery-fee payments · all time · excludes COD"
+                note="Verified delivery-fee payments · all time"
                 icon={<Wallet />}
               />
             )}
@@ -1003,9 +1023,9 @@ export function DeliveryPortal({
               icon={<PackageCheck />}
             />
             <Stat
-              label="COD owed to partners"
-              value={money(d.codOwed)}
-              note="Separate from delivery invoice debt"
+              label="Delivered, awaiting billing"
+              value={money(d.awaitingBilling)}
+              note="Completed deliveries not yet invoiced"
               icon={<Wallet />}
             />
           </div>
@@ -1082,7 +1102,7 @@ export function DeliveryPortal({
               <div className="d-card-header">
                 <div>
                   <h2>A clear view of your money</h2>
-                  <p>Delivery fees and recipient collections stay separate</p>
+                  <p>Your delivery fees, invoices and verified payments</p>
                 </div>
                 <ShieldCheck size={18} />
               </div>
@@ -1096,18 +1116,6 @@ export function DeliveryPortal({
                   "Delivered, awaiting billing",
                   d.awaitingBilling,
                   "Included only at the next eligible cutoff",
-                ],
-                [
-                  "COD held by drivers",
-                  d.driverCash,
-                  "Awaiting verified handover to iGO",
-                ],
-                [
-                  "COD received by iGO",
-                  d.companyCash,
-                  actor.role === "PARTNER"
-                    ? "Awaiting payment to you"
-                    : "Awaiting remittance to the partner",
                 ],
               ].map(([label, value, note]) => (
                 <div className="d-info-row" key={String(label)}>
@@ -1163,7 +1171,7 @@ export function DeliveryPortal({
           onDone={refresh}
         />
       );
-    if (["packages", "collections", "deliveries", "cod"].includes(screen)) {
+    if (["packages", "collections", "deliveries"].includes(screen)) {
       const d = request.data as List<Parcel>;
       return (
         <>
@@ -1210,12 +1218,6 @@ export function DeliveryPortal({
                 <strong>Selection does not record pickup.</strong> Check only
                 the packages physically received, then use Confirm Pickup.
               </>
-            ) : screen === "cod" ? (
-              <>
-                <strong>COD is recipient money.</strong> Delivery invoices
-                remain separately payable. Driver cash is not treated as
-                received by iGO until admin verifies a handover.
-              </>
             ) : (
               <>
                 Registration and driver assignment do not mean pickup. Pending
@@ -1247,57 +1249,6 @@ export function DeliveryPortal({
               </>
             ) : screen === "deliveries" ? (
               parcelCards(d.items)
-            ) : screen === "cod" ? (
-              <section className="d-card">
-                <GridTable
-                  headings={[
-                    "Package",
-                    "Partner / driver",
-                    "COD collected",
-                    "Cash location",
-                    "Actions",
-                  ]}
-                  rows={d.items.map((p) => [
-                    <div key="id" className="d-parcel-ref">
-                      {actor.role === "ADMIN" && (
-                        <Checkbox
-                          aria-label={`Select ${p.publicId}`}
-                          checked={selected.includes(p.id)}
-                          onCheckedChange={(v) => select(p.id, v)}
-                        />
-                      )}
-                      <strong>{p.publicId}</strong>
-                    </div>,
-                    <div key="who">
-                      <strong>{p.partner.businessName}</strong>
-                      <small>{p.driver?.name ?? "Driver"}</small>
-                    </div>,
-                    money(p.codAmount),
-                    codCashLabel(actor.role, p.remittanceId, p.handoverId),
-                    <div className="d-row-actions" key="actions">
-                      <Button
-                        variant="outline"
-                        onClick={() => open({ kind: "detail", parcel: p })}
-                      >
-                        Details
-                      </Button>
-                      {p.remittanceId &&
-                        (actor.role === "ADMIN" ||
-                          actor.role === "PARTNER") && (
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            title="View payout receipt"
-                            aria-label={`View payout receipt for ${p.publicId}`}
-                            onClick={() => setPayoutReceiptId(p.remittanceId)}
-                          >
-                            <ReceiptText size={17} />
-                          </Button>
-                        )}
-                    </div>,
-                  ])}
-                />
-              </section>
             ) : (
               <section className="d-card">
                 <GridTable
@@ -1341,27 +1292,6 @@ export function DeliveryPortal({
                   <Button onClick={() => open({ kind: "pickup" })}>
                     Confirm Pickup <Check size={15} />
                   </Button>
-                ) : screen === "cod" ? (
-                  <>
-                    <Button
-                      disabled={
-                        chosen.some((p) => !!p.handoverId) ||
-                        new Set(chosen.map((p) => p.driverId)).size !== 1
-                      }
-                      onClick={() => open({ kind: "handover" })}
-                    >
-                      Verify driver handover
-                    </Button>
-                    <Button
-                      disabled={
-                        chosen.some((p) => !p.handoverId || !!p.remittanceId) ||
-                        new Set(chosen.map((p) => p.partnerId)).size !== 1
-                      }
-                      onClick={() => open({ kind: "remit" })}
-                    >
-                      Record partner payout
-                    </Button>
-                  </>
                 ) : (
                   <Button
                     disabled={chosen.some((p) => p.state !== "REGISTERED")}
@@ -1402,7 +1332,11 @@ export function DeliveryPortal({
               rows={d.items.map((a) => [
                 <div key="who">
                   <strong>{a.partner?.businessName ?? a.name}</strong>
-                  <small>{a.partner ? a.name : a.role}</small>
+                  <small>
+                    {a.partner
+                      ? `${a.name} · ${operatingLocationLabels[a.partner.operatingLocation ?? ""] ?? "Location needs review"}`
+                      : a.role}
+                  </small>
                 </div>,
                 a.phone,
                 <Status key="s" value={a.status} />,
@@ -1423,6 +1357,16 @@ export function DeliveryPortal({
                     >
                       <History size={17} />
                       Deliveries & invoices
+                    </Button>
+                  )}
+                  {a.partner && (
+                    <Button
+                      variant="outline"
+                      onClick={() =>
+                        open({ kind: "operatingLocation", account: a })
+                      }
+                    >
+                      Operating location
                     </Button>
                   )}
                   {a.partner && (
@@ -1645,7 +1589,9 @@ export function DeliveryPortal({
         <SettingsPanel
           actor={actor}
           settings={(request.data as { settings: SettingValues }).settings}
-          openRate={(zone, fee) => open({ kind: "rate", zone, fee })}
+          openRate={(origin, zone, fee) =>
+            open({ kind: "rate", origin, zone, fee })
+          }
           execute={execute}
           busy={busy}
           error={error}
@@ -1665,7 +1611,7 @@ export function DeliveryPortal({
       try {
         const upload = new FormData();
         upload.set("file", f.get("file")!);
-        const response = await fetch("/api/delivery/receipt", {
+        const response = await deliveryFetch("/api/delivery/receipt", {
           method: "POST",
           body: upload,
         });
@@ -1696,7 +1642,6 @@ export function DeliveryPortal({
           destination: s("destination"),
           zone: s("zone"),
           description: s("description"),
-          codAmount: s("codAmount"),
         },
       });
     if (action.kind === "assign")
@@ -1709,7 +1654,6 @@ export function DeliveryPortal({
     if (action.kind === "deliver")
       Object.assign(values, {
         parcelId: action.parcel!.id,
-        codReceived: f.get("codReceived") === "on",
       });
     if (action.kind === "cancel")
       Object.assign(values, { parcelId: action.parcel!.id, reason: s("note") });
@@ -1726,8 +1670,18 @@ export function DeliveryPortal({
         minutes: h * 60 + m,
       });
     }
+    if (action.kind === "operatingLocation")
+      Object.assign(values, {
+        partnerId: action.account!.partner!.id,
+        location: s("location"),
+        reason: s("reason"),
+      });
     if (action.kind === "rate")
-      Object.assign(values, { zone: action.zone, fee: s("fee") });
+      Object.assign(values, {
+        origin: action.origin,
+        zone: action.zone,
+        fee: s("fee"),
+      });
     if (action.kind === "reviewPayment")
       Object.assign(values, {
         paymentId: action.payment!.id,
@@ -1735,14 +1689,6 @@ export function DeliveryPortal({
         confirmedAmount:
           s("decision") === "REJECT" ? "0" : s("confirmedAmount"),
         note: s("note"),
-      });
-    if (action.kind === "handover" || action.kind === "remit")
-      Object.assign(values, {
-        parcelIds: chosen.map((p) => p.id),
-        reference: s("reference"),
-        ...(action.kind === "handover"
-          ? { driverId: chosen[0].driverId }
-          : { partnerId: chosen[0].partnerId }),
       });
     await execute(values);
   }
@@ -1753,64 +1699,12 @@ export function DeliveryPortal({
       case "register":
         return (
           <>
-            {actor.role === "ADMIN" && (
-              <div className="d-field full">
-                <Label htmlFor="partner-search">Find an approved partner</Label>
-                <Input
-                  id="partner-search"
-                  value={choiceSearch}
-                  onChange={(e) => setChoiceSearch(e.target.value)}
-                  placeholder="Search business name"
-                />
-                <Pick
-                  name="partnerId"
-                  label="Partner page"
-                  options={(choices.data?.partners ?? []).map((p) => ({
-                    id: p.id,
-                    name: p.businessName,
-                  }))}
-                />
-              </div>
-            )}
-            <Field
-              name="externalReference"
-              label="Unique parcel reference from your page"
+            <RegisterPackageFields
+              actor={actor}
+              partners={choices.data?.partners ?? []}
+              search={choiceSearch}
+              onSearch={setChoiceSearch}
             />
-            <Field name="recipientName" label="Recipient name" />
-            <Field name="recipientPhone" label="Recipient phone" type="tel" />
-            <Field
-              name="destination"
-              label="Building, street, island and delivery instructions"
-              full
-            />
-            <Pick
-              name="zone"
-              label="Delivery zone"
-              options={Object.entries(zoneLabels).map(([id, name]) => ({
-                id,
-                name,
-              }))}
-              value="MALE"
-            />
-            <Field
-              name="codAmount"
-              label="Parcel amount to collect (MVR)"
-              value="0"
-              type="number"
-              min={0}
-              step="0.01"
-            />
-            <Field
-              name="description"
-              label="Parcel description / handling notes"
-              full
-              required={false}
-            />
-            <p className="full">
-              Use 0 for prepaid goods. Delivery fees are calculated separately
-              at current rates and frozen on registration. Registration does not
-              record pickup.
-            </p>
           </>
         );
       case "assign":
@@ -1857,17 +1751,6 @@ export function DeliveryPortal({
               <br />
               {p!.destination}
             </p>
-            <div className="d-note full">
-              {p!.codAmount > 0
-                ? `Collect ${money(p!.codAmount)} for the goods. Delivery fees are billed separately to the partner.`
-                : "Prepaid goods. No recipient cash collection is required."}
-            </div>
-            {p!.codAmount > 0 && (
-              <Label className="d-check-label full">
-                <Checkbox name="codReceived" required />I received the full{" "}
-                {money(p!.codAmount)} from the recipient.
-              </Label>
-            )}
             <Label className="d-check-label full">
               <Checkbox required />
               The recipient has physically received this package.
@@ -1914,6 +1797,24 @@ export function DeliveryPortal({
             <Field name="note" label="Review reason / message" full />
           </>
         );
+      case "operatingLocation":
+        return (
+          <>
+            <Pick
+              name="location"
+              label="Business operating location"
+              value={action.account!.partner!.operatingLocation ?? undefined}
+              options={Object.entries(operatingLocationLabels).map(
+                ([id, name]) => ({ id, name }),
+              )}
+            />
+            <Field name="reason" label="Reason for changing location" full />
+            <p className="full">
+              Only future packages use this location. Registered routes and
+              charges stay unchanged.
+            </p>
+          </>
+        );
       case "cutoff":
         return (
           <>
@@ -1933,8 +1834,9 @@ export function DeliveryPortal({
         return (
           <>
             <p className="full">
-              {zoneLabels[action.zone!]}. New rate applies only to future
-              packages.
+              {operatingLocationLabels[action.origin!]} →{" "}
+              {zoneLabels[action.zone!] ?? action.zone}. New rate applies only
+              to future packages.
             </p>
             <Field
               name="fee"
@@ -2035,38 +1937,6 @@ export function DeliveryPortal({
             </Label>
           </>
         );
-      case "handover":
-      case "remit":
-        return (
-          <>
-            <div className="d-note full">
-              <strong>
-                {money(chosen.reduce((a, p) => a + p.codAmount, 0))}
-              </strong>{" "}
-              across {chosen.length} packages.
-              <p>
-                {action.kind === "handover"
-                  ? "Record only cash physically received from this driver."
-                  : "Record only money actually sent to this partner. This does not pay or deduct delivery-fee invoices."}
-              </p>
-            </div>
-            <Field
-              name="reference"
-              label={
-                action.kind === "handover"
-                  ? "Unique handover / receipt reference"
-                  : "Unique bank payout reference"
-              }
-              full
-            />
-            <Label className="d-check-label full">
-              <Checkbox required />
-              {action.kind === "handover"
-                ? "I verified that iGO physically received this cash."
-                : "I verified the outgoing bank payout to the partner."}
-            </Label>
-          </>
-        );
       default:
         return null;
     }
@@ -2098,6 +1968,7 @@ export function DeliveryPortal({
               <Bell size={19} />
               {!!notices.data?.unread && <span className="d-notice-dot" />}
             </Link>
+            <WorkspaceSwitcher actor={actor} />
             <UserButton />
           </div>
         </header>
@@ -2175,10 +2046,13 @@ export function DeliveryPortal({
                   onClick={async () => {
                     setBusy(true);
                     try {
-                      const r = await fetch("/api/delivery/invoice-run", {
-                        method: "POST",
-                        headers: { "Idempotency-Key": crypto.randomUUID() },
-                      });
+                      const r = await deliveryFetch(
+                        "/api/delivery/invoice-run",
+                        {
+                          method: "POST",
+                          headers: { "Idempotency-Key": crypto.randomUUID() },
+                        },
+                      );
                       const value = await r.json();
                       if (!r.ok) throw new Error(value.error);
                       toast.success(value.message);
@@ -2230,12 +2104,11 @@ export function DeliveryPortal({
                     deliver: "Complete delivery",
                     cancel: "Cancel unpicked package",
                     reviewAccount: "Review account access",
+                    operatingLocation: "Business operating location",
                     cutoff: "Partner invoice cutoff",
                     rate: "Update delivery rate",
                     submitPayment: "Submit bank transfer",
                     reviewPayment: "Verify bank transfer",
-                    handover: "Verify driver cash handover",
-                    remit: "Record COD partner payout",
                     detail: "Package details",
                   } as Record<string, string>
                 )[action?.kind ?? ""]
@@ -2307,13 +2180,6 @@ export function DeliveryPortal({
           }}
         />
       )}
-      {payoutReceiptId && (
-        <PayoutReceiptModal
-          id={payoutReceiptId}
-          actor={actor}
-          close={() => setPayoutReceiptId(null)}
-        />
-      )}
     </div>
   );
 }
@@ -2356,7 +2222,7 @@ function ParcelDetail({ parcel: p }: { parcel: Parcel }) {
         </strong>
         <p>{p.destination}</p>
         <p>
-          {zoneLabels[p.zone]} · {p.description}
+          {p.destinationLabel ?? zoneLabels[p.zone] ?? p.zone} · {p.description}
         </p>
       </div>
       {[
@@ -2391,13 +2257,6 @@ function ParcelDetail({ parcel: p }: { parcel: Parcel }) {
           </p>
         </div>
         <span>{money(p.fee)}</span>
-      </div>
-      <div className="d-info-row">
-        <div>
-          <strong>Recipient COD amount</strong>
-          <p>Separate from delivery fees</p>
-        </div>
-        <span>{money(p.codAmount)}</span>
       </div>
     </div>
   );
@@ -2464,7 +2323,7 @@ function InvoiceModal({
     setSending(true);
     setSendError("");
     try {
-      const response = await fetch("/api/delivery/commands", {
+      const response = await deliveryFetch("/api/delivery/commands", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -2692,44 +2551,25 @@ function SettingsPanel({
 }: {
   actor: Actor;
   settings: SettingValues;
-  openRate: (zone: string, fee: number) => void;
+  openRate: (origin: string, zone: string, fee: number) => void;
   execute: (v: unknown) => Promise<void>;
   busy: boolean;
   error: string;
   revision: number;
 }) {
-  const rates = useResource<{ items: { zone: string; fee: number }[] }>(
-    "rates",
-    "",
-    revision,
-  );
   return (
     <div className="d-settings">
       {actor.role === "ADMIN" && <ScheduleHealth revision={revision} />}
-      <section className="d-card">
-        <div className="d-card-header">
-          <div>
-            <h2>Delivery rates</h2>
-            <p>
-              Registration freezes the rate. Historical charges never change.
-            </p>
-          </div>
-        </div>
-        {rates.data?.items.map((r) => (
-          <div className="d-info-row" key={r.zone}>
-            <div>
-              <strong>{zoneLabels[r.zone]}</strong>
-              <p>Per package</p>
-            </div>
-            <span>{money(r.fee)}</span>
-            {actor.role === "ADMIN" && (
-              <Button variant="outline" onClick={() => openRate(r.zone, r.fee)}>
-                Edit
-              </Button>
-            )}
-          </div>
-        ))}
-      </section>
+      {actor.role === "ADMIN" ? (
+        <PricingManager
+          revision={revision}
+          openRate={openRate}
+          execute={execute}
+          busy={busy}
+        />
+      ) : (
+        <PartnerRates revision={revision} />
+      )}
       <section className="d-card mt-6">
         <div className="d-card-header">
           <div>
@@ -2778,8 +2618,7 @@ function SettingsPanel({
           <div className="d-card-pad">
             <BankDetails />
             <p>
-              Delivery fees are invoiced separately. Cash-on-delivery payouts do
-              not automatically reduce your invoice balances.
+              Only verified delivery-fee payments reduce your invoice balances.
             </p>
           </div>
         )}
@@ -2871,7 +2710,7 @@ function ImportPanel({
     if (partner) form.set("partnerId", partner);
     key.current ??= crypto.randomUUID();
     try {
-      const r = await fetch("/api/delivery/import", {
+      const r = await deliveryFetch("/api/delivery/import", {
         method: "POST",
         headers: {
           "Idempotency-Key":
@@ -2991,12 +2830,11 @@ function ImportPanel({
             </div>
           ) : (
             <GridTable
-              headings={["Reference", "Recipient", "Zone", "COD (MVR)"]}
+              headings={["Reference", "Recipient", "Destination"]}
               rows={result.examples.map((r) => [
                 String(r.externalReference),
                 String(r.recipientName),
-                zoneLabels[String(r.zone)],
-                money(Number(r.codAmount)),
+                zoneLabels[String(r.zone)] ?? String(r.zone),
               ])}
             />
           )}
@@ -3015,16 +2853,13 @@ function downloadReport(data: Summary) {
     "invoiced",
     "confirmedPayments",
     "outstanding",
-    "codOwed",
-    "driverCash",
-    "companyCash",
   ] as const;
   const text =
     "Metric,Value,Unit\n" +
     fields
       .map(
         (k) =>
-          `${k},${k.endsWith("Estimate") || ["awaitingBilling", "invoiced", "confirmedPayments", "outstanding", "codOwed", "driverCash", "companyCash"].includes(k) ? (data[k] / 100).toFixed(2) : data[k]},${["registered", "pickedUp", "delivered"].includes(k) ? "packages" : "MVR"}`,
+          `${k},${k.endsWith("Estimate") || ["awaitingBilling", "invoiced", "confirmedPayments", "outstanding"].includes(k) ? (data[k] / 100).toFixed(2) : data[k]},${["registered", "pickedUp", "delivered"].includes(k) ? "packages" : "MVR"}`,
       )
       .join("\n");
   const url = URL.createObjectURL(
@@ -3035,4 +2870,324 @@ function downloadReport(data: Summary) {
   a.download = "igo-operational-totals.csv";
   a.click();
   URL.revokeObjectURL(url);
+}
+
+type RouteQuote = {
+  partner: { operatingLocation: string | null; businessName: string };
+  rates: { zone: string; fee: number; destination: { label: string } }[];
+};
+function RegisterPackageFields({
+  actor,
+  partners,
+  search,
+  onSearch,
+}: {
+  actor: Actor;
+  partners: { id: string; businessName: string }[];
+  search: string;
+  onSearch: (v: string) => void;
+}) {
+  const [partner, setPartner] = useState(actor.partnerId ?? ""),
+    [zone, setZone] = useState("");
+  const quote = useResource<RouteQuote>(
+    "quote-options",
+    `partnerId=${partner}`,
+    0,
+    !!partner,
+  );
+  const rate = quote.data?.rates.find((r) => r.zone === zone);
+  return (
+    <>
+      {actor.role === "ADMIN" && (
+        <div className="d-field full">
+          <Label htmlFor="partner-search">Find an approved partner</Label>
+          <Input
+            id="partner-search"
+            value={search}
+            onChange={(e) => onSearch(e.target.value)}
+            placeholder="Search business name"
+          />
+          <Pick
+            name="partnerId"
+            label="Partner page"
+            options={partners.map((p) => ({ id: p.id, name: p.businessName }))}
+            onChange={(id) => {
+              setPartner(id);
+              setZone("");
+            }}
+          />
+        </div>
+      )}
+      <Field
+        name="externalReference"
+        label="Unique parcel reference from your page"
+      />
+      <Field name="recipientName" label="Recipient name" />
+      <Field name="recipientPhone" label="Recipient phone" type="tel" />
+      <Field
+        name="destination"
+        label="Building, street, island and delivery instructions"
+        full
+      />
+      <Pick
+        key={partner}
+        name="zone"
+        label="Package destination"
+        options={(quote.data?.rates ?? []).map((r) => ({
+          id: r.zone,
+          name: `${r.destination.label} · ${money(r.fee)}`,
+        }))}
+        onChange={setZone}
+      />
+      <div className="d-note full">
+        {quote.error ??
+          (quote.data
+            ? quote.data.partner.operatingLocation
+              ? `From ${operatingLocationLabels[quote.data.partner.operatingLocation]}${rate ? ` · ${money(rate.fee)}` : " · Choose a destination"}`
+              : "Ask iGO to set your operating location before registering packages."
+            : partner
+              ? "Loading delivery rates…"
+              : "Choose your partner page to see its delivery rates.")}
+      </div>
+      <Field
+        name="description"
+        label="Parcel description / handling notes"
+        full
+        required={false}
+      />
+      <p className="full">
+        The fee is saved at registration using the business operating location
+        and destination. You are billed only after confirmed delivery.
+        Registration does not record pickup.
+      </p>
+    </>
+  );
+}
+function PartnerRates({ revision }: { revision: number }) {
+  const [page, setPage] = useState(1);
+  const quote = useResource<RouteQuote>("quote-options", "", revision);
+  return (
+    <section className="d-card">
+      <div className="d-card-header">
+        <div>
+          <h2>Your delivery rates</h2>
+          <p>
+            From{" "}
+            {operatingLocationLabels[
+              quote.data?.partner.operatingLocation ?? ""
+            ] ?? "your operating location"}
+            . Changes apply to future packages only.
+          </p>
+        </div>
+      </div>
+      {quote.error && (
+        <p className="d-card-pad" role="alert">
+          {quote.error}
+        </p>
+      )}
+      {quote.data?.rates.slice((page - 1) * 10, page * 10).map((r) => (
+        <div className="d-info-row" key={r.zone}>
+          <strong>{r.destination.label}</strong>
+          <span>{money(r.fee)}</span>
+        </div>
+      ))}
+      {quote.data && (
+        <Pager
+          list={{ total: quote.data.rates.length, page }}
+          onPage={setPage}
+        />
+      )}
+    </section>
+  );
+}
+function PricingManager({
+  revision,
+  openRate,
+  execute,
+  busy,
+}: {
+  revision: number;
+  openRate: (origin: string, zone: string, fee: number) => void;
+  execute: (v: unknown) => Promise<void>;
+  busy: boolean;
+}) {
+  const [page, setPage] = useState(1),
+    [destPage, setDestPage] = useState(1);
+  const rates = useResource<
+    List<{
+      origin: string;
+      zone: string;
+      fee: number;
+      destination: { label: string; active: boolean };
+    }>
+  >("rates", `page=${page}`, revision);
+  const destinations = useResource<
+    List<{ code: string; label: string; active: boolean }>
+  >("destinations", `page=${destPage}`, revision);
+  const [editDestination, setEditDestination] = useState<{
+    code: string;
+    label: string;
+    active: boolean;
+  } | null>(null);
+  return (
+    <>
+      <section className="d-card">
+        <div className="d-card-header">
+          <div>
+            <h2>Delivery rates</h2>
+            <p>
+              Origin + destination determine the fee. Existing packages keep
+              their registered fee.
+            </p>
+          </div>
+        </div>
+        {rates.error && (
+          <p className="d-card-pad" role="alert">
+            {rates.error}
+          </p>
+        )}
+        {rates.data && (
+          <>
+            <GridTable
+              headings={["Operating from", "Destination", "Fee", "Actions"]}
+              rows={rates.data.items.map((r) => [
+                operatingLocationLabels[r.origin],
+                r.destination.label +
+                  (r.destination.active ? "" : " · inactive"),
+                money(r.fee),
+                <Button
+                  key="edit"
+                  variant="outline"
+                  onClick={() => openRate(r.origin, r.zone, r.fee)}
+                >
+                  Edit rate
+                </Button>,
+              ])}
+            />
+            <Pager list={rates.data} onPage={setPage} />
+          </>
+        )}
+        <form
+          className="d-form d-card-pad"
+          onSubmit={(e) => {
+            e.preventDefault();
+            const f = new FormData(e.currentTarget);
+            void execute({
+              type: "rate",
+              origin: f.get("routeOrigin"),
+              zone: f.get("routeZone"),
+              fee: f.get("routeFee"),
+            });
+          }}
+        >
+          <h3 className="full">Add or update a route</h3>
+          <Pick
+            name="routeOrigin"
+            label="Operating from"
+            options={Object.entries(operatingLocationLabels).map(
+              ([id, name]) => ({ id, name }),
+            )}
+          />
+          <Field name="routeZone" label="Destination code" />
+          <Field
+            name="routeFee"
+            label="Delivery fee (MVR)"
+            type="number"
+            min={0.01}
+            step="0.01"
+          />
+          <Button type="submit" disabled={busy}>
+            Save route rate
+          </Button>
+        </form>
+      </section>
+      <section className="d-card">
+        <div className="d-card-header">
+          <div>
+            <h2>Destinations</h2>
+            <p>
+              Add unlisted areas here, then configure each origin’s rate.
+              Inactive areas cannot accept new packages.
+            </p>
+          </div>
+        </div>
+        {destinations.error && (
+          <p className="d-card-pad" role="alert">
+            {destinations.error}
+          </p>
+        )}
+        {destinations.data && (
+          <>
+            <GridTable
+              headings={["Code", "Name", "Availability", "Actions"]}
+              rows={destinations.data.items.map((d) => [
+                d.code,
+                d.label,
+                d.active ? "Active" : "Inactive",
+                <Button
+                  key="edit"
+                  variant="outline"
+                  onClick={() => setEditDestination(d)}
+                >
+                  Edit
+                </Button>,
+              ])}
+            />
+            <Pager list={destinations.data} onPage={setDestPage} />
+          </>
+        )}
+        <form
+          key={editDestination?.code ?? "new"}
+          className="d-form d-card-pad"
+          onSubmit={(e) => {
+            e.preventDefault();
+            const f = new FormData(e.currentTarget);
+            void execute({
+              type: "destination",
+              code: f.get("code"),
+              label: f.get("label"),
+              active: f.get("active") === "true",
+            });
+          }}
+        >
+          <h3 className="full">
+            {editDestination ? "Edit destination" : "Add destination"}
+          </h3>
+          <Field
+            name="code"
+            label="Code (e.g. VILLIMALE)"
+            value={editDestination?.code}
+          />
+          <Field
+            name="label"
+            label="Destination name"
+            value={editDestination?.label}
+          />
+          <Pick
+            name="active"
+            label="Availability"
+            value={String(editDestination?.active ?? true)}
+            options={[
+              { id: "true", name: "Active" },
+              { id: "false", name: "Inactive" },
+            ]}
+          />
+          <div className="d-row-actions">
+            <Button type="submit" disabled={busy}>
+              Save destination
+            </Button>
+            {editDestination && (
+              <Button
+                variant="ghost"
+                type="button"
+                onClick={() => setEditDestination(null)}
+              >
+                Add another
+              </Button>
+            )}
+          </div>
+        </form>
+      </section>
+    </>
+  );
 }

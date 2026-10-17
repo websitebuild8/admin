@@ -41,9 +41,7 @@ async function Workspace({
   if (actor.role === "PARTNER")
     redirect(`/partner${section?.length ? `/${section.join("/")}` : ""}`);
   if (actor.role === "DRIVER" || actor.role === "APPLICANT")
-    redirect(
-      `/rider${section?.[0] === "cod" ? "/cash" : section?.length ? `/${section.join("/")}` : ""}`,
-    );
+    redirect(`/rider${section?.length ? `/${section.join("/")}` : ""}`);
   if (actor.status !== "APPROVED") return <DeliveryApplication actor={actor} />;
   const screen = section?.[0] ?? "overview";
   const allowed =
@@ -54,16 +52,17 @@ async function Workspace({
           "partners",
           "applications",
           "drivers",
+          ...(actor.superAdmin ? ["administrators"] : []),
           "invoices",
           "payments",
-          "cod",
+
           "reports",
           "audit",
           "settings",
           "notifications",
           "import",
         ]
-      : ["collections", "deliveries", "cod", "notifications"];
+      : ["collections", "deliveries", "notifications"];
   if ((section && section.length > 1) || !allowed.includes(screen)) notFound();
   return <DeliveryPortal key={screen} actor={actor} screen={screen} />;
 }

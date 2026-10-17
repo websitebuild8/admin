@@ -1,4 +1,5 @@
 "use client";
+import { deliveryFetch } from "@/lib/delivery/fetch";
 import { useEffect, useRef, useState } from "react";
 import {
   ChevronLeft,
@@ -147,7 +148,7 @@ export function PartnerHistoryModal({
   const key = `${resource}?${query}&revision=${revision}`;
   useEffect(() => {
     const controller = new AbortController();
-    fetch(`/api/delivery/${key}`, {
+    deliveryFetch(`/api/delivery/${key}`, {
       cache: "no-store",
       signal: controller.signal,
     })
@@ -195,7 +196,7 @@ export function PartnerHistoryModal({
     if (retry.current?.body !== body)
       retry.current = { body, key: crypto.randomUUID() };
     try {
-      const response = await fetch("/api/delivery/commands", {
+      const response = await deliveryFetch("/api/delivery/commands", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

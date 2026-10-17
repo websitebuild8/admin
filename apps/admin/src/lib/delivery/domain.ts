@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { DeliveryWorkspace } from "./workspace-contract";
 
 export class DeliveryError extends Error {
   constructor(
@@ -15,12 +16,28 @@ export const zoneLabels: Record<string, string> = {
   HULHUMALE_1: "Hulhumalé Phase 1",
   HULHUMALE_2: "Hulhumalé Phase 2",
 };
-export const defaultRates = {
-  BOAT: 2500,
-  MALE: 2500,
-  HULHUMALE_1: 3500,
-  HULHUMALE_2: 4500,
+export const operatingLocations = [
+  "MALE",
+  "HULHUMALE_1",
+  "HULHUMALE_2",
+] as const;
+export const operatingLocationLabels: Record<string, string> = {
+  MALE: "Malé",
+  HULHUMALE_1: "Hulhumalé Phase 1",
+  HULHUMALE_2: "Hulhumalé Phase 2",
 };
+export const defaultRateMatrix: Record<string, Record<string, number>> = {
+  MALE: { MALE: 2500, HULHUMALE_1: 3500, HULHUMALE_2: 4500, BOAT: 2500 },
+  HULHUMALE_1: { MALE: 3500, HULHUMALE_1: 2500, HULHUMALE_2: 3000, BOAT: 3500 },
+  HULHUMALE_2: { MALE: 4500, HULHUMALE_1: 3000, HULHUMALE_2: 2500, BOAT: 4500 },
+};
+export const destinationCode = z
+  .string()
+  .trim()
+  .regex(
+    /^[A-Z][A-Z0-9_]{1,39}$/,
+    "Use an uppercase destination code, such as VILLIMALE.",
+  );
 export const money = (value: number) =>
   new Intl.NumberFormat("en-MV", { style: "currency", currency: "MVR" }).format(
     value / 100,
@@ -61,7 +78,7 @@ const amount = z.union([z.string(), z.number()]).transform((value, ctx) => {
     return z.NEVER;
   }
 });
-export const parcelInput = z.object({
+export const parcelInput = z.strictObject({
   externalReference: text(1, 80).transform((v) => v.toUpperCase()),
   recipientName: text(2, 120),
   recipientPhone: text(7, 12).regex(
@@ -69,9 +86,8 @@ export const parcelInput = z.object({
     "Use a seven-digit Maldives phone number.",
   ),
   destination: text(5, 500),
-  zone: z.enum(zones),
+  zone: destinationCode,
   description: text(0, 500).default(""),
-  codAmount: amount.default(0),
 });
 export const applicationInput = z
   .object({
@@ -118,11 +134,11 @@ export const commandInput = z.discriminatedUnion("type", [
     parcel: parcelInput,
   }),
   z.object({ type: z.literal("assign"), parcelIds: ids, driverId: uuid }),
+  z.object({ type: z.literal("claim"), parcelId: uuid }),
   z.object({ type: z.literal("pickup"), parcelIds: ids }),
   z.object({
     type: z.literal("deliver"),
     parcelId: uuid,
-    codReceived: z.boolean(),
   }),
   z.object({ type: z.literal("cancel"), parcelId: uuid, reason: text(3, 500) }),
   z.object({
@@ -146,23 +162,24 @@ export const commandInput = z.discriminatedUnion("type", [
   }),
   z.object({
     type: z.literal("rate"),
-    zone: z.enum(zones),
+    origin: z.enum(operatingLocations),
+    zone: destinationCode,
     fee: amount.refine(
       (v) => v > 0 && v <= 1000000,
       "Fee must be greater than zero and at most MVR 10,000.",
     ),
   }),
   z.object({
-    type: z.literal("handover"),
-    driverId: uuid,
-    parcelIds: ids,
-    reference: text(4, 100).transform((v) => v.toUpperCase()),
+    type: z.literal("destination"),
+    code: destinationCode,
+    label: text(2, 100),
+    active: z.boolean(),
   }),
   z.object({
-    type: z.literal("remit"),
+    type: z.literal("operatingLocation"),
     partnerId: uuid,
-    parcelIds: ids,
-    reference: text(4, 100).transform((v) => v.toUpperCase()),
+    location: z.enum(operatingLocations),
+    reason: text(3, 500),
   }),
   z.object({ type: z.literal("readNotice"), id: uuid }),
   z.object({
@@ -195,6 +212,8 @@ export type Actor = {
   name: string;
   businessName?: string;
   logoAvailable?: boolean;
+  superAdmin?: boolean;
+  workspaces?: DeliveryWorkspace[];
 };
 export function requireRole(actor: Actor, ...roles: Actor["role"][]) {
   if (!roles.includes(actor.role) || actor.status !== "APPROVED")

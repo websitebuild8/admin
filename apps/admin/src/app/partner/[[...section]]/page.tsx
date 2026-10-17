@@ -17,12 +17,14 @@ async function Workspace({
 }) {
   let actor;
   try {
-    actor = await deliveryActor();
+    actor = await deliveryActor("PARTNER", false);
   } catch (error) {
     if (error instanceof DeliveryError && error.status === 401)
       redirect("/partner/sign-in");
     throw error;
   }
+  if (actor.role === "APPLICANT" && actor.status === "UNREGISTERED")
+    redirect("/join?notice=registration-required");
   if (actor.role !== "PARTNER")
     return (
       <main className="d-auth">
@@ -53,7 +55,6 @@ async function Workspace({
       "import",
       "invoices",
       "payments",
-      "cod",
       "notifications",
       "settings",
     ].includes(screen)

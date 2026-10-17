@@ -1,5 +1,61 @@
 # Admin verification
 
+## Super admin, shared accounts and optional application assets — 17 October 2026
+
+95 unit tests and the complete 83-check database integration suite pass. The
+additional six checks cover super-admin-only grant/revoke/list access, protected
+roots, forged client flags, concurrent/replayed grants, stale admin commands after
+revocation, partner/admin and rider/admin identity preservation, workspace-scoped
+notifications, role-specific replay keys, ten-row administrator history and
+private database privileges. Facebook and Instagram applications without either
+URL or logo submit, review, invite and activate in both Hulhumalé phases. Invitation
+and identity-directory transports are test doubles; no real Clerk users or grants
+were changed by QA. All disposable schemas were removed.
+
+ESLint, whitespace checks and the final single-worker production build (including
+TypeScript) pass after the UI retry controls were completed.
+
+Actual client components were checked with fictional transports at 1280px and
+320/390px phone widths: administrator grant/removal confirmation, ten-row history,
+Admin ↔ Partner and Admin ↔ Rider selection, hidden management navigation for an
+ordinary admin, optional-field submission with no file included, no-logo review
+initials, and recovery from an intentionally failed administrator-list request.
+The workspace selector and removal dialog fit narrow phones; the desktop sidebar
+fits 720px height without scrolling. These checks replace Clerk and Next's
+transition wrapper and do not establish real signed-in sessions or hosted motion.
+
+Read-only Prisma status confirms two pending live migrations: origin pricing/COD
+retirement and `20261017010000_admin_access_optional_partner_assets`. Neither was
+applied. No commit, push or hosted deployment was performed. Follow the coordinated
+[release steps](origin-pricing-and-rider-jobs.md#release-steps) and
+[admin access guide](admin-access-and-workspaces.md) before publishing this code.
+
+## Operating locations, rider jobs and recipient-payment retirement — 17 October 2026
+
+The updated implementation passes 90 unit tests, 77 disposable-schema delivery
+workflow checks, two historical financial-retirement checks and two historical
+paid-invoice migration checks. The full route matrix, custom destinations,
+immutable quotes, competing rider claims, explicit physical pickup, private
+partner data, delivered-only invoices and verified payment history are exercised.
+Temporary test schemas are removed. No operational live records were changed.
+
+Actual client components with fictional transports were checked at 320, 390 and
+1440 pixels. The checks cover the sign-in redirect/continuation, application
+location choices, route-aware package quote, rider claim/physical pickup separation,
+admin location changes, rate/destination form submissions and ten-row pagination.
+The fixture replaces Clerk and the Next transition wrapper; it does not establish
+live authentication or hosted animation acceptance. ESLint and the final
+one-worker production build include TypeScript verification.
+
+Migration `20261017000000_origin_pricing_retire_cod` is prepared and tested, but
+**not applied to the live Supabase database**. The later admin-access/optional-assets
+migration is also pending. They must be released together with the updated site:
+the old published code reads the retired columns. No commit, push or deployment
+was performed. See [release steps](origin-pricing-and-rider-jobs.md#release-steps).
+All sections below describe earlier work and may include subsequently retired
+features; they are historical verification, not the current operating scope.
+
+
 ## Paid invoice history and iGO earnings — 17 October 2026
 
 91 unit tests, the complete 80-check disposable-schema delivery integration suite,

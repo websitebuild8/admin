@@ -19,8 +19,7 @@ export default function Page() {
           We use your account identity, name and phone number to review rider
           applications and coordinate assignments. Approved riders see the
           pickup and recipient information needed for their assigned packages.
-          Package events record who confirmed pickup and delivery and when; cash
-          collection and verified handovers are retained for operational and
+          Package events record who confirmed pickup and delivery and when. Delivery fees and verified payments are retained for operational and
           financial reconciliation.
         </p>
         <br />

@@ -924,12 +924,6 @@
   }
 }
 @media (max-width: 1020px) {
-  .r-stats-cash {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .r-stats-cash > div:last-child {
-    grid-column: 1/-1;
-  }
   .r-layout {
     gap: 25px;
     grid-template-columns: 158px minmax(0, 1fr);

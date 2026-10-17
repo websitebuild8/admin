@@ -12,8 +12,10 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { PublicRates } from "@/components/delivery/public-rates";
 import { LandingMotion } from "@/components/delivery/landing-motion";
 import { PublicPageTransition } from "@/components/delivery/public-page-transition";
+export const dynamic = "force-dynamic";
 export default function Page() {
   return (
     <PublicPageTransition>
@@ -187,29 +189,13 @@ export default function Page() {
                 <br />A big weight off.
               </h2>
               <p>
-                Delivery fees per delivery location, billed to your business.
-                Cash collected for your goods stays separate.
+                Delivery fees depend on where your business operates and where your package is going. Billed after confirmed delivery.
               </p>
               <Link href="/join" transitionTypes={["igo-forward"]}>
                 Apply for your partner account <ArrowUpRight size={17} />
               </Link>
             </div>
-            <div className="d-rate-grid">
-              {[
-                ["Boat", "25"],
-                ["Within Malé", "25"],
-                ["Hulhumalé Phase 1", "35"],
-                ["Hulhumalé Phase 2", "45"],
-              ].map(([name, fee]) => (
-                <article key={name} data-reveal>
-                  <h3>{name}</h3>
-                  <p className="d-rate-price">
-                    <span>MVR</span>
-                    <strong>{fee}</strong>
-                  </p>
-                </article>
-              ))}
-            </div>
+            <PublicRates />
           </section>
           <section className="d-final-cta" data-reveal>
             <div>

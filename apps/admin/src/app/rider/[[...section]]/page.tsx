@@ -15,7 +15,7 @@ async function Workspace({
   if (!section?.length) redirect("/rider/collections");
   let actor;
   try {
-    actor = await deliveryActor();
+    actor = await deliveryActor("DRIVER", false);
   } catch (error) {
     if (error instanceof DeliveryError && error.status === 401)
       redirect("/rider/sign-in");

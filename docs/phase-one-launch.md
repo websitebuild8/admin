@@ -47,16 +47,16 @@ Put values in ignored `apps/admin/.env.local` for development and in the hosting
 provider's private environment settings for production. Never paste credentials
 in a public repository, screenshot, chat, Flutter build or browser code.
 
-| Variable | Purpose |
-| --- | --- |
-| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Browser key for the correct Clerk instance |
-| `CLERK_SECRET_KEY` | Server Clerk key from that same instance |
-| `ADMIN_CLERK_USER_IDS` | Comma-separated explicit administrator user IDs |
-| `DATABASE_URL` | Supabase PostgreSQL transaction-pooler URL for runtime |
-| `DIRECT_URL` | Direct/session-pooler URL, only needed for migration/setup tools |
-| `SUPABASE_URL` | HTTPS project URL |
-| `SUPABASE_SECRET_KEY` | Server-only Storage secret; legacy service-role key is also supported |
-| `IGO_DEMO_MODE` | `false` for deployed use |
+| Variable                            | Purpose                                                                                         |
+| ----------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Browser key for the correct Clerk instance                                                      |
+| `CLERK_SECRET_KEY`                  | Server Clerk key from that same instance                                                        |
+| `ADMIN_CLERK_USER_IDS`              | Existing protected super admin IDs; retain these when adding ordinary admins through the portal |
+| `DATABASE_URL`                      | Supabase PostgreSQL transaction-pooler URL for runtime                                          |
+| `DIRECT_URL`                        | Direct/session-pooler URL, only needed for migration/setup tools                                |
+| `SUPABASE_URL`                      | HTTPS project URL                                                                               |
+| `SUPABASE_SECRET_KEY`               | Server-only Storage secret; legacy service-role key is also supported                           |
+| `IGO_DEMO_MODE`                     | `false` for deployed use                                                                        |
 
 Keep the existing verified public database CA at
 `apps/admin/certs/supabase-root.crt`. Connection helpers validate TLS; do not turn
@@ -137,7 +137,7 @@ Clerk redirects and private Storage reads on the hosted runtime.
 5. Use clearly identified test parcels with permission from the account owners.
    Register/import, assign, open collection list, tick a package, then explicitly
    confirm physical receipt. Ensure unselected packages remain registered.
-6. Complete a delivery with a COD acknowledgement where applicable. Check driver
+6. Complete a delivery after physical receipt by the recipient. Check driver
    attribution, UTC+5 timestamps, partner notification and admin list.
 7. At cutoff, verify one invoice containing delivered packages only. Check an
    older unpaid invoice remains outstanding after the next cycle. Use the job
@@ -145,9 +145,9 @@ Clerk redirects and private Storage reads on the hosted runtime.
 8. Submit a test receipt only for a real, explicitly authorized test transfer.
    Confirm pending evidence leaves debt unchanged. Verify the bank record before
    admin confirmation. Test partial/rejected evidence and duplicate requests.
-9. Record COD handover only when iGO receives cash. Record a partner payout only
-   after an actual authorized payout. Neither action reduces delivery invoices.
-   These are accounting records; this software does not initiate bank transfers.
+9. Verify the full delivery-fee payment, send its paid invoice from admin, and
+   check partner payment history. Recipient goods payments are not collected.
+   This software records verified payments; it does not initiate bank transfers.
 10. On a phone, check driver collection/delivery cards, checkbox targets, dialogs,
     navigation and connection errors. Check desktop admin tables and pagination.
 
@@ -155,42 +155,41 @@ Clerk redirects and private Storage reads on the hosted runtime.
 
 - [ ] Registered legal name/number/address, support contact and receiving account.
 - [ ] Approved partner service agreement, driver operating agreement, privacy
-  notice and recipient-data handling. Current mobile/food policy drafts are not
-  Phase 1 seller-delivery agreements and must not be reused without review.
+      notice and recipient-data handling. Current mobile/food policy drafts are not
+      Phase 1 seller-delivery agreements and must not be reused without review.
 - [ ] Confirm GST/tax applicability, tax-inclusive/exclusive rate presentation,
-  invoice requirements and any statutory retention with a Maldives adviser.
-  Current invoices record delivery charges; they do not calculate GST or claim
-  to be tax invoices. No fictional tax registration is displayed.
+      invoice requirements and any statutory retention with a Maldives adviser.
+      Current invoices record delivery charges; they do not calculate GST or claim
+      to be tax invoices. No fictional tax registration is displayed.
 - [ ] Define prohibited/restricted goods, package limits, boat handoff responsibility,
-  damage/loss claims, failed deliveries/returns, fee disputes and support response.
-  This initial workflow supports registered → picked up → delivered and cancellation
-  before pickup. It does not invent a delivery-failure or refund ledger.
-- [ ] Agree COD cash controls, driver reconciliation, bank payout authorization,
-  maximum cash exposure and separate delivery debt collection. No fee netting.
+      damage/loss claims, failed deliveries/returns, fee disputes and support response.
+      This initial workflow supports registered → picked up → delivered and cancellation
+      before pickup. It does not invent a delivery-failure or refund ledger.
+- [ ] Agree delivery-fee bank verification, invoice handling and overdue debt collection.
 - [ ] Choose database backup/restore arrangements for the actual Supabase plan;
-  perform a restore drill. Choose recovery targets, alerts and incident owners.
+      perform a restore drill. Choose recovery targets, alerts and incident owners.
 - [ ] Decide retention for recipient addresses/phones, receipts, audit and financial
-  evidence. Unsubmitted receipt uploads currently remain private; there is no
-  automatic retention/deletion job for them. Review them operationally until an
-  approved retention policy is implemented. Do not delete financial history.
+      evidence. Unsubmitted receipt uploads currently remain private; there is no
+      automatic retention/deletion job for them. Review them operationally until an
+      approved retention policy is implemented. Do not delete financial history.
 - [ ] Confirm available hosting/database/Storage quotas and domain costs. Free
-  plans are not a capacity guarantee; monitor errors, storage and scheduler runs.
+      plans are not a capacity guarantee; monitor errors, storage and scheduler runs.
 - [x] Complete actual Clerk admin sign-in and admin browser acceptance checks.
 - [ ] Register separate partner and driver accounts, approve them and complete
-  their signed-in browser walkthroughs. No public test accounts were silently added.
+      their signed-in browser walkthroughs. No public test accounts were silently added.
 - [ ] Complete hosted Netlify runtime and deployment acceptance checks.
 
 ## Operational boundaries
 
 Notifications are a private in-app inbox, refreshed while the page is visible.
-Email, SMS, WhatsApp, background push and Facebook/Instagram order ingestion are
-not integrated. Drivers use written destination/pickup instructions; this phase
-does not silently add paid geocoding or live rider tracking. COD is the full
-specified amount per parcel; partial parcel cash collection is not supported.
-Bank verification and payouts are manual, auditable admin records.
+Rider background push uses browser permission, configured VAPID keys and the
+retry outbox. Email, SMS, WhatsApp and Facebook/Instagram order ingestion are not
+integrated. Riders use saved addresses with Google Maps directions. This phase
+does not add live rider tracking. Recipient goods payments are not collected.
+Delivery-fee bank verification remains a manual, auditable admin action.
 
 Invoices are immutable: corrections need an agreed credit-note/adjustment workflow
 before being supported in software. Do not edit issued SQL records to compensate
 for mistakes. Unpaid balances are derived from invoice totals less confirmed
-allocations. Pending delivery charges, pending receipts and COD never count as
+allocations. Pending delivery charges, pending receipts never count as
 settled invoices. Maintain a support process for exceptions before commercial use.

@@ -1,4 +1,6 @@
 "use client";
+import { WorkspaceSwitcher } from "@/components/delivery/workspace-switcher";
+import { deliveryFetch } from "@/lib/delivery/fetch";
 import {
   useCallback,
   useEffect,
@@ -24,7 +26,6 @@ import {
   Phone,
   RefreshCw,
   Search,
-  Wallet,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,7 +41,6 @@ import {
 } from "@/components/ui/dialog";
 import {
   money,
-  zoneLabels,
   type Actor,
   type DeliveryCommandInput,
 } from "@/lib/delivery/domain";
@@ -49,6 +49,7 @@ import {
   googleDirections,
   googleRouteEmbed,
   pickupAddress,
+  type AvailableJob,
   type RiderNotice,
   type RiderParcel,
   type RiderScreen,
@@ -79,11 +80,12 @@ const screens = [
     subtitle: "Your completed deliveries and confirmation times.",
   },
   {
-    id: "cash",
-    label: "Cash",
-    icon: Wallet,
-    title: "Your collections, accounted for.",
-    subtitle: "Recipient cash is separate from the partner’s delivery fees.",
+    id: "available",
+    label: "Find jobs",
+    icon: Search,
+    title: "Your next delivery starts here.",
+    subtitle:
+      "Take an available job, then confirm pickup after physical receipt.",
   },
 ] as const;
 const date = (value: string | null) =>
@@ -150,7 +152,7 @@ export function RiderWorkspace({
           page: String(page),
           q: query,
         });
-        const response = await fetch(
+        const response = await deliveryFetch(
           `/api/delivery/rider-workspace?${params}`,
           { signal, cache: "no-store" },
         );
@@ -226,7 +228,7 @@ export function RiderWorkspace({
     if (attempt.current.body !== body)
       attempt.current = { body, key: crypto.randomUUID() };
     try {
-      const response = await fetch("/api/delivery/commands", {
+      const response = await deliveryFetch("/api/delivery/commands", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -296,6 +298,7 @@ export function RiderWorkspace({
               </span>
             )}
           </Link>
+          <WorkspaceSwitcher actor={actor} />
           <UserButton />
         </div>
       </header>
@@ -358,9 +361,7 @@ export function RiderWorkspace({
             <RiderSkeleton />
           ) : (
             <>
-              <div
-                className={`r-stats${screen === "cash" ? " r-stats-cash" : ""}`}
-              >
+              <div className="r-stats">
                 <div>
                   <span>To collect</span>
                   <strong>{snapshot.summary.collections}</strong>
@@ -370,19 +371,9 @@ export function RiderWorkspace({
                   <strong>{snapshot.summary.onBoard}</strong>
                 </div>
                 <div>
-                  <span>
-                    {screen === "cash" ? "Cash held" : "Delivered today"}
-                  </span>
-                  <strong>
-                    {screen === "cash"
-                      ? money(snapshot.summary.cashHeld)
-                      : snapshot.summary.deliveredToday}
-                  </strong>
-                  <small>
-                    {screen === "cash"
-                      ? "Awaiting admin handover verification"
-                      : "Maldives Time"}
-                  </small>
+                  <span>Delivered today</span>
+                  <strong>{snapshot.summary.deliveredToday}</strong>
+                  <small>Maldives Time</small>
                 </div>
               </div>
               {(screen === "collections" || screen === "notifications") && (
@@ -391,17 +382,7 @@ export function RiderWorkspace({
                   userId={actor.userId}
                 />
               )}
-              {screen === "cash" && (
-                <div className="r-explainer">
-                  <Wallet size={20} />
-                  <p>
-                    Hand collected cash to iGO. Only admin can verify a
-                    handover; the balance stays here until that verification.
-                    Delivery fees are billed separately to each partner.
-                  </p>
-                </div>
-              )}
-              {screen !== "notifications" && (
+              {screen !== "notifications" && screen !== "available" && (
                 <form className="r-search" onSubmit={search}>
                   <Search size={18} />
                   <Input
@@ -424,8 +405,8 @@ export function RiderWorkspace({
                       ? "Delivery stops"
                       : screen === "history"
                         ? "Completed packages"
-                        : screen === "cash"
-                          ? "Cash records"
+                        : screen === "available"
+                          ? "Available deliveries"
                           : "Notifications"}
                 </h2>
                 <span>
@@ -453,7 +434,7 @@ export function RiderWorkspace({
                     {query
                       ? "Try a different package ID or recipient name."
                       : screen === "collections"
-                        ? "New assignments from admin will appear here. Enable alerts to hear about your next stop."
+                        ? "Take a job from Find jobs, or wait for an admin assignment. Enable alerts to hear about your next stop."
                         : screen === "deliveries"
                           ? "Packages appear here after you explicitly confirm pickup."
                           : "Your records will appear here as deliveries progress."}
@@ -484,6 +465,34 @@ export function RiderWorkspace({
                           Mark read
                         </Button>
                       )}
+                    </article>
+                  ))}
+                </div>
+              ) : screen === "available" ? (
+                <div className="r-delivery-grid">
+                  {(snapshot.work.items as AvailableJob[]).map((job) => (
+                    <article className="r-delivery" key={job.id}>
+                      <div className="r-delivery-top">
+                        <span className="r-status">Available</span>
+                        <span>{job.publicId}</span>
+                      </div>
+                      <span className="r-eyebrow">PICKUP</span>
+                      <h2>{job.partner.businessName}</h2>
+                      <p>{pickupAddress(job)}</p>
+                      <span className="r-eyebrow">DELIVER TO</span>
+                      <p className="r-destination">{dropoffAddress(job)}</p>
+                      <p className="r-map-note">
+                        Recipient contact details appear after you take this
+                        delivery. Taking a job does not confirm pickup.
+                      </p>
+                      <Button
+                        disabled={busy}
+                        onClick={() =>
+                          void command({ type: "claim", parcelId: job.id })
+                        }
+                      >
+                        Take delivery <ArrowRight size={16} />
+                      </Button>
                     </article>
                   ))}
                 </div>
@@ -540,11 +549,11 @@ export function RiderWorkspace({
                             <div className="r-package-destination">
                               <strong>{p.recipientName}</strong>
                               <p>{p.destination}</p>
-                              <span>{zoneLabels[p.zone]}</span>
+                              <span>{p.destinationLabel}</span>
                             </div>
                             <div className="r-package-money">
-                              <span>Recipient collection</span>
-                              <strong>{money(p.codAmount)}</strong>
+                              <span>Delivery fee</span>
+                              <strong>{money(p.fee)}</strong>
                               <button
                                 className="r-text-button"
                                 onClick={() =>
@@ -581,13 +590,7 @@ export function RiderWorkspace({
                     <article className="r-delivery" key={p.id}>
                       <div className="r-delivery-top">
                         <span className="r-status">
-                          {screen === "cash"
-                            ? p.handoverId
-                              ? "Handover verified"
-                              : "Cash held"
-                            : p.state === "DELIVERED"
-                              ? "Delivered"
-                              : "On board"}
+                          {p.state === "DELIVERED" ? "Delivered" : "On board"}
                         </span>
                         <span>{p.publicId}</span>
                       </div>
@@ -599,14 +602,6 @@ export function RiderWorkspace({
                       {p.description && (
                         <p className="r-instructions">{p.description}</p>
                       )}
-                      <div className="r-money-row">
-                        <span>
-                          {p.state === "DELIVERED"
-                            ? "Recipient cash recorded"
-                            : "Collect from recipient"}
-                        </span>
-                        <strong>{money(p.codAmount)}</strong>
-                      </div>
                       <div className="r-fee-row">
                         <span>Delivery fee · billed to partner</span>
                         <span>{money(p.fee)}</span>
@@ -703,7 +698,7 @@ export function RiderWorkspace({
               {action?.kind === "pickup"
                 ? "Only the selected packages will be marked as picked up. Opening this list or ticking a box does not record pickup."
                 : action?.kind === "deliver"
-                  ? "Confirm only after the recipient has received the package and any required cash has been collected."
+                  ? "Confirm only after the recipient has physically received the package."
                   : "Check the pickup and destination details before you set off."}
             </DialogDescription>
           </DialogHeader>
@@ -752,9 +747,7 @@ export function RiderWorkspace({
                           setConfirmed(value === true)
                         }
                       />
-                      {action.parcel.codAmount > 0
-                        ? `I delivered this package and received the full ${money(action.parcel.codAmount)} from the recipient.`
-                        : "I delivered this package to the recipient. No cash collection is required."}
+                      I delivered this package to the recipient.
                     </Label>
                     <Button
                       disabled={busy || !confirmed}
@@ -762,7 +755,6 @@ export function RiderWorkspace({
                         void command({
                           type: "deliver",
                           parcelId: action.parcel.id,
-                          codReceived: action.parcel.codAmount > 0 && confirmed,
                         })
                       }
                     >
@@ -884,10 +876,6 @@ function ParcelDetails({
           <p>{p.description}</p>
         </div>
       )}
-      <div className="r-money-row">
-        <span>Recipient collection</span>
-        <strong>{money(p.codAmount)}</strong>
-      </div>
       <div className="r-fee-row">
         <span>Delivery fee · billed to partner</span>
         <span>{money(p.fee)}</span>

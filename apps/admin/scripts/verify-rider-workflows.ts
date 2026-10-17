@@ -129,7 +129,6 @@ export async function verifyRiderWorkflows(
           recipientPhone: "7771234",
           destination: "Private QA building, Malé",
           zone: "MALE",
-          codAmount: 1000,
           description: "QA only",
         },
       });
@@ -318,18 +317,10 @@ export async function verifyRiderWorkflows(
     )) as RiderSnapshot;
     assert.equal(active.work.total, 1);
     assert.equal(active.summary.collections, 11);
-    await assert.rejects(
-      cmd(rider, {
-        type: "deliver",
-        parcelId: parcels[0].id,
-        codReceived: false,
-      }),
-    );
     const deliveryKey = randomUUID(),
       completion = {
         type: "deliver" as const,
         parcelId: parcels[0].id,
-        codReceived: true,
       };
     await Promise.all([
       cmd(rider, completion, deliveryKey),
@@ -341,7 +332,7 @@ export async function verifyRiderWorkflows(
       new URLSearchParams("screen=history"),
     )) as RiderSnapshot;
     assert.equal(history.work.total, 1);
-    assert.equal(history.summary.cashHeld, 1000);
+    assert.equal(typeof history.summary.available, "number");
     assert.equal(history.summary.onBoard, 0);
     const delivered = await db.deliveryParcel.findUniqueOrThrow({
       where: { id: parcels[0].id },
@@ -349,7 +340,7 @@ export async function verifyRiderWorkflows(
     assert.equal(delivered.deliveredBy, rider.userId);
     assert(delivered.deliveredAt && delivered.pickedUpAt);
     ok(
-      "explicit pickup and COD-confirmed delivery update only this rider's packages, history and cash once",
+      "explicit pickup and delivery update only this rider's packages and history once",
     );
     const suspended = await job();
     await cmd(admin, {

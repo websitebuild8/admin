@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
-import { SignIn } from "@clerk/nextjs";
+import { PartnerSignIn } from "@/components/delivery/partner-sign-in";
 import { hasClerkKeys } from "@/lib/mode";
 export default function Page() {
   return (
@@ -21,12 +21,7 @@ export default function Page() {
         invitation email first.
       </p>
       {hasClerkKeys() ? (
-        <SignIn
-          routing="path"
-          path="/partner/sign-in"
-          signUpUrl="/join"
-          forceRedirectUrl="/partner"
-        />
+        <PartnerSignIn />
       ) : (
         <p role="alert">Partner sign-in needs Clerk configuration.</p>
       )}

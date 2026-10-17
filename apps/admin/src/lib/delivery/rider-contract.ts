@@ -4,7 +4,7 @@ export const riderScreens = [
   "collections",
   "deliveries",
   "history",
-  "cash",
+  "available",
   "notifications",
 ] as const;
 export type RiderScreen = (typeof riderScreens)[number];
@@ -16,15 +16,14 @@ export type RiderParcel = {
   recipientPhone: string;
   destination: string;
   zone: string;
+  destinationLabel: string;
   description: string;
   fee: number;
-  codAmount: number;
   state: string;
   partnerId: string;
   registeredAt: string;
   pickedUpAt: string | null;
   deliveredAt: string | null;
-  handoverId: string | null;
   partner: {
     businessName: string;
     pickupAddress: string;
@@ -45,30 +44,48 @@ export type RiderList<T> = {
   page: number;
   pageSize: number;
 };
+export type AvailableJob = {
+  id: string;
+  publicId: string;
+  destination: string;
+  zone: string;
+  destinationLabel: string;
+  registeredAt: string;
+  partner: { businessName: string; pickupAddress: string; pickupArea: string };
+};
 export type RiderSnapshot = {
-  work: RiderList<RiderParcel> | RiderList<RiderNotice>;
+  work:
+    RiderList<RiderParcel> | RiderList<RiderNotice> | RiderList<AvailableJob>;
   notices: RiderList<RiderNotice> & { unread: number };
   summary: {
     collections: number;
     onBoard: number;
     deliveredToday: number;
-    cashHeld: number;
+    available: number;
   };
   config: { mapsEmbedKey: string | null; pushPublicKey: string | null };
 };
 
-export function pickupAddress(parcel: RiderParcel) {
+export function pickupAddress(
+  parcel: Pick<RiderParcel, "partner"> | AvailableJob,
+) {
   return `${parcel.partner.pickupAddress}, ${parcel.partner.pickupArea}, Maldives`;
 }
-export function dropoffAddress(parcel: RiderParcel) {
+export function dropoffAddress(
+  parcel: Pick<RiderParcel, "destination" | "zone" | "destinationLabel">,
+) {
   const island =
     parcel.zone === "BOAT"
       ? ""
-      : parcel.zone === "MALE"
-        ? "Malé"
-        : parcel.zone === "HULHUMALE_2"
-          ? "Hulhumalé Phase 2"
-          : "Hulhumalé Phase 1";
+      : (parcel.destinationLabel ??
+        (
+          {
+            MALE: "Malé",
+            HULHUMALE_1: "Hulhumalé Phase 1",
+            HULHUMALE_2: "Hulhumalé Phase 2",
+          } as Record<string, string>
+        )[parcel.zone] ??
+        "");
   return [parcel.destination, island, "Maldives"].filter(Boolean).join(", ");
 }
 export function googleDirections(destination: string, origin?: string) {

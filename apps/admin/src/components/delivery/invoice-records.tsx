@@ -1,4 +1,5 @@
 "use client";
+import { deliveryFetch } from "@/lib/delivery/fetch";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -56,7 +57,7 @@ export function InvoiceRecords({
   }>();
   useEffect(() => {
     const controller = new AbortController();
-    fetch(`/api/delivery/${key}`, {
+    deliveryFetch(`/api/delivery/${key}`, {
       signal: controller.signal,
       cache: "no-store",
     })

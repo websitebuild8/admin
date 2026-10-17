@@ -1,4 +1,5 @@
 "use client";
+import { deliveryFetch } from "@/lib/delivery/fetch";
 import { useEffect, useState } from "react";
 import { Bell, BellRing } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -24,7 +25,7 @@ async function save(
   action: "subscribe" | "unsubscribe",
 ) {
   const json = subscription.toJSON();
-  const response = await fetch("/api/delivery/push-subscription", {
+  const response = await deliveryFetch("/api/delivery/push-subscription", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(

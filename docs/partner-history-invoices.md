@@ -2,7 +2,7 @@
 
 From the **admin dashboard**, select **Partner deliveries & invoices**, or open **Partner pages** in the admin sidebar. The **Deliveries & invoices** button beside each business opens its delivery history. Search by package ID, seller reference or recipient; filter registered, picked-up, completed, cancelled or completed/uninvoiced deliveries. Lists show ten records per page. The summary covers the whole business, independently of the current search or page. Invoice creation and sending are admin actions; partners can view and pay only their own invoices.
 
-**Create invoice** issues one invoice for all of that partner's completed, uninvoiced deliveries through the server's current timestamp. The preview shows the eligible package count and total. Registered, picked-up, cancelled and already-invoiced packages are excluded. Pending delivery fees are estimates, not outstanding debt. COD collections and partner payouts remain separate.
+**Create invoice** issues one invoice for all of that partner's completed, uninvoiced deliveries through the server's current timestamp. The preview shows the eligible package count and total. Registered, picked-up, cancelled and already-invoiced packages are excluded. Pending delivery fees are estimates, not outstanding debt.
 
 Creation records the issued debt and immediately makes the invoice visible in the partner's **Invoices**. The admin can review the package lines and total, then click **Send invoice**. Sending adds one private notification to the partner's dashboard and records the sender/time. It does not email the partner. Repeated or concurrent sends do not duplicate the notification. Daily invoices retain their existing automatic notification flow.
 
@@ -16,7 +16,7 @@ Full verified settlement automatically creates one immutable **paid invoice** fo
 
 The **Full history** tab contains the invoice issue, manual sends, every payment submission, rejection or verification, full settlement and paid-invoice send. Its append-only events are paginated on the server. The open invoice refreshes with the workspace's existing 30-second foreground refresh. Closing and reopening it also loads the latest records.
 
-The admin overview's **Total earned by iGO** card is all-time verified delivery-fee payments received. Unpaid charges, unverified submissions and recipient COD belonging to partners are excluded. It is a received-fee total; rider salaries and other expenses are not deducted.
+The admin overview's **Total earned by iGO** card is all-time verified delivery-fee payments received. Unpaid charges, unverified submissions are excluded. It is a received-fee total; rider salaries and other expenses are not deducted.
 
 The history's **Invoices** tab shows this business's previous invoices, totals, confirmed payments, outstanding balances and manual send status. **View invoice** opens the details; closing those details returns to the business history. Both admin and the invoiced partner can use **Print / save invoice** to open an authenticated document and print or save it as PDF. Screen lists show ten packages; printing includes all packages on that invoice.
 
