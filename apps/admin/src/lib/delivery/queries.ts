@@ -4,13 +4,23 @@ import { administrators } from "./admin-access";
 import { z } from "zod";
 import { Prisma } from "@/generated/prisma/client";
 import { database } from "../db";
-import { DeliveryError, requireRole, localDate, type Actor } from "./domain";
+import { DeliveryError, requireRole, type Actor } from "./domain";
 import { riderScreens } from "./rider-contract";
 import { riderClientConfig } from "./push-settings";
 import { applicationSelection } from "./partner-applications";
 import { storageConfigurationStatus } from "../storage-configuration";
 import { partnerHistory } from "./partner-history";
 import { invoiceRecords } from "./invoice-history";
+import {
+  invoiceFilter,
+  maldivesToday,
+  packageFilterWhere,
+} from "./dashboard-filters";
+import {
+  dateFilter,
+  parcelPeriodWhere,
+  reportingRange,
+} from "./reporting-period";
 
 export const parcelSelection = {
   id: true,
@@ -66,30 +76,39 @@ export async function deliveryQuery(
         : null,
     };
   requireRole(actor, "ADMIN", "PARTNER", "DRIVER");
+  const range = dateFilter(search);
   if (resource === "rider-summary") {
     requireRole(actor, "DRIVER");
     const where = { driverId: actor.id! };
-    const today = new Date(`${localDate(new Date())}T00:00:00+05:00`);
-    const [collections, onBoard, deliveredToday, available] = await Promise.all(
-      [
-        db.deliveryParcel.count({ where: { ...where, state: "REGISTERED" } }),
-        db.deliveryParcel.count({ where: { ...where, state: "PICKED_UP" } }),
+    const today = maldivesToday();
+    const [collections, onBoard, deliveredToday, available, delivered] =
+      await Promise.all([
         db.deliveryParcel.count({
-          where: { ...where, state: "DELIVERED", deliveredAt: { gte: today } },
+          where: { ...where, state: "REGISTERED", registeredAt: range },
+        }),
+        db.deliveryParcel.count({
+          where: { ...where, state: "PICKED_UP", pickedUpAt: range },
+        }),
+        db.deliveryParcel.count({
+          where: { ...where, state: "DELIVERED", deliveredAt: today },
         }),
         db.deliveryParcel.count({
           where: {
             state: "REGISTERED",
             driverId: null,
             partner: { account: { status: "APPROVED" } },
+            registeredAt: range,
           },
         }),
-      ],
-    );
+        db.deliveryParcel.count({
+          where: { ...where, state: "DELIVERED", deliveredAt: range },
+        }),
+      ]);
     return {
       collections,
       onBoard,
       deliveredToday,
+      delivered,
       available,
     };
   }
@@ -101,9 +120,13 @@ export async function deliveryQuery(
     const workSearch = new URLSearchParams(search);
     const workResource = screen === "history" ? "deliveries" : screen;
     if (screen === "history") workSearch.set("state", "DELIVERED");
+    if (screen !== "history" && workSearch.get("period") === "TODAY") {
+      workSearch.delete("period");
+      workSearch.delete("value");
+    }
     if (screen === "deliveries") workSearch.set("state", "PICKED_UP");
     const [summary, work, notices] = await Promise.all([
-      deliveryQuery(actor, "rider-summary", new URLSearchParams()),
+      deliveryQuery(actor, "rider-summary", workSearch),
       deliveryQuery(actor, workResource, workSearch),
       deliveryQuery(actor, "notifications", new URLSearchParams("page=1")),
     ]);
@@ -140,7 +163,7 @@ export async function deliveryQuery(
   const page = parsed.data,
     take = 10,
     skip = (page - 1) * take;
-  if (resource === "administrators") return administrators(actor, page);
+  if (resource === "administrators") return administrators(actor, page, search);
   if (resource === "invoice-history" || resource === "invoice-payments")
     return invoiceRecords(actor, resource, search, page);
   if (resource === "partner-history")
@@ -149,14 +172,14 @@ export async function deliveryQuery(
     requireRole(actor, "ADMIN");
     const [items, total] = await Promise.all([
       db.deliveryPartnerApplication.findMany({
-        where: { submittedAt: { not: null } },
+        where: { submittedAt: { not: null, ...range } },
         select: applicationSelection,
         orderBy: [{ createdAt: "desc" }, { id: "desc" }],
         take,
         skip,
       }),
       db.deliveryPartnerApplication.count({
-        where: { submittedAt: { not: null } },
+        where: { submittedAt: { not: null, ...range } },
       }),
     ]);
     return {
@@ -197,16 +220,33 @@ export async function deliveryQuery(
       latest,
       awaitingApproval,
       paymentReview,
+      issued,
+      verified,
     ] = await Promise.all([
-      db.deliveryParcel.count({ where: { ...scope, state: "REGISTERED" } }),
-      db.deliveryParcel.count({ where: { ...scope, state: "PICKED_UP" } }),
-      db.deliveryParcel.count({ where: { ...scope, state: "DELIVERED" } }),
+      db.deliveryParcel.count({
+        where: { ...scope, state: "REGISTERED", registeredAt: range },
+      }),
+      db.deliveryParcel.count({
+        where: { ...scope, state: "PICKED_UP", registeredAt: range },
+      }),
+      db.deliveryParcel.count({
+        where: { ...scope, state: "DELIVERED", deliveredAt: range },
+      }),
       db.deliveryParcel.aggregate({
-        where: { ...scope, state: { in: ["REGISTERED", "PICKED_UP"] } },
+        where: {
+          ...scope,
+          state: { in: ["REGISTERED", "PICKED_UP"] },
+          registeredAt: range,
+        },
         _sum: { fee: true },
       }),
       db.deliveryParcel.aggregate({
-        where: { ...scope, state: "DELIVERED", invoiceLine: null },
+        where: {
+          ...scope,
+          state: "DELIVERED",
+          invoiceLine: null,
+          deliveredAt: range,
+        },
         _sum: { fee: true },
       }),
       actor.role === "DRIVER"
@@ -216,22 +256,47 @@ export async function deliveryQuery(
             _sum: { total: true, paid: true },
           }),
       db.deliveryParcel.findMany({
-        where: scope,
+        where: { ...scope, registeredAt: range },
         select: parcelSelection,
         take: 5,
         orderBy: [{ registeredAt: "desc" }, { id: "desc" }],
       }),
       actor.role === "ADMIN"
         ? Promise.all([
-            db.deliveryAccount.count({ where: { status: "PENDING" } }),
+            db.deliveryAccount.count({
+              where: { status: "PENDING", createdAt: range },
+            }),
             db.deliveryPartnerApplication.count({
-              where: { status: "PENDING", submittedAt: { not: null } },
+              where: {
+                status: "PENDING",
+                submittedAt: { not: null, ...range },
+              },
             }),
           ]).then((counts) => counts[0] + counts[1])
         : 0,
       actor.role === "ADMIN"
-        ? db.deliveryPayment.count({ where: { status: "PENDING" } })
+        ? db.deliveryPayment.count({
+            where: { status: "PENDING", createdAt: range },
+          })
         : 0,
+      actor.role === "DRIVER"
+        ? null
+        : db.deliveryInvoice.aggregate({
+            where: { partnerId, createdAt: range },
+            _sum: { total: true },
+          }),
+      actor.role === "DRIVER"
+        ? null
+        : db.deliveryPaymentAllocation.aggregate({
+            where: {
+              invoice: { partnerId },
+              payment: {
+                status: { in: ["PARTIAL", "CONFIRMED"] },
+                reviewedAt: { ...range, lte: new Date() },
+              },
+            },
+            _sum: { amount: true },
+          }),
     ]);
     return {
       registered,
@@ -239,12 +304,13 @@ export async function deliveryQuery(
       delivered,
       pendingEstimate: pending._sum.fee ?? 0,
       awaitingBilling: unbilled._sum.fee ?? 0,
-      invoiced: invoices?._sum.total ?? 0,
-      confirmedPayments: invoices?._sum.paid ?? 0,
+      invoiced: issued?._sum.total ?? 0,
+      confirmedPayments: verified?._sum.amount ?? 0,
       outstanding: (invoices?._sum.total ?? 0) - (invoices?._sum.paid ?? 0),
       latest,
       awaitingApproval,
       paymentReview,
+      periodLabel: reportingRange(search).label,
     };
   }
   if (resource === "available") {
@@ -253,6 +319,7 @@ export async function deliveryQuery(
       state: "REGISTERED",
       driverId: null,
       partner: { account: { status: "APPROVED" } },
+      registeredAt: range,
     };
     // Recipient identity and phone are disclosed only after an approved rider claims the job.
     const [items, total] = await Promise.all([
@@ -320,12 +387,11 @@ export async function deliveryQuery(
                   ? filter
                   : { in: ["PICKED_UP", "DELIVERED"] },
             }
-          : filter &&
-              ["REGISTERED", "PICKED_UP", "DELIVERED", "CANCELLED"].includes(
-                filter,
-              )
-            ? { state: filter as "REGISTERED" }
-            : {}),
+          : packageFilterWhere(filter)),
+      ...parcelPeriodWhere(
+        resource === "collections" ? "REGISTERED" : filter,
+        search,
+      ),
       ...(query
         ? {
             OR: [
@@ -357,6 +423,7 @@ export async function deliveryQuery(
     const where = {
       role:
         resource === "partners" ? ("PARTNER" as const) : ("DRIVER" as const),
+      createdAt: range,
     };
     const [items, total] = await Promise.all([
       db.deliveryAccount.findMany({
@@ -372,7 +439,13 @@ export async function deliveryQuery(
   }
   if (resource === "invoices") {
     requireRole(actor, "ADMIN", "PARTNER");
-    const where = { partnerId };
+    const where: Prisma.DeliveryInvoiceWhereInput = {
+      partnerId,
+      createdAt: range,
+      ...(invoiceFilter(search.get("state")) === "OUTSTANDING"
+        ? { paid: { lt: db.deliveryInvoice.fields.total } }
+        : {}),
+    };
     const [items, total] = await Promise.all([
       db.deliveryInvoice.findMany({
         where,
@@ -450,7 +523,7 @@ export async function deliveryQuery(
     requireRole(actor, "ADMIN", "PARTNER");
     const [items, total] = await Promise.all([
       db.deliveryPayment.findMany({
-        where: { partnerId },
+        where: { partnerId, createdAt: range },
         include: {
           invoice: { select: { publicId: true, total: true, paid: true } },
           partner: { select: { businessName: true } },
@@ -459,7 +532,7 @@ export async function deliveryQuery(
         take,
         skip,
       }),
-      db.deliveryPayment.count({ where: { partnerId } }),
+      db.deliveryPayment.count({ where: { partnerId, createdAt: range } }),
     ]);
     return { items, total, page, pageSize: take };
   }
@@ -467,6 +540,7 @@ export async function deliveryQuery(
     const where = {
       recipient: actor.userId,
       workspace: { in: ["ACCOUNT", actor.role] },
+      createdAt: range,
     };
     const [items, total, unread] = await Promise.all([
       db.deliveryNotification.findMany({
@@ -484,11 +558,12 @@ export async function deliveryQuery(
     requireRole(actor, "ADMIN");
     const [items, total] = await Promise.all([
       db.deliveryActivity.findMany({
+        where: { createdAt: range },
         orderBy: [{ createdAt: "desc" }, { id: "desc" }],
         take,
         skip,
       }),
-      db.deliveryActivity.count(),
+      db.deliveryActivity.count({ where: { createdAt: range } }),
     ]);
     return { items, total, page, pageSize: take };
   }

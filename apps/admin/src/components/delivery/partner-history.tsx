@@ -1,4 +1,11 @@
 "use client";
+import { DatePeriodFilter } from "./date-period-filter";
+import {
+  allTime,
+  parcelDateLabel,
+  periodQuery,
+  type PeriodSelection,
+} from "@/lib/delivery/reporting-period";
 import { deliveryFetch } from "@/lib/delivery/fetch";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -123,6 +130,7 @@ export function PartnerHistoryModal({
   changed: () => void;
 }) {
   const [name, setName] = useState("Partner history");
+  const [selection, setSelection] = useState<PeriodSelection>(allTime);
   const [tab, setTab] = useState("deliveries"),
     [page, setPage] = useState(1),
     [filter, setFilter] = useState("ALL"),
@@ -143,6 +151,7 @@ export function PartnerHistoryModal({
     page: String(page),
     filter,
     q,
+    ...Object.fromEntries(new URLSearchParams(periodQuery(selection))),
   });
   const resource = tab === "deliveries" ? "partner-history" : "invoices";
   const key = `${resource}?${query}&revision=${revision}`;
@@ -267,6 +276,18 @@ export function PartnerHistoryModal({
             <RefreshCw size={15} />
           </Button>
         </div>
+        <DatePeriodFilter
+          selection={selection}
+          onChange={(next) => {
+            setSelection(next);
+            setPage(1);
+            setResult(undefined);
+          }}
+          basis={
+            tab === "invoices" ? "Invoice issue date" : parcelDateLabel(filter)
+          }
+          disabled={busy}
+        />
         {loading && data && (
           <p role="status" className="d-history-hint">
             Updating history…
@@ -298,20 +319,21 @@ export function PartnerHistoryModal({
                 <strong>{history.summary.delivered}</strong>
               </div>
               <div>
-                <span>Invoiced & outstanding</span>
+                <span>Outstanding · all time</span>
                 <strong>{money(history.summary.outstanding)}</strong>
               </div>
             </div>
             <div className="d-history-invoice">
               <div>
-                <span>Ready to invoice</span>
+                <span>Ready to invoice · all time</span>
                 <strong>{money(history.summary.eligibleTotal)}</strong>
                 <p>
                   {history.summary.eligibleCount} completed, uninvoiced{" "}
                   {history.summary.eligibleCount === 1
                     ? "delivery"
                     : "deliveries"}{" "}
-                  across all pages. Collected parcel money stays separate.
+                  across all pages and dates, including outside the selected
+                  period.
                 </p>
               </div>
               <Button
@@ -436,8 +458,8 @@ export function PartnerHistoryModal({
         ) : invoices ? (
           <>
             <p className="d-history-hint">
-              Every invoice for this partner. Earlier unpaid invoices remain
-              outstanding.
+              Invoices issued in the selected period. Earlier unpaid invoices
+              remain outstanding.
             </p>
             <Table>
               <TableHeader>
@@ -495,7 +517,8 @@ export function PartnerHistoryModal({
                 {!invoices.items.length && (
                   <TableRow>
                     <TableCell colSpan={5}>
-                      No invoices issued for this partner yet.
+                      No invoices issued for this partner in the selected
+                      period.
                     </TableCell>
                   </TableRow>
                 )}

@@ -18,6 +18,7 @@ import {
   type EarningsPeriod,
   type EarningsResult,
 } from "@/lib/delivery/earnings-period";
+import type { PeriodSelection } from "@/lib/delivery/reporting-period";
 
 const months = Array.from({ length: 12 }, (_, index) => ({
   value: String(index + 1).padStart(2, "0"),
@@ -26,11 +27,18 @@ const months = Array.from({ length: 12 }, (_, index) => ({
     timeZone: "UTC",
   }).format(new Date(Date.UTC(2024, index, 1))),
 }));
-export function EarningsCard({ revision = 0 }: { revision?: number }) {
-  const [selection, setSelection] = useState<{
+export function EarningsCard({
+  revision = 0,
+  selection: controlled,
+}: {
+  revision?: number;
+  selection?: PeriodSelection;
+}) {
+  const [localSelection, setSelection] = useState<{
     period: EarningsPeriod;
     value: string;
   }>({ period: "ALL_TIME", value: "" });
+  const selection = controlled ?? localSelection;
   const [result, setResult] = useState<{
     key: string;
     data: EarningsResult | null;
@@ -98,90 +106,93 @@ export function EarningsCard({ revision = 0 }: { revision?: number }) {
         <span>Total earned by iGO</span>
         <Wallet aria-hidden="true" />
       </div>
-      <div className="d-earnings-controls">
-        <Select
-          items={earningsPeriods}
-          value={selection.period}
-          onValueChange={(value) => {
-            if (value) changePeriod(value as EarningsPeriod);
-          }}
-        >
-          <SelectTrigger aria-label="Earnings period">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {earningsPeriods.map((period) => (
-              <SelectItem key={period.value} value={period.value}>
-                {period.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {selection.period === "DAILY" && (
-          <Input
-            aria-label="Earnings day"
-            type="date"
-            max={today}
-            value={selection.value}
-            onChange={(event) => {
-              if (event.target.value)
-                setSelection({ ...selection, value: event.target.value });
-            }}
-          />
-        )}
-        {selection.period === "MONTHLY" && (
+      {!controlled && (
+        <div className="d-earnings-controls">
           <Select
-            items={months}
-            value={selection.value.slice(5)}
+            items={earningsPeriods}
+            value={selection.period}
             onValueChange={(value) => {
-              if (value)
-                setSelection({ ...selection, value: `${year}-${value}` });
+              if (value) changePeriod(value as EarningsPeriod);
             }}
           >
-            <SelectTrigger aria-label="Earnings month">
+            <SelectTrigger aria-label="Earnings period">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {months.map((month) => (
-                <SelectItem
-                  key={month.value}
-                  value={month.value}
-                  disabled={`${year}-${month.value}` > today.slice(0, 7)}
-                >
-                  {month.label}
+              {earningsPeriods.map((period) => (
+                <SelectItem key={period.value} value={period.value}>
+                  {period.label}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
-        )}
-        {(selection.period === "MONTHLY" || selection.period === "YEARLY") && (
-          <Select
-            items={years.map((value) => ({ value, label: value }))}
-            value={year}
-            onValueChange={(value) => {
-              if (value)
-                setSelection({
-                  ...selection,
-                  value:
-                    selection.period === "YEARLY"
-                      ? value
-                      : `${value}-${value === today.slice(0, 4) && selection.value.slice(5) > today.slice(5, 7) ? today.slice(5, 7) : selection.value.slice(5)}`,
-                });
-            }}
-          >
-            <SelectTrigger aria-label="Earnings year">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {years.map((value) => (
-                <SelectItem key={value} value={value}>
-                  {value}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
-      </div>
+          {selection.period === "DAILY" && (
+            <Input
+              aria-label="Earnings day"
+              type="date"
+              max={today}
+              value={selection.value}
+              onChange={(event) => {
+                if (event.target.value)
+                  setSelection({ ...selection, value: event.target.value });
+              }}
+            />
+          )}
+          {selection.period === "MONTHLY" && (
+            <Select
+              items={months}
+              value={selection.value.slice(5)}
+              onValueChange={(value) => {
+                if (value)
+                  setSelection({ ...selection, value: `${year}-${value}` });
+              }}
+            >
+              <SelectTrigger aria-label="Earnings month">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {months.map((month) => (
+                  <SelectItem
+                    key={month.value}
+                    value={month.value}
+                    disabled={`${year}-${month.value}` > today.slice(0, 7)}
+                  >
+                    {month.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          {(selection.period === "MONTHLY" ||
+            selection.period === "YEARLY") && (
+            <Select
+              items={years.map((value) => ({ value, label: value }))}
+              value={year}
+              onValueChange={(value) => {
+                if (value)
+                  setSelection({
+                    ...selection,
+                    value:
+                      selection.period === "YEARLY"
+                        ? value
+                        : `${value}-${value === today.slice(0, 4) && selection.value.slice(5) > today.slice(5, 7) ? today.slice(5, 7) : selection.value.slice(5)}`,
+                  });
+              }}
+            >
+              <SelectTrigger aria-label="Earnings year">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {years.map((value) => (
+                  <SelectItem key={value} value={value}>
+                    {value}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        </div>
+      )}
       {current?.error ? (
         <div className="d-earnings-error" role="alert">
           <span>{current.error}</span>

@@ -235,12 +235,62 @@
   gap: 12px;
   margin-bottom: 23px;
 }
-.r-stats > div {
+.r-stats > :is(div, a) {
   background: #ffffffb8;
   border: 1px solid #fff;
   box-shadow: 0 3px 20px #18201403;
   border-radius: 19px;
   padding: 20px;
+}
+.r-stats > a {
+  color: inherit;
+  text-decoration: none;
+  touch-action: manipulation;
+  transition:
+    transform 160ms ease,
+    box-shadow 160ms ease,
+    border-color 160ms ease;
+}
+.r-stats > a:focus-visible {
+  outline: 3px solid #171717;
+  outline-offset: 4px;
+}
+@media (hover: hover) and (pointer: fine) {
+  .r-stats > a:hover {
+    transform: translateY(-3px);
+    border-color: #e6d94d;
+    box-shadow: 0 10px 26px #2025100c;
+  }
+}
+.r-stats > a:active {
+  transform: scale(0.985);
+}
+.r-history-filters {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+.r-history-filters a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 8px 14px;
+  border: 1px solid var(--r-border);
+  border-radius: 12px;
+  background: #ffffffb8;
+  color: var(--r-muted);
+  font-size: 12px;
+  text-decoration: none;
+}
+.r-history-filters a[aria-current="page"] {
+  background: #fff8ad;
+  border-color: #eee080;
+  color: #202919;
+}
+.r-history-filters a:focus-visible {
+  outline: 2px solid #171717;
+  outline-offset: 2px;
 }
 .r-stats span {
   font-size: 12px;
@@ -949,7 +999,7 @@
   .r-alerts button {
     margin-left: 52px;
   }
-  .r-stats > div {
+  .r-stats > :is(div, a) {
     padding: 16px;
   }
   .r-stats strong {
@@ -1060,7 +1110,7 @@
     gap: 8px;
     margin-bottom: 18px;
   }
-  .r-stats > div {
+  .r-stats > :is(div, a) {
     padding: 14px 12px;
     border-radius: 15px;
   }
@@ -1074,7 +1124,7 @@
   .r-stats small {
     font-size: 8px;
   }
-  .r-stats > div:last-child strong {
+  .r-stats > :is(div, a):last-child strong {
     font-size: 24px;
   }
   .r-alerts {
@@ -1219,6 +1269,13 @@
   }
 }
 @media (prefers-reduced-motion: reduce) {
+  .r-stats > a {
+    transition: none;
+  }
+  .r-stats > a:hover,
+  .r-stats > a:active {
+    transform: none;
+  }
   .r-main,
   .r-onboarding-card,
   .r-spin {

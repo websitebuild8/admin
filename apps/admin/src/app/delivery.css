@@ -1179,6 +1179,94 @@ html:has(.d-site) {
   gap: 16px;
   margin: 22px 0 25px;
 }
+.d-period-filter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 14px 20px;
+  padding: 16px 18px;
+  margin: 0 0 22px;
+  border: 1px solid #e5e8de;
+  border-radius: 17px;
+  background: #ffffffbf;
+}
+.d-period-caption {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+  flex: 1 1 200px;
+}
+.d-period-caption > svg {
+  flex: none;
+  margin-top: 2px;
+  color: #747d69;
+}
+.d-period-caption strong {
+  font-size: 13px;
+  font-weight: 700;
+  color: #202419;
+}
+.d-period-caption p {
+  font-size: 10px;
+  color: #747d69;
+  margin: 3px 0 0;
+}
+.d-period-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+.d-period-controls [data-slot="select-trigger"] {
+  min-width: 125px;
+  width: auto;
+  min-height: 44px;
+  background: #fff;
+  border-color: #e2e5da;
+  border-radius: 11px;
+  font-size: 12px;
+}
+.d-period-controls input {
+  min-height: 44px;
+  width: 160px;
+  max-width: 100%;
+  border-radius: 11px;
+  background: #fff;
+  font-size: 12px;
+}
+.d-period-controls input[type="number"] {
+  width: 100px;
+}
+.d-period-controls [data-slot="button"] {
+  min-height: 44px;
+}
+.d-period-error {
+  flex-basis: 100%;
+  color: #ae2b18;
+  font-size: 12px;
+}
+@media (max-width: 600px) {
+  .d-period-filter {
+    padding: 14px;
+    gap: 12px;
+  }
+  .d-period-caption {
+    flex-basis: 100%;
+  }
+  .d-period-controls {
+    width: 100%;
+  }
+  .d-period-controls input {
+    flex: 1 1 130px;
+    min-width: 0;
+  }
+  .d-period-controls input[type="number"] {
+    width: auto;
+  }
+}
 .d-stat {
   background: #ffffffc9;
   border: 1px solid #fff;
@@ -1217,6 +1305,39 @@ html:has(.d-site) {
 .d-stat.accent {
   background: linear-gradient(125deg, #fff586, #fffbd3);
   border-color: #f7eb73;
+}
+.d-stat-link {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+  touch-action: manipulation;
+  transition:
+    transform 160ms ease,
+    box-shadow 160ms ease,
+    border-color 160ms ease;
+}
+.d-stat-link:focus-visible {
+  outline: 3px solid #171717;
+  outline-offset: 4px;
+}
+@media (hover: hover) and (pointer: fine) {
+  .d-stat-link:hover {
+    transform: translateY(-3px);
+    border-color: #e6d94d;
+    box-shadow: 0 10px 26px #2025100c;
+  }
+}
+.d-stat-link:active {
+  transform: scale(0.985);
+}
+@media (prefers-reduced-motion: reduce) {
+  .d-stat-link {
+    transition: none;
+  }
+  .d-stat-link:hover,
+  .d-stat-link:active {
+    transform: none;
+  }
 }
 .d-grid-two {
   display: grid;
@@ -1427,7 +1548,7 @@ html:has(.d-site) {
   gap: 5px;
   flex-wrap: wrap;
 }
-.d-filter-tabs button {
+.d-filter-tabs :is(button, a) {
   border: 1px solid #e6e9de;
   background: #ffffffad;
   padding: 8px 12px;
@@ -1435,11 +1556,21 @@ html:has(.d-site) {
   font-size: 10px;
   color: #7c876d;
   min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
 }
-.d-filter-tabs button.active {
+.d-filter-tabs :is(button, a).active {
   color: #202919;
   background: #fff8ad;
   border-color: #eee080;
+}
+.d-filter-tabs a:focus-visible {
+  outline: 2px solid #171717;
+  outline-offset: 2px;
+}
+.d-invoice-filters {
+  margin-bottom: 16px;
 }
 .d-pagination {
   display: flex;
@@ -2191,7 +2322,7 @@ html:has(.d-site) {
   .d-filter-tabs {
     gap: 4px;
   }
-  .d-filter-tabs button {
+  .d-filter-tabs :is(button, a) {
     font-size: 9px;
     padding: 8px 10px;
   }

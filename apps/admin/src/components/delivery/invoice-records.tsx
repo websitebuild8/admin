@@ -1,4 +1,10 @@
 "use client";
+import { DatePeriodFilter } from "./date-period-filter";
+import {
+  allTime,
+  periodQuery,
+  type PeriodSelection,
+} from "@/lib/delivery/reporting-period";
 import { deliveryFetch } from "@/lib/delivery/fetch";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -49,7 +55,8 @@ export function InvoiceRecords({
   review: (payment: Payment) => void;
 }) {
   const [page, setPage] = useState(1);
-  const key = `invoice-${view}?id=${id}&page=${page}&revision=${revision}`;
+  const [selection, setSelection] = useState<PeriodSelection>(allTime);
+  const key = `invoice-${view}?id=${id}&page=${page}&revision=${revision}&${periodQuery(selection)}`;
   const [state, setState] = useState<{
     key: string;
     data?: List;
@@ -72,16 +79,40 @@ export function InvoiceRecords({
       });
     return () => controller.abort();
   }, [key]);
-  if (state?.key !== key) return <DeliverySkeleton />;
+  const controls = (
+    <DatePeriodFilter
+      selection={selection}
+      onChange={(next) => {
+        setPage(1);
+        setSelection(next);
+      }}
+      basis={
+        view === "history"
+          ? "Invoice event date · invoice amounts remain complete"
+          : "Transfer submission date · invoice amounts remain complete"
+      }
+    />
+  );
+  if (state?.key !== key)
+    return (
+      <>
+        {controls}
+        <DeliverySkeleton />
+      </>
+    );
   if (state.error)
     return (
-      <div className="d-error" role="alert">
-        {state.error}
-      </div>
+      <>
+        {controls}
+        <div className="d-error" role="alert">
+          {state.error}
+        </div>
+      </>
     );
   const data = state.data!;
   return (
     <>
+      {controls}
       <div className="d-invoice-records">
         <Table>
           <TableHeader>
@@ -192,7 +223,7 @@ export function InvoiceRecords({
                   {view === "history"
                     ? "history events"
                     : "payment submissions"}{" "}
-                  for this invoice yet.
+                  for this invoice in the selected period.
                 </TableCell>
               </TableRow>
             )}

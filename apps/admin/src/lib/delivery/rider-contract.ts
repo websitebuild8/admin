@@ -61,6 +61,7 @@ export type RiderSnapshot = {
     collections: number;
     onBoard: number;
     deliveredToday: number;
+    delivered?: number;
     available: number;
   };
   config: { mapsEmbedKey: string | null; pushPublicKey: string | null };

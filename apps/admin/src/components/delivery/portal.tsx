@@ -13,6 +13,17 @@ import {
   type ReactNode,
 } from "react";
 import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { DatePeriodFilter } from "./date-period-filter";
+import {
+  allTime,
+  datedScreens,
+  parcelDateLabel,
+  periodQuery,
+  periodSelection,
+  withPeriod,
+  type PeriodSelection,
+} from "@/lib/delivery/reporting-period";
 import Image from "next/image";
 import { UserButton } from "@clerk/nextjs";
 import { toast } from "sonner";
@@ -89,6 +100,11 @@ import {
   invoicePaymentStatus,
   invoiceStatusLabels,
 } from "@/lib/delivery/invoice-lifecycle";
+import {
+  invoiceFilter,
+  packageFilter,
+  packageFilters,
+} from "@/lib/delivery/dashboard-filters";
 
 type Parcel = {
   id: string;
@@ -179,6 +195,7 @@ type Activity = {
 };
 type List<T> = { items: T[]; total: number; page: number; pageSize: number };
 type Summary = {
+  periodLabel?: string;
   registered: number;
   pickedUp: number;
   delivered: number;
@@ -696,11 +713,60 @@ export function DeliveryPortal({
   actor: Actor;
   screen: string;
 }) {
+  const params = useSearchParams();
+  const pathname = usePathname(),
+    router = useRouter();
+  let selection: PeriodSelection;
+  try {
+    selection = datedScreens[screen] ? periodSelection(params) : allTime;
+  } catch {
+    return (
+      <div className="d-error" role="alert">
+        Choose a valid current or past date filter.{" "}
+        <Link href={pathname}>Reset date filter</Link>
+      </div>
+    );
+  }
+  const filter =
+    screen === "packages"
+      ? packageFilter(params.get("state"))
+      : screen === "invoices"
+        ? invoiceFilter(params.get("state"))
+        : "";
+  // Reset pagination, selection and search when navigation changes the filter,
+  // including browser Back/Forward or a card on the current workspace.
+  return (
+    <DeliveryPortalContent
+      key={`${filter}:${periodQuery(selection)}`}
+      actor={actor}
+      screen={screen}
+      filter={filter}
+      selection={selection}
+      changePeriod={(next) =>
+        router.push(withPeriod(`${pathname}?${params}`, next), {
+          scroll: false,
+        })
+      }
+    />
+  );
+}
+function DeliveryPortalContent({
+  actor,
+  screen,
+  filter,
+  selection,
+  changePeriod,
+}: {
+  actor: Actor;
+  screen: string;
+  filter: string;
+  selection: PeriodSelection;
+  changePeriod: (selection: PeriodSelection) => void;
+}) {
   const [revision, setRevision] = useState(0),
     [page, setPage] = useState(1),
     [q, setQ] = useState(""),
     [choiceSearch, setChoiceSearch] = useState(""),
-    [filter, setFilter] = useState(""),
     [selected, setSelected] = useState<string[]>([]),
     [mobileOpen, setMobileOpen] = useState(false),
     [action, setAction] = useState<Action | null>(null),
@@ -722,7 +788,8 @@ export function DeliveryPortal({
       : screen === "settings"
         ? "settings"
         : screen;
-  const query = `page=${page}&q=${encodeURIComponent(q)}&state=${filter}`;
+  const query = `page=${page}&q=${encodeURIComponent(q)}&state=${filter}&${periodQuery(selection)}`;
+  const datedHref = (href: string) => withPeriod(href, selection);
   const request = useResource<unknown>(resource, query, revision);
   const notices = useResource<List<Notice> & { unread: number }>(
     "notifications",
@@ -1031,7 +1098,7 @@ export function DeliveryPortal({
       );
     if (screen === "administrators")
       return actor.superAdmin ? (
-        <AdminAccessPanel workspaceRevision={revision} />
+        <AdminAccessPanel workspaceRevision={revision} selection={selection} />
       ) : (
         <p>Only the super admin can manage administrator access.</p>
       );
@@ -1043,12 +1110,16 @@ export function DeliveryPortal({
           <div
             className={`d-stats${actor.role === "ADMIN" ? " d-stats-income" : ""}`}
           >
-            {actor.role === "ADMIN" && <EarningsCard revision={revision} />}
+            {actor.role === "ADMIN" && (
+              <EarningsCard revision={revision} selection={selection} />
+            )}
             <Stat
               label="Invoiced balance due"
               value={money(d.outstanding)}
-              note="Confirmed payments deducted only"
+              note="All time · confirmed payments deducted only"
               icon={<ReceiptText />}
+              href={`${workspaceBase}/invoices?state=OUTSTANDING`}
+              destination="View outstanding invoices"
               accent
             />
             <Stat
@@ -1056,18 +1127,24 @@ export function DeliveryPortal({
               value={String(d.registered + d.pickedUp)}
               note={`${d.registered} registered · ${d.pickedUp} picked up`}
               icon={<Package />}
+              href={datedHref(`${workspaceBase}/packages?state=PENDING`)}
+              destination="View pending deliveries"
             />
             <Stat
               label="Delivered packages"
               value={String(d.delivered)}
               note="Completed by assigned drivers"
               icon={<PackageCheck />}
+              href={datedHref(`${workspaceBase}/packages?state=DELIVERED`)}
+              destination="View delivered packages"
             />
             <Stat
               label="Delivered, awaiting billing"
               value={money(d.awaitingBilling)}
               note="Completed deliveries not yet invoiced"
               icon={<Wallet />}
+              href={datedHref(`${workspaceBase}/packages?state=UNINVOICED`)}
+              destination="View delivered packages awaiting billing"
             />
           </div>
           <div className="d-grid-two">
@@ -1081,11 +1158,11 @@ export function DeliveryPortal({
                   </h2>
                   <p>
                     {screen === "reports"
-                      ? "Operational totals and exports cover all time. The earnings card has its own period filter."
-                      : "Your most recently registered packages"}
+                      ? "Counts, income and exports follow the selected period. Total balance due always includes older unpaid invoices."
+                      : "Packages registered in the selected period"}
                   </p>
                 </div>
-                <Link href={`${workspaceBase}/packages`}>
+                <Link href={datedHref(`${workspaceBase}/packages`)}>
                   View all <ArrowUpRight size={13} />
                 </Link>
               </div>
@@ -1231,26 +1308,20 @@ export function DeliveryPortal({
               />
             </div>
             {screen === "packages" && (
-              <div className="d-filter-tabs">
-                {[
-                  ["", "All"],
-                  ["REGISTERED", "Registered"],
-                  ["PICKED_UP", "Picked up"],
-                  ["DELIVERED", "Delivered"],
-                ].map(([v, label]) => (
-                  <button
+              <nav className="d-filter-tabs" aria-label="Filter packages">
+                {packageFilters.map(({ value: v, label }) => (
+                  <Link
                     key={v}
+                    href={datedHref(
+                      `${workspaceBase}/packages${v ? `?state=${v}` : ""}`,
+                    )}
+                    aria-current={filter === v ? "page" : undefined}
                     className={filter === v ? "active" : ""}
-                    onClick={() => {
-                      setFilter(v);
-                      setPage(1);
-                      setSelected([]);
-                    }}
                   >
                     {label}
-                  </button>
+                  </Link>
                 ))}
-              </div>
+              </nav>
             )}
           </div>
           <div className="d-note">
@@ -1431,8 +1502,12 @@ export function DeliveryPortal({
             />
           ) : (
             <Empty
-              title="No applications yet"
-              text="Applicants register through the website and submit their details for review."
+              title={
+                selection.period === "ALL_TIME"
+                  ? "No accounts yet"
+                  : "No accounts registered in this period"
+              }
+              text="Try another date period, or review new applications as they arrive."
             />
           )}
           <Pager list={d} onPage={changePage} />
@@ -1443,7 +1518,36 @@ export function DeliveryPortal({
       const d = request.data as List<Invoice>;
       return (
         <>
+          <nav
+            className="d-filter-tabs d-invoice-filters"
+            aria-label="Filter invoices"
+          >
+            {[
+              { value: "", label: "All invoices" },
+              { value: "OUTSTANDING", label: "Outstanding" },
+            ].map(({ value, label }) => (
+              <Link
+                key={value}
+                href={datedHref(
+                  `${workspaceBase}/invoices${value ? `?state=${value}` : ""}`,
+                )}
+                className={filter === value ? "active" : ""}
+                aria-current={filter === value ? "page" : undefined}
+              >
+                {label}
+              </Link>
+            ))}
+          </nav>
           <div className="d-note">
+            {selection.period !== "ALL_TIME" && (
+              <>
+                Showing invoices issued in the selected period.{" "}
+                <Link href={`${workspaceBase}/invoices?state=OUTSTANDING`}>
+                  View all outstanding invoices
+                </Link>
+                .{" "}
+              </>
+            )}
             Only delivered packages enter invoices. Empty billing cycles create
             no invoice. Previous unpaid invoices remain due when a new invoice
             is issued.
@@ -1504,8 +1608,20 @@ export function DeliveryPortal({
               />
             ) : (
               <Empty
-                title="No invoices yet"
-                text="Delivered packages are invoiced automatically at your partner’s daily cutoff. Registered and picked-up packages are estimates only."
+                title={
+                  selection.period !== "ALL_TIME"
+                    ? "No matching invoices issued in this period"
+                    : filter === "OUTSTANDING"
+                      ? "No outstanding invoices"
+                      : "No invoices yet"
+                }
+                text={
+                  selection.period !== "ALL_TIME"
+                    ? "Try another period or open all outstanding invoices to review any earlier unpaid delivery fees."
+                    : filter === "OUTSTANDING"
+                      ? "There are no invoiced delivery fees left to pay. Pending receipts still need admin verification before they reduce a balance."
+                      : "Delivered packages are invoiced automatically at your partner’s daily cutoff. Registered and picked-up packages are estimates only."
+                }
               />
             )}
             <Pager list={d} onPage={changePage} />
@@ -1608,7 +1724,11 @@ export function DeliveryPortal({
             ))
           ) : (
             <Empty
-              title="You’re all caught up"
+              title={
+                selection.period === "ALL_TIME"
+                  ? "You’re all caught up"
+                  : "No notifications in this period"
+              }
               text="Pickup, delivery, application and invoice updates appear here."
             />
           )}
@@ -1635,7 +1755,13 @@ export function DeliveryPortal({
             ])}
           />
           {!d.items.length && (
-            <Empty title="Activity starts with your first action" />
+            <Empty
+              title={
+                selection.period === "ALL_TIME"
+                  ? "Activity starts with your first action"
+                  : "No activity in this period"
+              }
+            />
           )}
           <Pager list={d} onPage={changePage} />
         </section>
@@ -2090,7 +2216,7 @@ export function DeliveryPortal({
                 </Button>
               )}
               {screen === "overview" && (
-                <Link href={`${workspaceBase}/packages`}>
+                <Link href={datedHref(`${workspaceBase}/packages`)}>
                   <Button>
                     View packages <ArrowUpRight size={15} />
                   </Button>
@@ -2130,6 +2256,18 @@ export function DeliveryPortal({
               )}
             </div>
           </div>
+          {datedScreens[screen] && (
+            <DatePeriodFilter
+              selection={selection}
+              onChange={changePeriod}
+              basis={
+                screen === "packages"
+                  ? parcelDateLabel(filter)
+                  : datedScreens[screen]
+              }
+              disabled={busy}
+            />
+          )}
           {mainContent()}
         </main>
         <footer className="d-footer">
@@ -2246,23 +2384,31 @@ function Stat({
   value,
   note,
   icon,
+  href,
+  destination,
   accent = false,
 }: {
   label: string;
   value: string;
   note: string;
   icon: ReactNode;
+  href: string;
+  destination: string;
   accent?: boolean;
 }) {
   return (
-    <article className={`d-stat ${accent ? "accent" : ""}`}>
+    <Link
+      href={href}
+      className={`d-stat d-stat-link ${accent ? "accent" : ""}`}
+      aria-label={`${destination}: ${value}`}
+    >
       <div>
         <span>{label}</span>
         {icon}
       </div>
       <strong>{value}</strong>
       <small>{note}</small>
-    </article>
+    </Link>
   );
 }
 function ParcelDetail({ parcel: p }: { parcel: Parcel }) {
@@ -2930,7 +3076,7 @@ function downloadReport(data: Summary) {
     "outstanding",
   ] as const;
   const text =
-    "Metric,Value,Unit\n" +
+    `Reporting period,${data.periodLabel ?? "All time"},Maldives Time\nBalance due scope,All unpaid invoices,All time\nMetric,Value,Unit\n` +
     fields
       .map(
         (k) =>

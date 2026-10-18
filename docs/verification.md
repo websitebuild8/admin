@@ -1,5 +1,86 @@
 # Admin verification
 
+## Shared reporting periods — 19 October 2026
+
+Added All time, Daily, Monthly and Yearly selection across current Admin,
+Partner and Rider data views, including overview/report totals, packages,
+collections, on-board work, completed history, available jobs, invoices,
+transfers, account directories, applications, admin grants, notifications and
+activity. Nested partner and invoice timelines also accept periods. Main-page
+URLs preserve period/status combinations; changed filters reset pagination and
+selection, and lists remain capped at ten. Dates use Maldives Time (UTC+5).
+
+113 unit tests and the combined ten-check dashboard/reporting-period database
+suite pass after the final compatibility fix.
+The database suite uses actual Prisma queries in a disposable schema and
+verifies calendar boundaries, milestone-specific package dates, status/date
+composition, ten-row pagination, income verification dates, tenant isolation,
+unchanged invoice documents, payment values, all-time outstanding debt and
+full manual-invoice eligibility. It also checks nested timeline events,
+application submission dates, account/admin directories, notification
+workspaces, audit dates and rejection of impossible/future periods. The initial
+timeline fixture expected one event despite both issuance and submission being
+valid in the same window; it was corrected to assert those two immutable
+events and exclude the next day's review. The successful rerun removed its
+disposable schema. No operational live records were changed.
+
+The wider regression run passed all 103 pre-existing workflow checks before
+reaching an older dashboard helper that supplied `period=` or an unknown
+period. Empty periods now retain their old All time meaning; unknown periods
+are intentionally rejected rather than silently returning an unfiltered list.
+The helper assertion was updated, unit coverage verifies empty-period
+compatibility, and the final combined ten-check suite passes in a fresh schema.
+That final schema was removed. A complete 113-check invocation was not rerun;
+the pre-existing workflow coverage and combined feature suite were verified in
+separate runs. Changed-source ESLint and whitespace checks pass.
+The final single-worker production build, including TypeScript, also passes.
+
+Actual components were checked with fictional transports and substitutes for
+Clerk/Next navigation: daily/month/year selection and Apply, combined invoice
+status/date URLs, the all-outstanding-debt shortcut, Partner card navigation
+retaining its month, Rider history retaining its year, and mobile width 390px
+without horizontal page overflow. The native month/day pickers were exercised
+with keyboard controls. These checks do not establish a hosted Clerk session,
+hosted navigation behavior or deployment.
+
+No database migration or environment setting is needed. The changes still
+require the user's manual VS Code commit/push and Netlify redeployment. See
+[date-period filter operation](date-period-filters.md) for date semantics and
+financial safeguards.
+
+## Dashboard card navigation — 19 October 2026
+
+Admin and Partner summary cards now open their own workspace's filtered lists:
+balance due → outstanding invoices (including partially paid and pending-review
+balances), pending deliveries → registered or picked-up packages, delivered →
+all delivered packages, and awaiting billing → delivered packages without an
+invoice line. Filter choices are reflected in URLs and remain available on the
+destination page. Changing the URL filter resets search, page and selection.
+Rider cards open Collections, On board, and today's delivered history. Today is
+the half-open midnight-to-midnight window in Maldives Time; All deliveries
+remains available. Card navigation never confirms pickup or payment.
+
+109 unit tests pass, including midnight, leap-day and year-boundary checks. The
+five focused `--dashboard-navigation` database checks pass in an isolated schema
+which was removed afterward. They cover server-side status combinations,
+ten-row pagination, search composition, invoice column comparison, partial and
+pending-receipt balances, partner/rider isolation, midnight boundaries and exact
+reconciliation between overview totals and destination lists. A transient
+connection timeout occurred before the successful database rerun. No live
+operational records were changed. The single-worker production build (including
+TypeScript), changed-source ESLint and whitespace checks pass.
+
+The actual portal components were checked with fictional data and authentication
+and Next navigation substitutes. All four Admin and Partner card destinations
+and all three Rider destinations opened correctly. Mobile width 390px has no
+horizontal page overflow; keyboard Enter activates the cards. The existing
+earnings-period controls remain independent. This preview does not establish a
+real hosted Clerk session or hosted Next.js transition behavior.
+
+No schema migration or new environment variable is required. The user still
+needs to commit/push from VS Code and redeploy Netlify. No commit, push or hosted
+deployment was performed.
+
 ## Automatic admin, partner and rider workspaces — 18 October 2026
 
 107 unit tests and the complete 103-check database integration suite pass. The

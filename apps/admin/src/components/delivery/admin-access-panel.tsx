@@ -1,4 +1,9 @@
 "use client";
+import {
+  allTime,
+  periodQuery,
+  type PeriodSelection,
+} from "@/lib/delivery/reporting-period";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -54,8 +59,10 @@ const date = (value: string) =>
   }).format(new Date(value));
 export function AdminAccessPanel({
   workspaceRevision = 0,
+  selection = allTime,
 }: {
   workspaceRevision?: number;
+  selection?: PeriodSelection;
 }) {
   const [page, setPage] = useState(1),
     [revision, setRevision] = useState(0),
@@ -65,9 +72,10 @@ export function AdminAccessPanel({
     [selected, setSelected] = useState<AdminRecord | null>(null);
   const request = useRef({ body: "", key: "" }),
     lock = useRef(false);
+  const period = periodQuery(selection);
   useEffect(() => {
     const abort = new AbortController();
-    deliveryFetch(`/api/delivery/administrators?page=${page}`, {
+    deliveryFetch(`/api/delivery/administrators?page=${page}&${period}`, {
       signal: abort.signal,
       cache: "no-store",
     })
@@ -86,7 +94,7 @@ export function AdminAccessPanel({
           setError(failure.message ?? "Could not load administrators.");
       });
     return () => abort.abort();
-  }, [page, revision, workspaceRevision]);
+  }, [page, revision, workspaceRevision, period]);
   async function save(payload: unknown) {
     if (lock.current) return;
     lock.current = true;

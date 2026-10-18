@@ -2,6 +2,7 @@ import "server-only";
 import { z } from "zod";
 import { database } from "../db";
 import { DeliveryError, requireRole, type Actor } from "./domain";
+import { parcelPeriodWhere } from "./reporting-period";
 export async function partnerHistory(
   actor: Actor,
   search: URLSearchParams,
@@ -34,6 +35,7 @@ export async function partnerHistory(
   const q = search.get("q")?.trim().slice(0, 100);
   const where = {
     partnerId,
+    ...parcelPeriodWhere(filter, search),
     ...(filter === "UNINVOICED"
       ? { state: "DELIVERED" as const, invoiceLine: null }
       : filter !== "ALL"
@@ -74,11 +76,22 @@ export async function partnerHistory(
       },
     }),
     db.deliveryParcel.count({ where }),
-    db.deliveryParcel.groupBy({
-      by: ["state"],
-      where: { partnerId },
-      _count: { _all: true },
-    }),
+    Promise.all(
+      ["REGISTERED", "PICKED_UP", "DELIVERED", "CANCELLED"].map(
+        async (state) => ({
+          state,
+          _count: {
+            _all: await db.deliveryParcel.count({
+              where: {
+                partnerId,
+                state: state as "REGISTERED",
+                ...parcelPeriodWhere(state, search),
+              },
+            }),
+          },
+        }),
+      ),
+    ),
     db.deliveryParcel.aggregate({
       where: { partnerId, state: "DELIVERED", invoiceLine: null },
       _count: { _all: true },

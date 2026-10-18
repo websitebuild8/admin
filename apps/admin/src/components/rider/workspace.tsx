@@ -9,6 +9,15 @@ import {
   type FormEvent,
 } from "react";
 import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { DatePeriodFilter } from "@/components/delivery/date-period-filter";
+import {
+  datedScreens,
+  periodQuery,
+  periodSelection,
+  withPeriod,
+  type PeriodSelection,
+} from "@/lib/delivery/reporting-period";
 import Image from "next/image";
 import { UserButton } from "@clerk/nextjs";
 import { toast } from "sonner";
@@ -41,6 +50,7 @@ import {
 } from "@/components/ui/dialog";
 import {
   money,
+  localDate,
   type Actor,
   type DeliveryCommandInput,
 } from "@/lib/delivery/domain";
@@ -129,6 +139,45 @@ export function RiderWorkspace({
   actor: Actor;
   screen: RiderScreen;
 }) {
+  const params = useSearchParams();
+  const router = useRouter(),
+    pathname = usePathname();
+  let selection: PeriodSelection;
+  try {
+    selection = periodSelection(params);
+  } catch {
+    return (
+      <div className="r-error" role="alert">
+        Choose a valid current or past date filter.{" "}
+        <Link href={pathname}>Reset date filter</Link>
+      </div>
+    );
+  }
+  return (
+    <RiderWorkspaceContent
+      key={`${screen}:${periodQuery(selection)}`}
+      actor={actor}
+      screen={screen}
+      selection={selection}
+      changePeriod={(next) =>
+        router.push(withPeriod(`${pathname}?${params}`, next), {
+          scroll: false,
+        })
+      }
+    />
+  );
+}
+function RiderWorkspaceContent({
+  actor,
+  screen,
+  selection,
+  changePeriod,
+}: {
+  actor: Actor;
+  screen: RiderScreen;
+  selection: PeriodSelection;
+  changePeriod: (selection: PeriodSelection) => void;
+}) {
   const [snapshot, setSnapshot] = useState<RiderSnapshot | null>(null),
     [error, setError] = useState(""),
     [refreshing, setRefreshing] = useState(false);
@@ -143,6 +192,10 @@ export function RiderWorkspace({
     seen = useRef<Set<string> | null>(null),
     requestNumber = useRef(0),
     commandLock = useRef(false);
+  const period = periodQuery(selection);
+  const todayOnly =
+    selection.period === "DAILY" && selection.value === localDate(new Date());
+  const datedHref = (href: string) => withPeriod(href, selection);
   const load = useCallback(
     async (signal?: AbortSignal) => {
       const current = ++requestNumber.current;
@@ -153,7 +206,7 @@ export function RiderWorkspace({
           q: query,
         });
         const response = await deliveryFetch(
-          `/api/delivery/rider-workspace?${params}`,
+          `/api/delivery/rider-workspace?${params}&${period}`,
           { signal, cache: "no-store" },
         );
         const result = await response.json();
@@ -185,7 +238,7 @@ export function RiderWorkspace({
         if (current === requestNumber.current) setRefreshing(false);
       }
     },
-    [screen, page, query],
+    [screen, page, query, period],
   );
   useEffect(() => {
     const abort = new AbortController();
@@ -273,6 +326,11 @@ export function RiderWorkspace({
     setPage(1);
     setSelected([]);
   }
+  function resetList() {
+    setQuery("");
+    setPage(1);
+    setSelected([]);
+  }
   const meta = screens.find((s) => s.id === screen);
   const parcels =
     screen === "notifications"
@@ -322,7 +380,7 @@ export function RiderWorkspace({
             {screens.map((s) => (
               <Link
                 key={s.id}
-                href={`/rider/${s.id}`}
+                href={datedHref(`/rider/${s.id}`)}
                 aria-current={screen === s.id ? "page" : undefined}
               >
                 <s.icon size={21} />
@@ -365,6 +423,18 @@ export function RiderWorkspace({
               <RefreshCw size={18} className={refreshing ? "r-spin" : ""} />
             </Button>
           </div>
+          <DatePeriodFilter
+            selection={selection}
+            onChange={changePeriod}
+            basis={
+              screen === "history"
+                ? "Delivery completion date"
+                : screen === "available"
+                  ? "Package registration date"
+                  : datedScreens[screen]
+            }
+            disabled={busy}
+          />
           {error && (
             <div className="r-error" role="alert">
               {error} <button onClick={() => void load()}>Try again</button>
@@ -375,19 +445,40 @@ export function RiderWorkspace({
           ) : (
             <>
               <div className="r-stats">
-                <div>
+                <Link
+                  href={datedHref("/rider/collections")}
+                  onClick={resetList}
+                  aria-label={`View packages to collect: ${snapshot.summary.collections}`}
+                >
                   <span>To collect</span>
                   <strong>{snapshot.summary.collections}</strong>
-                </div>
-                <div>
+                </Link>
+                <Link
+                  href={datedHref("/rider/deliveries")}
+                  onClick={resetList}
+                  aria-label={`View packages on board: ${snapshot.summary.onBoard}`}
+                >
                   <span>On board</span>
                   <strong>{snapshot.summary.onBoard}</strong>
-                </div>
-                <div>
-                  <span>Delivered today</span>
-                  <strong>{snapshot.summary.deliveredToday}</strong>
-                  <small>Maldives Time</small>
-                </div>
+                </Link>
+                <Link
+                  href={datedHref("/rider/history")}
+                  onClick={resetList}
+                  aria-label={`View delivered packages: ${snapshot.summary.delivered ?? snapshot.summary.deliveredToday}`}
+                >
+                  <span>
+                    {todayOnly ? "Delivered today" : "Delivered packages"}
+                  </span>
+                  <strong>
+                    {snapshot.summary.delivered ??
+                      snapshot.summary.deliveredToday}
+                  </strong>
+                  <small>
+                    {selection.period === "ALL_TIME"
+                      ? "All time"
+                      : "Selected period · MVT"}
+                  </small>
+                </Link>
               </div>
               {(screen === "collections" || screen === "notifications") && (
                 <PushAlerts
@@ -399,6 +490,7 @@ export function RiderWorkspace({
                 <form className="r-search" onSubmit={search}>
                   <Search size={18} />
                   <Input
+                    key={query}
                     name="q"
                     aria-label="Search your packages"
                     placeholder="Search package ID, reference or recipient"
@@ -410,6 +502,27 @@ export function RiderWorkspace({
                   </Button>
                 </form>
               )}
+              {screen === "history" && (
+                <nav
+                  className="r-history-filters"
+                  aria-label="Filter delivery history"
+                >
+                  <Link
+                    href="/rider/history"
+                    aria-current={
+                      selection.period === "ALL_TIME" ? "page" : undefined
+                    }
+                  >
+                    All deliveries
+                  </Link>
+                  <Link
+                    href="/rider/history?period=TODAY"
+                    aria-current={todayOnly ? "page" : undefined}
+                  >
+                    Today · MVT
+                  </Link>
+                </nav>
+              )}
               <div className="r-list-caption">
                 <h2>
                   {screen === "collections"
@@ -417,7 +530,9 @@ export function RiderWorkspace({
                     : screen === "deliveries"
                       ? "Delivery stops"
                       : screen === "history"
-                        ? "Completed packages"
+                        ? todayOnly
+                          ? "Delivered today · Maldives Time"
+                          : "Completed packages"
                         : screen === "available"
                           ? "Available deliveries"
                           : "Notifications"}

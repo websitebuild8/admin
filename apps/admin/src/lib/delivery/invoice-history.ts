@@ -2,6 +2,7 @@ import "server-only";
 import { z } from "zod";
 import { database } from "../db";
 import { DeliveryError, requireRole, type Actor } from "./domain";
+import { dateFilter } from "./reporting-period";
 export async function invoiceRecords(
   actor: Actor,
   resource: string,
@@ -19,7 +20,13 @@ export async function invoiceRecords(
     select: { id: true },
   });
   if (!invoice) throw new DeliveryError("Invoice not found.", 404);
-  const where = { invoiceId: id };
+  const range = dateFilter(search);
+  const where = {
+    invoiceId: id,
+    ...(resource === "invoice-history"
+      ? { occurredAt: range }
+      : { createdAt: range }),
+  };
   if (resource === "invoice-history") {
     const [items, total] = await Promise.all([
       db.deliveryInvoiceEvent.findMany({

@@ -25,6 +25,8 @@ import { verifyPaidInvoices } from "./verify-paid-invoices";
 import { verifyEarnings } from "./verify-earnings";
 import { verifyDeletion } from "./verify-deletion";
 import { verifyAdminWorkspaces } from "./verify-admin-workspaces";
+import { verifyDashboardNavigation } from "./verify-dashboard-navigation";
+import { verifyReportingPeriods } from "./verify-reporting-periods";
 import { verifyPaidInvoiceMigration } from "./verify-paid-invoice-migration";
 import {
   nextCutoff,
@@ -181,6 +183,28 @@ async function main() {
         description: "Not a real delivery",
       },
     });
+    if (process.argv.includes("--dashboard-and-periods")) {
+      await verifyDashboardNavigation(db, admin, ok);
+      await verifyReportingPeriods(db, admin, ok);
+      console.log(
+        `Verified ${checks} dashboard and reporting-period checks in a disposable schema.`,
+      );
+      return;
+    }
+    if (process.argv.includes("--reporting-periods")) {
+      await verifyReportingPeriods(db, admin, ok);
+      console.log(
+        `Verified ${checks} reporting-period checks in a disposable schema.`,
+      );
+      return;
+    }
+    if (process.argv.includes("--dashboard-navigation")) {
+      await verifyDashboardNavigation(db, admin, ok);
+      console.log(
+        `Verified ${checks} dashboard navigation checks in a disposable schema.`,
+      );
+      return;
+    }
     if (process.argv.includes("--admin-workspaces")) {
       await verifyAdminWorkspaces(db, admin, partner, driver, ok);
       console.log(
@@ -594,6 +618,8 @@ async function main() {
     await verifyOptionalPartnerAssets(db, admin, ok);
     await verifyDeletion(db, admin, partner, ok);
     await verifyAdminWorkspaces(db, admin, partner, driver, ok);
+    await verifyDashboardNavigation(db, admin, ok);
+    await verifyReportingPeriods(db, admin, ok);
     console.log(
       `Verified ${checks} database integration checks in an isolated disposable schema.`,
     );

@@ -9,6 +9,7 @@ import { verifiedPrimaryEmail } from "./partner-application-input";
 import { DeliveryError, type Actor } from "./domain";
 import { provisionAdminWorkspaces } from "./admin-workspaces";
 import { permitRoleIdentity, roleAccounts } from "./role-authorization";
+import { dateFilter } from "./reporting-period";
 const reason = z.string().trim().min(3).max(500);
 export const adminAccessInput = z.discriminatedUnion("action", [
   z.strictObject({
@@ -210,16 +211,22 @@ export async function manageAdministrator(
     };
   });
 }
-export async function administrators(actor: Actor, page: number) {
+export async function administrators(
+  actor: Actor,
+  page: number,
+  search = new URLSearchParams(),
+) {
   requireSuperAdmin(actor);
   const db = database();
+  const where = { grantedAt: dateFilter(search) };
   const [items, total] = await Promise.all([
     db.deliveryAdminGrant.findMany({
+      where,
       orderBy: [{ grantedAt: "desc" }, { id: "desc" }],
       take: 10,
       skip: (page - 1) * 10,
     }),
-    db.deliveryAdminGrant.count(),
+    db.deliveryAdminGrant.count({ where }),
   ]);
   const accounts = await db.deliveryAccount.findMany({
     where: { clerkUserId: { in: items.map((item) => item.clerkUserId) } },
