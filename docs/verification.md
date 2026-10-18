@@ -1,5 +1,20 @@
 # Delivery platform verification
 
+## Appearance button alignment and logo placement — 19 October 2026
+
+Moved the theme selector beside the logo on the homepage, partner application,
+Admin/Partner sidebar and Rider header. On mobile, Admin/Partner use the logo row
+inside their navigation drawer. The shared trigger now explicitly centers its
+18-pixel icon inside a non-shrinking 44-pixel square, instead of inheriting the
+select component's spacing. Small-screen brand/navigation groups remain separate.
+
+The production build and lint pass. Browser checks on the actual local site at
+320, 390, 768 and 1440 pixels confirm zero icon-center offset, the intended 8/12px
+logo spacing, no header overlap and no horizontal page overflow on the homepage
+and authenticated Rider workspace. The authenticated Admin sidebar and 320px
+navigation drawer were checked too; selecting Light from the drawer works.
+This is a presentation-only change; database tests were not rerun.
+
 ## Mark all read and clear — 19 October 2026
 
 Added one shared clear-all action to Admin, Partner and Rider notification pages.

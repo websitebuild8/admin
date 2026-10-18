@@ -2738,7 +2738,7 @@ html:has(.d-site) {
   .r-header-actions {
     gap: 7px;
   }
-  .r-header:has(.d-workspace-switch) .r-brand > span {
+  .r-header:has(.d-workspace-switch) .r-brand-label {
     display: none;
   }
   .d-admin-access .d-pagination {

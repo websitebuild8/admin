@@ -26,15 +26,18 @@ export default function Page() {
     <PublicPageTransition>
       <LandingMotion>
         <header className="d-site-header">
-          <Link href="/" aria-label="iGO Delivery home">
-            <Image
-              src="/brand/igo-delivery.jpg"
-              width={108}
-              height={61}
-              alt="iGO Delivery"
-              priority
-            />
-          </Link>
+          <div className="brand-theme-group">
+            <Link href="/" aria-label="iGO Delivery home">
+              <Image
+                src="/brand/igo-delivery.jpg"
+                width={108}
+                height={61}
+                alt="iGO Delivery"
+                priority
+              />
+            </Link>
+            <ThemeSwitcher inHeader />
+          </div>
           <nav aria-label="Main navigation">
             <a className="d-nav-section" href="#how-it-works">
               How it works
@@ -42,7 +45,6 @@ export default function Page() {
             <a className="d-nav-section" href="#delivery-rates">
               Delivery rates
             </a>
-            <ThemeSwitcher inHeader />
             <Link
               className="d-nav-rider"
               href="/rider/join"

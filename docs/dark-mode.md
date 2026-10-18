@@ -1,6 +1,10 @@
 # Shared appearance — 19 October 2026
 
-The appearance button in the header offers **Light**, **Dark** and **System**.
+The appearance button offers **Light**, **Dark** and **System**. It sits beside
+the logo on the homepage, partner application and Rider header. Admin and Partner
+workspaces place it beside the sidebar logo (open the navigation menu on mobile).
+Its 44-pixel square trigger keeps the sun/moon/monitor icon centered without
+inheriting the select control's default spacing.
 System is the default. The choice applies to the homepage, Admin, Partner and
 Rider portals, registration, sign-in, settings, dialogs and invoice documents.
 Pages without a shared header have an appearance button in the top corner.

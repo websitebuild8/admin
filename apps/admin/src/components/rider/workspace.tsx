@@ -365,18 +365,20 @@ function RiderWorkspaceContent({
   return (
     <div className="r-app">
       <header className="r-header">
-        <Link href="/rider" aria-label="iGO rider home" className="r-brand">
-          <Image
-            src="/brand/igo-delivery.jpg"
-            width={85}
-            height={48}
-            alt="iGO Delivery"
-            priority
-          />
-          <span>RIDER WORKSPACE</span>
-        </Link>
-        <div className="r-header-actions">
+        <div className="brand-theme-group r-header-brand">
+          <Link href="/rider" aria-label="iGO rider home" className="r-brand">
+            <Image
+              src="/brand/igo-delivery.jpg"
+              width={85}
+              height={48}
+              alt="iGO Delivery"
+              priority
+            />
+          </Link>
           <ThemeSwitcher inHeader />
+          <span className="r-brand-label">RIDER WORKSPACE</span>
+        </div>
+        <div className="r-header-actions">
           <Link
             href="/rider/notifications"
             aria-label={`Notifications, ${snapshot?.notices.unread ?? 0} unread`}

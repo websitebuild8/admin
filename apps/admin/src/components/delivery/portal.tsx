@@ -936,24 +936,27 @@ function DeliveryPortalContent({
   const navigation = (close?: () => void) => (
     <aside className="d-sidebar">
       <div className="d-nav-brand">
-        <Link href="/" aria-label="iGO Delivery home">
-          <Image
-            src={
-              actor.role === "PARTNER" && actor.logoAvailable
-                ? "/api/delivery/partner-logo"
-                : "/brand/igo-delivery.jpg"
-            }
-            alt={actor.businessName ?? "iGO Delivery"}
-            width={128}
-            height={72}
-            unoptimized={actor.role === "PARTNER" && actor.logoAvailable}
-            className={
-              actor.role === "PARTNER" && actor.logoAvailable
-                ? "d-business-logo"
-                : undefined
-            }
-          />
-        </Link>
+        <div className="brand-theme-group">
+          <Link href="/" aria-label="iGO Delivery home">
+            <Image
+              src={
+                actor.role === "PARTNER" && actor.logoAvailable
+                  ? "/api/delivery/partner-logo"
+                  : "/brand/igo-delivery.jpg"
+              }
+              alt={actor.businessName ?? "iGO Delivery"}
+              width={128}
+              height={72}
+              unoptimized={actor.role === "PARTNER" && actor.logoAvailable}
+              className={
+                actor.role === "PARTNER" && actor.logoAvailable
+                  ? "d-business-logo"
+                  : undefined
+              }
+            />
+          </Link>
+          <ThemeSwitcher inHeader />
+        </div>
         {actor.role === "PARTNER" && (
           <strong className="d-business-name">{actor.businessName}</strong>
         )}
@@ -2194,7 +2197,6 @@ function DeliveryPortalContent({
           </div>
           <div className="d-top-actions">
             <span className="d-mvt">Maldives · UTC+5</span>
-            <ThemeSwitcher inHeader />
             <Link
               href={`${workspaceBase}/notifications`}
               aria-label="Notifications"

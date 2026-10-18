@@ -42,7 +42,9 @@ export function ThemeSwitcher({ inHeader = false }: { inHeader?: boolean }) {
           aria-label="Color theme"
           title={`Appearance: ${ready ? current.label : "System"}`}
         >
-          <Icon size={18} aria-hidden="true" />
+          <span className="theme-icon" aria-hidden="true">
+            <Icon size={18} />
+          </span>
           <SelectValue className="theme-value" placeholder="Appearance" />
         </SelectTrigger>
         <SelectContent

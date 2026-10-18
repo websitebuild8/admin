@@ -105,7 +105,7 @@
   border-radius: 9px;
   object-fit: cover;
 }
-.r-brand > span {
+.r-brand-label {
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 1.3px;
@@ -1033,7 +1033,7 @@
   .r-brand {
     gap: 10px;
   }
-  .r-brand > span {
+  .r-brand-label {
     font-size: 8px;
     letter-spacing: 0.8px;
     padding-left: 10px;

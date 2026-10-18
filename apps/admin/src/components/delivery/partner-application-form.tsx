@@ -171,21 +171,23 @@ export function PartnerApplicationForm({
     <main className="d-partner-join">
       <ViewTransition enter="d-join-header-motion" default="none">
         <header className="d-join-header">
-          <Link
-            href="/"
-            transitionTypes={["igo-back"]}
-            aria-label="iGO Delivery home"
-          >
-            <Image
-              src="/brand/igo-delivery.jpg"
-              width={108}
-              height={61}
-              alt="iGO Delivery"
-              priority
-            />
-          </Link>
-          <div className="d-join-header-actions">
+          <div className="brand-theme-group">
+            <Link
+              href="/"
+              transitionTypes={["igo-back"]}
+              aria-label="iGO Delivery home"
+            >
+              <Image
+                src="/brand/igo-delivery.jpg"
+                width={108}
+                height={61}
+                alt="iGO Delivery"
+                priority
+              />
+            </Link>
             <ThemeSwitcher inHeader />
+          </div>
+          <div className="d-join-header-actions">
             <Link href="/partner/sign-in">
               Already approved?{" "}
               <strong>
