@@ -1,5 +1,6 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import type { ResourceSeed } from "@/lib/delivery/portal-initial";
 import { Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,9 +31,11 @@ const months = Array.from({ length: 12 }, (_, index) => ({
 export function EarningsCard({
   revision = 0,
   selection: controlled,
+  initial,
 }: {
   revision?: number;
   selection?: PeriodSelection;
+  initial?: ResourceSeed<EarningsResult>;
 }) {
   const [localSelection, setSelection] = useState<{
     period: EarningsPeriod;
@@ -43,14 +46,22 @@ export function EarningsCard({
     key: string;
     data: EarningsResult | null;
     error: string;
-  }>({ key: "", data: null, error: "" });
+  }>(() =>
+    initial ? { ...initial, error: "" } : { key: "", data: null, error: "" },
+  );
   const [retry, setRetry] = useState(0);
   const [calendar, setCalendar] = useState<{
     today: string;
     years: string[];
-  } | null>(null);
+  } | null>(() =>
+    initial?.data
+      ? { today: initial.data.today, years: initial.data.years }
+      : null,
+  );
   const key = new URLSearchParams(selection).toString();
+  const completed = useRef(initial?.key === key ? `${key}:0:0` : "");
   useEffect(() => {
+    if (completed.current === `${key}:${revision}:${retry}`) return;
     const abort = new AbortController();
     deliveryFetch(`/api/delivery/earnings?${key}`, {
       signal: abort.signal,
@@ -61,6 +72,7 @@ export function EarningsCard({
         if (!response.ok)
           throw new Error(data.error ?? "Could not load earnings.");
         if (!abort.signal.aborted) {
+          completed.current = `${key}:${revision}:${retry}`;
           setResult({ key, data, error: "" });
           setCalendar({ today: data.today, years: data.years });
         }

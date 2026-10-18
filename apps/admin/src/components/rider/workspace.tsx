@@ -1,6 +1,7 @@
 "use client";
 import { WorkspaceSwitcher } from "@/components/delivery/workspace-switcher";
 import { deliveryFetch } from "@/lib/delivery/fetch";
+import type { RiderInitial } from "@/lib/delivery/portal-initial";
 import {
   useCallback,
   useEffect,
@@ -135,9 +136,11 @@ export function RiderSkeleton() {
 export function RiderWorkspace({
   actor,
   screen,
+  initial,
 }: {
   actor: Actor;
   screen: RiderScreen;
+  initial?: RiderInitial;
 }) {
   const params = useSearchParams();
   const router = useRouter(),
@@ -159,6 +162,11 @@ export function RiderWorkspace({
       actor={actor}
       screen={screen}
       selection={selection}
+      initial={
+        initial?.key === `${screen}:${periodQuery(selection)}`
+          ? initial.data
+          : undefined
+      }
       changePeriod={(next) =>
         router.push(withPeriod(`${pathname}?${params}`, next), {
           scroll: false,
@@ -172,13 +180,17 @@ function RiderWorkspaceContent({
   screen,
   selection,
   changePeriod,
+  initial,
 }: {
   actor: Actor;
   screen: RiderScreen;
   selection: PeriodSelection;
   changePeriod: (selection: PeriodSelection) => void;
+  initial?: RiderSnapshot;
 }) {
-  const [snapshot, setSnapshot] = useState<RiderSnapshot | null>(null),
+  const [snapshot, setSnapshot] = useState<RiderSnapshot | null>(
+      initial ?? null,
+    ),
     [error, setError] = useState(""),
     [refreshing, setRefreshing] = useState(false);
   const [page, setPage] = useState(1),
@@ -189,10 +201,14 @@ function RiderWorkspaceContent({
     [confirmed, setConfirmed] = useState(false),
     [actionError, setActionError] = useState("");
   const attempt = useRef({ body: "", key: "" }),
-    seen = useRef<Set<string> | null>(null),
+    seen = useRef<Set<string> | null>(
+      initial ? new Set(initial.notices.items.map((n) => n.id)) : null,
+    ),
     requestNumber = useRef(0),
     commandLock = useRef(false);
   const period = periodQuery(selection);
+  const requestKey = `${page}:${query}:${period}`;
+  const completed = useRef(initial ? requestKey : "");
   const todayOnly =
     selection.period === "DAILY" && selection.value === localDate(new Date());
   const datedHref = (href: string) => withPeriod(href, selection);
@@ -213,6 +229,7 @@ function RiderWorkspaceContent({
         if (!response.ok)
           throw new Error(result.error ?? "Could not load assignments.");
         if (current !== requestNumber.current) return;
+        completed.current = requestKey;
         const next = result as RiderSnapshot;
         if (seen.current)
           for (const notice of next.notices.items)
@@ -238,12 +255,12 @@ function RiderWorkspaceContent({
         if (current === requestNumber.current) setRefreshing(false);
       }
     },
-    [screen, page, query, period],
+    [screen, page, query, period, requestKey],
   );
   useEffect(() => {
     const abort = new AbortController();
     const initial = window.setTimeout(() => {
-      void load(abort.signal);
+      if (completed.current !== requestKey) void load(abort.signal);
     }, 0);
     const refresh = () => {
       if (document.visibilityState === "visible" && navigator.onLine)
@@ -279,7 +296,7 @@ function RiderWorkspaceContent({
       window.removeEventListener("online", refresh);
       navigator.serviceWorker?.removeEventListener("message", message);
     };
-  }, [load]);
+  }, [load, requestKey]);
   function open(next: Action) {
     setConfirmed(false);
     setActionError("");

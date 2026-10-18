@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import Image from "next/image";
 import {
   ArrowRight,
@@ -12,7 +13,10 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { PublicRates } from "@/components/delivery/public-rates";
+import {
+  PublicRates,
+  PublicRatesSkeleton,
+} from "@/components/delivery/public-rates";
 import { LandingMotion } from "@/components/delivery/landing-motion";
 import { PublicPageTransition } from "@/components/delivery/public-page-transition";
 export const dynamic = "force-dynamic";
@@ -189,13 +193,18 @@ export default function Page() {
                 <br />A big weight off.
               </h2>
               <p>
-                Delivery fees depend on where your business operates and where your package is going. Billed after confirmed delivery.
+                Delivery fees depend on where your business operates and where
+                your package is going. Billed after confirmed delivery.
               </p>
               <Link href="/join" transitionTypes={["igo-forward"]}>
                 Apply for your partner account <ArrowUpRight size={17} />
               </Link>
             </div>
-            <PublicRates />
+            <div data-reveal>
+              <Suspense fallback={<PublicRatesSkeleton />}>
+                <PublicRates />
+              </Suspense>
+            </div>
           </section>
           <section className="d-final-cta" data-reveal>
             <div>

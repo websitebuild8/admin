@@ -1,5 +1,7 @@
 import "server-only";
 import { deliveryEarnings } from "./earnings";
+import { overviewSummary } from "./overview-summary";
+import { recentParcels } from "./recent-parcels";
 import { administrators } from "./admin-access";
 import { z } from "zod";
 import { Prisma } from "@/generated/prisma/client";
@@ -210,109 +212,13 @@ export async function deliveryQuery(
         ? { partnerId }
         : {};
   if (resource === "overview" || resource === "reports") {
-    const [
-      registered,
-      pickedUp,
-      delivered,
-      pending,
-      unbilled,
-      invoices,
-      latest,
-      awaitingApproval,
-      paymentReview,
-      issued,
-      verified,
-    ] = await Promise.all([
-      db.deliveryParcel.count({
-        where: { ...scope, state: "REGISTERED", registeredAt: range },
-      }),
-      db.deliveryParcel.count({
-        where: { ...scope, state: "PICKED_UP", registeredAt: range },
-      }),
-      db.deliveryParcel.count({
-        where: { ...scope, state: "DELIVERED", deliveredAt: range },
-      }),
-      db.deliveryParcel.aggregate({
-        where: {
-          ...scope,
-          state: { in: ["REGISTERED", "PICKED_UP"] },
-          registeredAt: range,
-        },
-        _sum: { fee: true },
-      }),
-      db.deliveryParcel.aggregate({
-        where: {
-          ...scope,
-          state: "DELIVERED",
-          invoiceLine: null,
-          deliveredAt: range,
-        },
-        _sum: { fee: true },
-      }),
-      actor.role === "DRIVER"
-        ? null
-        : db.deliveryInvoice.aggregate({
-            where: { partnerId },
-            _sum: { total: true, paid: true },
-          }),
-      db.deliveryParcel.findMany({
-        where: { ...scope, registeredAt: range },
-        select: parcelSelection,
-        take: 5,
-        orderBy: [{ registeredAt: "desc" }, { id: "desc" }],
-      }),
-      actor.role === "ADMIN"
-        ? Promise.all([
-            db.deliveryAccount.count({
-              where: { status: "PENDING", createdAt: range },
-            }),
-            db.deliveryPartnerApplication.count({
-              where: {
-                status: "PENDING",
-                submittedAt: { not: null, ...range },
-              },
-            }),
-          ]).then((counts) => counts[0] + counts[1])
-        : 0,
-      actor.role === "ADMIN"
-        ? db.deliveryPayment.count({
-            where: { status: "PENDING", createdAt: range },
-          })
-        : 0,
-      actor.role === "DRIVER"
-        ? null
-        : db.deliveryInvoice.aggregate({
-            where: { partnerId, createdAt: range },
-            _sum: { total: true },
-          }),
-      actor.role === "DRIVER"
-        ? null
-        : db.deliveryPaymentAllocation.aggregate({
-            where: {
-              invoice: { partnerId },
-              payment: {
-                status: { in: ["PARTIAL", "CONFIRMED"] },
-                reviewedAt: { ...range, lte: new Date() },
-              },
-            },
-            _sum: { amount: true },
-          }),
+    const [summary, latest] = await Promise.all([
+      overviewSummary(actor, range),
+      recentParcels(actor, range),
     ]);
-    return {
-      registered,
-      pickedUp,
-      delivered,
-      pendingEstimate: pending._sum.fee ?? 0,
-      awaitingBilling: unbilled._sum.fee ?? 0,
-      invoiced: issued?._sum.total ?? 0,
-      confirmedPayments: verified?._sum.amount ?? 0,
-      outstanding: (invoices?._sum.total ?? 0) - (invoices?._sum.paid ?? 0),
-      latest,
-      awaitingApproval,
-      paymentReview,
-      periodLabel: reportingRange(search).label,
-    };
+    return { ...summary, latest, periodLabel: reportingRange(search).label };
   }
+
   if (resource === "available") {
     requireRole(actor, "DRIVER");
     const where: Prisma.DeliveryParcelWhereInput = {
@@ -600,8 +506,8 @@ export async function deliveryQuery(
     requireRole(actor, "ADMIN");
     // Searchable selectors are bounded; the management lists remain paginated.
     const q = search.get("q")?.slice(0, 100) ?? "";
-    return {
-      partners: await db.deliveryPartner.findMany({
+    const [partners, drivers] = await Promise.all([
+      db.deliveryPartner.findMany({
         where: {
           account: { status: "APPROVED" },
           businessName: { contains: q, mode: "insensitive" },
@@ -609,7 +515,7 @@ export async function deliveryQuery(
         take: 50,
         select: { id: true, businessName: true },
       }),
-      drivers: await db.deliveryAccount.findMany({
+      db.deliveryAccount.findMany({
         where: {
           role: "DRIVER",
           status: "APPROVED",
@@ -618,7 +524,8 @@ export async function deliveryQuery(
         take: 50,
         select: { id: true, name: true },
       }),
-    };
+    ]);
+    return { partners, drivers };
   }
   throw new DeliveryError("Unknown delivery resource.", 404);
 }

@@ -1,5 +1,80 @@
 # Delivery platform verification
 
+## Loading performance — 19 October 2026
+
+Reduced repeated authorization, overview aggregates and recent-package relation
+queries. Admin, Partner and Rider pages now supply authorized initial data
+directly to their client components; matching payloads are not immediately
+fetched again. Choices load on demand, optional panels/transports load lazily,
+and public rate cards stream separately with a 60-second public-only cache.
+Private financial and authorization data are not persistently cached.
+
+Read-only profiling reduced the initial admin data path from 41 to 10 SQL
+queries, and warm account lookup from 403 ms to 128–133 ms in the recorded
+samples. These are database measurements from this machine, not a deployed
+whole-page speed guarantee. Netlify remains in Ohio and Supabase in Seoul;
+the user's free plan does not permit the proposed function-region change.
+No upgrade, region change, schema migration or environment update is required.
+
+All 68 retained unit tests, the complete 113-check workflow regression, six
+focused performance correctness checks and the final ten-check dashboard/date
+suite pass. The full regression started before the final recent-package join;
+the final join was verified by the two focused suites. All disposable schemas
+were removed; live operational records were not changed. Actual client
+components with fictional transports show zero immediate repeat data requests
+for matching Admin, Partner and Rider initial payloads, correct manual refresh
+requests and on-demand choices. This does not establish hosted Clerk or hosted
+navigation verification. ESLint, TypeScript and the final single-worker
+production build pass. The source still needs the owner's manual commit/push
+and Netlify deployment; no deployment was performed here.
+The actual local production homepage also passed: main content rendered with
+the rate skeleton first, followed by real database rates, using the normal Clerk
+middleware. No authenticated hosted walkthrough was repeated.
+
+See [loading performance](performance.md) for measurements, limitations,
+official documentation sources and the hosted verification procedure.
+
+## Retired platform removal — 19 October 2026
+
+Removed the old restaurant dashboard, its admin/native/demo/dispatch/menu-photo
+APIs, the retired Flutter project and build workflow, obsolete shared contracts,
+old components/styles/assets, food checkout/demo/Places services and their tests.
+Private logo/receipt transport now belongs to the current delivery platform.
+Current request limits use the DeliveryRequestBucket model mapped to the shared
+physical MapUsageBucket table, preserving compatibility with deployed forms.
+Its retired Google counters are removed. Historical Prisma migrations remain
+immutable so existing and new databases can reach the final current schema.
+
+Netlify was checked after the user's manual push: current homepage/logo returned
+200 and the removed old logo returned 404. The hosted landing and partner form
+rendered the current content. Only then was the cleanup migration applied live.
+It removed 21 obsolete tables and the old Google prune function/job and Storage
+policies. The old empty food-image bucket was removed through the Storage API;
+private partner-logo and delivery-receipt buckets remain. All 27 current tables
+have RLS; none expose SELECT/INSERT/UPDATE/DELETE to anon/authenticated. Invoice
+and expired-request cleanup schedules are active. Rider push had no installed
+job beforehand and no background delivery activation is claimed.
+
+The immediate private snapshot's fingerprints match every current business table
+and delivery request counter exactly after migration. The only retired persisted
+record was a fictional demo session; no current account, partner, package,
+invoice, payment, history or audit record was changed by the cleanup. A verified
+owner-only data snapshot is held outside Git under `/tmp`; it is not a full
+database recovery backup or a completed restore drill.
+
+Verification: all 68 retained unit tests pass; the complete 113-check workflow
+regression passes; two final-mapping request-limit checks prove atomic concurrent
+limiting and identity isolation; a separate full-history migration test proves
+retired restaurant data removal, current delivered/invoiced parcel preservation,
+RLS/role denial, request-counter preservation, replay and unchanged real cron
+jobs. All disposable schemas were removed. The workflow regression began before
+the final physical-table compatibility adjustment; that final adjustment was
+covered by the dedicated migration and two request-limit checks. Lint,
+TypeScript and the final single-worker production build pass. Its route manifest
+contains no retired APIs or dashboard routes. No authenticated hosted walkthrough
+was repeated. Local preview hit a Clerk development-host proxy connection error
+and was stopped; hosted public rendering passed.
+
 ## Shared reporting periods — 19 October 2026
 
 Added All time, Daily, Monthly and Yearly selection across current Admin,

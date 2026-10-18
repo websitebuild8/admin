@@ -16,7 +16,7 @@ import {
   updateWorkspaceProfile,
 } from "@/lib/delivery/workspace-profiles";
 import { workspaceProfileInput } from "@/lib/delivery/workspace-profile-input";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { NextResponse, after } from "next/server";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -38,13 +38,9 @@ import {
   formUpload,
   limitRequests,
 } from "@/lib/delivery/http";
-import { uploadReceipt, receiptUrl } from "@/lib/delivery/storage";
-import { packageImport } from "@/lib/delivery/import-service";
 import { database } from "@/lib/db";
 import { reviewPartnerApplication } from "@/lib/delivery/partner-applications";
 import { sendPartnerInvitation } from "@/lib/delivery/partner-invitations";
-import { partnerLogo } from "@/lib/delivery/partner-logos";
-import { dispatchRiderPush, savePushSubscription } from "@/lib/delivery/push";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 type Context = { params: Promise<{ resource: string }> };
@@ -73,6 +69,7 @@ export async function GET(request: Request, context: Context) {
       return json({ pending: await database().deliveryDeletedFile.count() });
     }
     if (resource === "partner-logo") {
+      const { partnerLogo } = await import("@/lib/delivery/partner-logos");
       const applicationId = params.get("id");
       const logo = await partnerLogo(
         actor,
@@ -100,7 +97,8 @@ export async function GET(request: Request, context: Context) {
         },
       });
     }
-    if (resource === "receipt")
+    if (resource === "receipt") {
+      const { receiptUrl } = await import("@/lib/delivery/storage");
       return NextResponse.redirect(
         await receiptUrl(actor, z.uuid().parse(params.get("id"))),
         {
@@ -110,6 +108,7 @@ export async function GET(request: Request, context: Context) {
           },
         },
       );
+    }
     return json(await deliveryQuery(actor, resource, params));
   } catch (error) {
     return failure(error);
@@ -128,6 +127,7 @@ export async function POST(request: Request, context: Context) {
     );
     if (resource === "push-subscription") {
       requireRole(actor, "DRIVER");
+      const { savePushSubscription } = await import("@/lib/delivery/push");
       return json(
         await savePushSubscription(
           actor,
@@ -136,6 +136,7 @@ export async function POST(request: Request, context: Context) {
       );
     }
     if (resource === "receipt") {
+      const { uploadReceipt } = await import("@/lib/delivery/storage");
       const form = await formUpload(request, 5 * 1024 * 1024 + 16000),
         file = form.get("file");
       if (!(file instanceof File))
@@ -220,6 +221,7 @@ export async function POST(request: Request, context: Context) {
       );
     }
     if (resource === "import") {
+      const { packageImport } = await import("@/lib/delivery/import-service");
       const form = await formUpload(request, 1024 * 1024 + 16000),
         file = form.get("file");
       if (!(file instanceof File) || !file.name.toLowerCase().endsWith(".xlsx"))
@@ -253,8 +255,18 @@ export async function POST(request: Request, context: Context) {
       JSON.parse((await boundedBody(request, 64000)).toString("utf8")),
     );
     const result = await deliveryCommand(actor, key, command);
+    if (command.type === "rate" || command.type === "destination") {
+      try {
+        revalidateTag("delivery-public-rates", { expire: 0 });
+      } catch {
+        console.error(
+          "Public rate cache refresh deferred to its short expiry.",
+        );
+      }
+    }
     after(async () => {
       try {
+        const { dispatchRiderPush } = await import("@/lib/delivery/push");
         await dispatchRiderPush();
       } catch {
         console.error("Rider push dispatch deferred to retry queue.");

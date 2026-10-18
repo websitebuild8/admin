@@ -1,3 +1,5 @@
+import { portalInitialData } from "@/lib/delivery/initial-data";
+import { pageSearch } from "@/lib/delivery/portal-initial";
 import { Suspense } from "react";
 import Link from "next/link";
 import { UserButton } from "@clerk/nextjs";
@@ -12,8 +14,10 @@ import { DeliverySkeleton } from "@/components/delivery/skeleton";
 export const dynamic = "force-dynamic";
 async function Workspace({
   params,
+  searchParams,
 }: {
   params: Promise<{ section?: string[] }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   let actor;
   try {
@@ -60,10 +64,23 @@ async function Workspace({
     ].includes(screen)
   )
     notFound();
-  return <DeliveryPortal key={screen} actor={actor} screen={screen} />;
+  const initial = await portalInitialData(
+    actor,
+    screen,
+    pageSearch(await searchParams),
+  );
+  return (
+    <DeliveryPortal
+      key={screen}
+      actor={actor}
+      screen={screen}
+      initial={initial}
+    />
+  );
 }
 export default function Page(props: {
   params: Promise<{ section?: string[] }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   return (
     <Suspense fallback={<DeliverySkeleton />}>

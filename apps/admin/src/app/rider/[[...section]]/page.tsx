@@ -1,3 +1,5 @@
+import { riderInitialData } from "@/lib/delivery/initial-data";
+import { pageSearch } from "@/lib/delivery/portal-initial";
 import { Suspense } from "react";
 import { notFound, redirect } from "next/navigation";
 import { deliveryActor } from "@/lib/delivery/auth";
@@ -8,8 +10,10 @@ import { RiderWorkspace, RiderSkeleton } from "@/components/rider/workspace";
 export const dynamic = "force-dynamic";
 async function Workspace({
   params,
+  searchParams,
 }: {
   params: Promise<{ section?: string[] }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { section } = await params;
   if (!section?.length) redirect("/rider/collections");
@@ -29,16 +33,23 @@ async function Workspace({
     notFound();
   if (actor.role !== "DRIVER" || actor.status !== "APPROVED")
     return <RiderApplication actor={actor} />;
+  const initial = await riderInitialData(
+    actor,
+    screen as (typeof riderScreens)[number],
+    pageSearch(await searchParams),
+  );
   return (
     <RiderWorkspace
       key={screen}
       actor={actor}
+      initial={initial}
       screen={screen as (typeof riderScreens)[number]}
     />
   );
 }
 export default function Page(props: {
   params: Promise<{ section?: string[] }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   return (
     <Suspense fallback={<RiderSkeleton />}>

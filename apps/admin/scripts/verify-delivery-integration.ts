@@ -29,6 +29,7 @@ import { verifyDashboardNavigation } from "./verify-dashboard-navigation";
 import { verifyReportingPeriods } from "./verify-reporting-periods";
 import { verifyPaidInvoiceMigration } from "./verify-paid-invoice-migration";
 import { limitRequests } from "../src/lib/delivery/http";
+import { verifyPerformance } from "./verify-performance";
 import {
   nextCutoff,
   type Actor,
@@ -185,14 +186,33 @@ async function main() {
         description: "Not a real delivery",
       },
     });
+    if (process.argv.includes("--performance")) {
+      await verifyPerformance(db, admin, partner, other, driver, ok);
+      console.log(
+        `Verified ${checks} performance correctness checks in a disposable schema.`,
+      );
+      return;
+    }
     if (process.argv.includes("--request-limits")) {
       const attempts = await Promise.allSettled(
-        Array.from({ length: 6 }, () => limitRequests(partner, "retirement-qa", 2)),
+        Array.from({ length: 6 }, () =>
+          limitRequests(partner, "retirement-qa", 2),
+        ),
       );
-      assert.equal(attempts.filter(v => v.status === "fulfilled").length, 2);
-      assert.equal(attempts.filter(v => v.status === "rejected" && v.reason.status === 429).length, 4);
-      assert.equal((await db.deliveryRequestBucket.findFirstOrThrow()).count, 6);
-      ok("delivery request limits remain atomic through the mapped shared table");
+      assert.equal(attempts.filter((v) => v.status === "fulfilled").length, 2);
+      assert.equal(
+        attempts.filter(
+          (v) => v.status === "rejected" && v.reason.status === 429,
+        ).length,
+        4,
+      );
+      assert.equal(
+        (await db.deliveryRequestBucket.findFirstOrThrow()).count,
+        6,
+      );
+      ok(
+        "delivery request limits remain atomic through the mapped shared table",
+      );
       await limitRequests(other, "retirement-qa", 2);
       assert.equal(await db.deliveryRequestBucket.count(), 2);
       ok("rate counters isolate partner identities after legacy retirement");

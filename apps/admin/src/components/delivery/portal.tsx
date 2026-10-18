@@ -1,9 +1,21 @@
 "use client";
+import dynamic from "next/dynamic";
 import { WorkspaceSwitcher } from "./workspace-switcher";
-import { AdminAccessPanel } from "./admin-access-panel";
+import {
+  portalResource,
+  type PortalInitial,
+  type ResourceSeed,
+} from "@/lib/delivery/portal-initial";
+const AdminAccessPanel = dynamic(
+  () => import("./admin-access-panel").then((m) => m.AdminAccessPanel),
+  { loading: () => <DeliverySkeleton /> },
+);
 import { EarningsCard } from "./earnings-card";
 import { DeleteDataButton, DeletionFileCleanup } from "./delete-data-button";
-import { WorkspaceProfiles } from "./workspace-profiles";
+const WorkspaceProfiles = dynamic(
+  () => import("./workspace-profiles").then((m) => m.WorkspaceProfiles),
+  { loading: () => <DeliverySkeleton /> },
+);
 import { deliveryFetch } from "@/lib/delivery/fetch";
 import {
   useEffect,
@@ -89,13 +101,18 @@ import {
   operatingLocationLabels,
   type Actor,
 } from "@/lib/delivery/domain";
-import {
-  PartnerApplications,
-  type PartnerApplicationRecord,
-} from "./partner-applications";
+import type { PartnerApplicationRecord } from "./partner-applications";
+const PartnerApplications = dynamic(
+  () => import("./partner-applications").then((m) => m.PartnerApplications),
+  { loading: () => <DeliverySkeleton /> },
+);
 import { DeliverySkeleton } from "./skeleton";
-import { PartnerHistoryModal } from "./partner-history";
-import { InvoiceRecords } from "./invoice-records";
+const PartnerHistoryModal = dynamic(() =>
+  import("./partner-history").then((m) => m.PartnerHistoryModal),
+);
+const InvoiceRecords = dynamic(() =>
+  import("./invoice-records").then((m) => m.InvoiceRecords),
+);
 import {
   invoicePaymentStatus,
   invoiceStatusLabels,
@@ -261,15 +278,21 @@ function useResource<T>(
   query: string = "",
   revision = 0,
   enabled = true,
+  seed?: ResourceSeed,
 ) {
   const key = `${resource}?${query}`;
   const [state, setState] = useState<{
     key: string;
     data: T | null;
     error: string | null;
-  }>({ key: "", data: null, error: null });
+  }>(() =>
+    seed?.key === key
+      ? { key, data: seed.data as T, error: null }
+      : { key: "", data: null, error: null },
+  );
+  const completed = useRef(seed?.key === key ? `${key}:0` : "");
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled || completed.current === `${key}:${revision}`) return;
     const controller = new AbortController();
     deliveryFetch(`/api/delivery/${resource}?${query}`, {
       cache: "no-store",
@@ -282,7 +305,10 @@ function useResource<T>(
         return value as T;
       })
       .then((data) => {
-        if (!controller.signal.aborted) setState({ key, data, error: null });
+        if (!controller.signal.aborted) {
+          completed.current = `${key}:${revision}`;
+          setState({ key, data, error: null });
+        }
       })
       .catch((e) => {
         if (!controller.signal.aborted)
@@ -709,9 +735,11 @@ type Action = {
 export function DeliveryPortal({
   actor,
   screen,
+  initial,
 }: {
   actor: Actor;
   screen: string;
+  initial?: PortalInitial;
 }) {
   const params = useSearchParams();
   const pathname = usePathname(),
@@ -740,6 +768,7 @@ export function DeliveryPortal({
       key={`${filter}:${periodQuery(selection)}`}
       actor={actor}
       screen={screen}
+      initial={initial}
       filter={filter}
       selection={selection}
       changePeriod={(next) =>
@@ -753,12 +782,14 @@ export function DeliveryPortal({
 function DeliveryPortalContent({
   actor,
   screen,
+  initial,
   filter,
   selection,
   changePeriod,
 }: {
   actor: Actor;
   screen: string;
+  initial?: PortalInitial;
   filter: string;
   selection: PeriodSelection;
   changePeriod: (selection: PeriodSelection) => void;
@@ -780,21 +811,22 @@ function DeliveryPortalContent({
     [decision, setDecision] = useState("CONFIRM");
   const retry = useRef<{ body: string; key: string } | null>(null);
   const workspaceBase = actor.role === "PARTNER" ? "/partner" : "/delivery";
-  const resource =
-    screen === "import" ||
-    screen === "administrators" ||
-    screen === "my-workspaces"
-      ? "account"
-      : screen === "settings"
-        ? "settings"
-        : screen;
+  const resource = portalResource(screen);
   const query = `page=${page}&q=${encodeURIComponent(q)}&state=${filter}&${periodQuery(selection)}`;
   const datedHref = (href: string) => withPeriod(href, selection);
-  const request = useResource<unknown>(resource, query, revision);
+  const request = useResource<unknown>(
+    resource ?? "account",
+    query,
+    revision,
+    !!resource,
+    initial?.main,
+  );
   const notices = useResource<List<Notice> & { unread: number }>(
     "notifications",
     "page=1",
     revision,
+    true,
+    initial?.notices,
   );
   const choices = useResource<{
     partners: { id: string; businessName: string }[];
@@ -803,7 +835,10 @@ function DeliveryPortalContent({
     "choices",
     `q=${encodeURIComponent(choiceSearch)}`,
     revision,
-    actor.role === "ADMIN",
+    actor.role === "ADMIN" &&
+      (screen === "import" ||
+        action?.kind === "register" ||
+        action?.kind === "assign"),
   );
   useEffect(() => {
     const interval = setInterval(() => {
@@ -1097,6 +1132,16 @@ function DeliveryPortalContent({
       ) : (
         <p>Only the super admin can manage administrator access.</p>
       );
+    if (screen === "import")
+      return (
+        <ImportPanel
+          actor={actor}
+          choices={choices.data?.partners ?? []}
+          search={choiceSearch}
+          onSearch={setChoiceSearch}
+          onDone={refresh}
+        />
+      );
     if (!request.data) return <DeliverySkeleton />;
     if (screen === "overview" || screen === "reports") {
       const d = request.data as Summary;
@@ -1106,7 +1151,11 @@ function DeliveryPortalContent({
             className={`d-stats${actor.role === "ADMIN" ? " d-stats-income" : ""}`}
           >
             {actor.role === "ADMIN" && (
-              <EarningsCard revision={revision} selection={selection} />
+              <EarningsCard
+                revision={revision}
+                selection={selection}
+                initial={initial?.earnings}
+              />
             )}
             <Stat
               label="Invoiced balance due"
@@ -1274,16 +1323,7 @@ function DeliveryPortalContent({
         </>
       );
     }
-    if (screen === "import")
-      return (
-        <ImportPanel
-          actor={actor}
-          choices={choices.data?.partners ?? []}
-          search={choiceSearch}
-          onSearch={setChoiceSearch}
-          onDone={refresh}
-        />
-      );
+
     if (["packages", "collections", "deliveries"].includes(screen)) {
       const d = request.data as List<Parcel>;
       return (

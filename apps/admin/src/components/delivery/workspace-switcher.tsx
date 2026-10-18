@@ -42,7 +42,9 @@ export function WorkspaceSwitcher({ actor }: { actor: Actor }) {
         /* Keep the last known choices during a connection interruption. */
       }
     };
-    void refresh();
+    // The server already supplied current choices with the page. Recheck on
+    // focus/poll without repeating authorization immediately after hydration.
+    if (!actor.workspaces) void refresh();
     const interval = setInterval(() => void refresh(), 30000);
     const focus = () => void refresh();
     window.addEventListener("focus", focus);
@@ -51,7 +53,7 @@ export function WorkspaceSwitcher({ actor }: { actor: Actor }) {
       clearInterval(interval);
       window.removeEventListener("focus", focus);
     };
-  }, []);
+  }, [actor.workspaces]);
   if (
     !workspaces.length ||
     (workspaces.length === 1 && workspaces[0] === actor.role)
