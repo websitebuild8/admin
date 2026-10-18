@@ -1,4 +1,4 @@
-# The repository also contains Flutter; install/build only the Next.js backend.
+# Build the current delivery web platform.
 [build]
   base = "apps/admin"
   command = "npm run build"
@@ -13,4 +13,4 @@
 
 # Netlify detects Next.js and installs its maintained adapter automatically.
 # Scheduled HTTP calls are configured separately in Supabase Cron; see
-# docs/netlify-deployment.md. vercel.json is not a Netlify schedule.
+# docs/netlify-deployment.md.

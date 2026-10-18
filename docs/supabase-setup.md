@@ -1,96 +1,61 @@
-# Supabase connection setup
+# Supabase setup for the delivery platform
 
-Supabase PostgreSQL replaces Neon. Clerk remains responsible for identity; the
-Next.js backend uses Prisma and the existing pg driver. No Supabase SDK, Auth
-replacement or public database key is needed. Menu photos now use the Storage API
-with a private backend secret key; see [food photo setup](menu-images-setup.md).
+Clerk handles identity. The trusted Next.js backend uses Prisma/pg for PostgreSQL
+and the private Supabase Storage API for partner logos and bank receipt images.
+No public database key, Supabase Auth replacement or food-photo bucket is needed.
 
-## Create the development database
+## Connections
 
-1. Create a fresh project named `igo-development` at https://supabase.com/dashboard.
-   Save its database password privately. Choose a region close to the eventual
-   application server; keep production and development separate.
-2. In API settings, disable the Data API before applying migrations. This app
-   accesses Postgres through its own authenticated server APIs.
-3. Open Connect. Copy the Transaction pooler connection string to `DATABASE_URL`
-   in `apps/admin/.env.local` (port 6543).
-4. Copy the Session pooler string to `DIRECT_URL` (port 5432). This supports IPv4
-   development environments. The direct endpoint can instead be used where IPv6
-   is available. Never use the transaction pooler for migrations.
-5. Replace the password placeholder with the database password, URL-encoding
-   special characters in the password. Copy the host and username exactly from
-   the dashboard. Include `sslmode=require`; never disable TLS verification in code.
-6. Leave `IGO_DEMO_MODE=true` until migration and Clerk settings are ready.
+1. Use separate development and production projects. Save passwords privately.
+2. Disable the Data API for this server-only integration. Tables have RLS and no
+   grants for `anon`/`authenticated`; no direct client policies are created.
+3. From Supabase Connect, use the transaction pooler (port 6543) for `DATABASE_URL`.
+4. Use the session pooler (5432), or direct endpoint where supported, for
+   `DIRECT_URL` used by migrations/setup. Do not migrate through transaction pooling.
+5. Replace password placeholders entirely, including their square brackets.
+   URL-encode special password characters; preserve the exact dashboard host/user.
+6. Keep TLS enabled. The supplied public CA at `apps/admin/certs/supabase-root.crt`
+   verifies the database. Never disable certificate checks.
 
-```dotenv
-# Illustrative only: copy your actual dashboard URLs, do not use these values.
-DATABASE_URL="postgresql://postgres.PROJECT_REF:ENCODED_PASSWORD@POOLER_HOST:6543/postgres?sslmode=require"
-DIRECT_URL="postgresql://postgres.PROJECT_REF:ENCODED_PASSWORD@POOLER_HOST:5432/postgres?sslmode=require"
-```
+Put actual values in ignored `apps/admin/.env.local` or private hosting settings.
+Injected environment variables take precedence over local dotenv files.
 
-The dashboard's default database owner can bootstrap development. Both connections
-must target the same project/database. Production should use a dedicated server
-database role with only the privileges required for operations; migration credentials
-remain separate. The runtime role must support this server-only access model
-(table ownership or BYPASSRLS); end-user authorization is enforced in our backend.
-Do not hand this role or its password to a browser or mobile application.
-
-## Apply migrations and activate
-
-From `apps/admin`, run these sequentially:
-
-```bash
-npm run db:generate
+```sh
+cd apps/admin
 npm run db:deploy
-npm run db:status
+npm run delivery:storage
+npm run delivery:logo-storage
 ```
 
-Three migrations create the tables, add fulfilment fields, and enable row-level
-security with no client policies on business tables. They revoke access from
-Supabase's `anon` and `authenticated` roles. Existing migration history is preserved.
-Do not use `db push` or reset a populated project. No demo rows are imported.
+Storage requires `SUPABASE_URL` (the project's HTTPS API origin) and a private
+`SUPABASE_SECRET_KEY`, or supported service-role JWT `SUPABASE_SERVICE_ROLE_KEY`.
+Only the server receives this key. Modern secret keys use the `apikey` header;
+JWT service-role keys also use Authorization. Logo and receipt buckets remain
+private and are read through authorized backend routes/signed receipt access.
 
-Configure Clerk keys and `ADMIN_CLERK_USER_IDS`, set `IGO_DEMO_MODE=false`, then
-rebuild/restart. Verify administrator access, non-admin denial, database reads and
-writes, and that customer/restaurant responses never contain rider coordinates.
-Before production, verify RLS and concurrent rider acceptance against the database.
+## Scheduling
 
-For Vercel, add the corresponding production environment variables and use a
-separate production database. Local `.env.local` is ignored by Git and not deployed.
-Keep the Data API disabled; enabling it later requires a deliberate policy review.
-For the current Netlify demo deployment, follow [Netlify setup](netlify-deployment.md)
-for app directories, private dashboard settings and Supabase-hosted schedules.
+Enable Supabase Cron (`pg_cron`), then run `npm run delivery:cron`. This installs
+only named invoice and expired-request cleanup jobs; it preserves unrelated jobs.
+Optional rider background push has a separate signed HTTP job and Vault setup:
+see [rider setup](rider-web-setup.md).
 
-## Later features
+`npm run delivery:verify` checks security and invokes the live due-invoice processor;
+it may issue genuinely due invoices. `npm run delivery:integration` instead tests
+only a disposable schema and removes it afterwards. A successful manual run does
+not prove future scheduled executions. Monitor cron run history and failures.
 
-Menu-photo Storage is connected separately using a public food-photo bucket and
-server-authorized writes. Private verification-document storage is still a separate
-feature and must use its own private bucket and access policies. Realtime needs authenticated
-private channels and separate admin GPS versus participant status payloads.
-If clients use these services directly, configure Supabase's Clerk third-party
-integration and authorization policies first. The present app retains API polling.
+## Schema maintenance
 
-## References
+The final public application schema contains only current delivery tables plus
+Prisma's migration ledger. The shared physical table `MapUsageBucket` now
+contains delivery request-limit counters only; its Prisma model is
+`DeliveryRequestBucket`. Keeping this table name preserves the deployed form
+endpoints while the source changes are released. [Legacy retirement](legacy-retirement.md) removes old
+restaurant/mobile/demo tables and unused food-image storage. Keep all applied
+migration files: fresh databases replay them and then apply retirement; existing
+databases apply only pending migrations. Never use `db push`, reset or handwritten
+SQL deletion in place of reviewed production migrations.
 
-- https://supabase.com/docs/guides/database/prisma
-- https://supabase.com/docs/guides/database/postgres/row-level-security
-- https://supabase.com/docs/guides/auth/third-party/overview
-
-## Verified connection and certificate
-
-The downloaded public Supabase Root 2021 CA is stored in
-`apps/admin/certs/supabase-root.crt` (expires 26 April 2031). It contains no private
-key or credentials. `src/lib/database-url.ts` adds the appropriate certificate
-parameters for pg runtime connections and Prisma migration connections, preserving
-certificate verification. Next.js tracing includes the certificate for deployment.
-Run commands from `apps/admin`; deployment root must also be `apps/admin`.
-If Supabase rotates its CA, download and verify the replacement from its dashboard.
-Do not disable certificate verification to resolve trust errors.
-
-On 3 October 2026 all three migrations were applied successfully. Both the session
-and transaction pooler connections authenticated using the certificate. Prisma
-read/create/update/delete checks passed in a rolled-back transaction. All ten
-business tables have RLS enabled and no SELECT/INSERT/UPDATE/DELETE grants for
-`anon` or `authenticated`. Demo mode remains enabled until the Clerk sign-in
-activation step. Deployment certificate packaging and browser sign-in still need
-end-to-end verification. Data API dashboard settings were not inspected.
+Choose and test a database/file backup and recovery process appropriate to the
+actual Supabase plan before accepting real operations.

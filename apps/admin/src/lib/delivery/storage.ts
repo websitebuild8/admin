@@ -2,7 +2,7 @@ import "server-only";
 import sharp from "sharp";
 import { createHash, randomUUID } from "node:crypto";
 import { database } from "../db";
-import { storageSettings } from "../menu-image-storage";
+import { storageSettings } from "./storage-client";
 import { DeliveryError, requireRole, type Actor } from "./domain";
 import { audit } from "./commands";
 export const receiptBucket = "igo-delivery-receipts";

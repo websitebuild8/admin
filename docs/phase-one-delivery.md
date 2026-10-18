@@ -1,7 +1,7 @@
 # Phase 1: iGO Delivery operating specification
 
-Updated scope, 17 October 2026. The restaurant/mobile product remains available
-for Phase 2; Phase 1 is a real, separately scoped seller delivery service.
+Updated scope, 19 October 2026. The repository and application database serve
+the seller-delivery web platform only.
 
 ## Architecture
 
@@ -12,10 +12,11 @@ manage private database-backed administrator grants without replacing an approve
 partner/rider role. See [admin access and workspaces](admin-access-and-workspaces.md).
 No Clerk organization, sign-up metadata, checkbox or client request grants a role.
 Supabase database and private receipt Storage are accessed by the backend only.
-New delivery records never reuse restaurant purchases or their payment gates.
+All operational records belong to this delivery platform.
 
-Public site: `/`. Operating portal: `/delivery`. Existing Phase 2 administration
-moves to `/legacy`; its mobile APIs remain at their existing URLs.
+Public site: `/`. Admin: `/delivery`. Partners: `/partner`. Riders: `/rider`.
+The retired restaurant/mobile code and tables are removed; applied migration
+history is retained. See [retirement](legacy-retirement.md).
 
 ## Confirmed business decisions
 
@@ -25,8 +26,8 @@ moves to `/legacy`; its mobile APIs remain at their existing URLs.
   change this location later with a reason. Route prices are defined in
   [origin pricing](origin-pricing-and-rider-jobs.md), not one destination-only rate.
 - Recipient goods-value collection is not offered. Package registration and
-  imports contain no cash amount. Old money records are retained privately as
-  read-only history, without operational endpoints or portal controls.
+  imports contain no cash amount. The unused retired cash archives are removed
+  with the old platform; current delivery-fee invoice/payment records remain.
 - Default daily invoice cutoff is 18:00 Maldives Time; admin may change it per
   partner. Existing unpaid invoices remain outstanding across all later cycles.
 - Admin's total earned card counts all-time verified delivery-fee payments received,
@@ -37,6 +38,8 @@ moves to `/legacy`; its mobile APIs remain at their existing URLs.
 
 ## Data model
 
+- DeliveryRequestBucket: durable hashed-identity submission limits, with hourly
+  expired-counter cleanup; no Google Places usage is stored.
 - DeliveryAccount: one profile per Clerk identity and operational role, with a
   retained primary profile. Only active admins automatically receive both
   Partner and Rider profiles; ordinary identities have one active role.

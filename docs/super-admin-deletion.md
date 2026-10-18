@@ -15,14 +15,11 @@ Removing payment records does not reverse any actual bank transfer.
 | --- | --- |
 | Partner | Delivery-role account, partner profile/application, packages, imports, billing cycles, invoices, payment submissions/allocations, paid invoice copies/history, receipts, logo and related notifications |
 | Rider | Delivery-role account, device subscriptions, queued alerts and related notices. Registered work is unassigned. Completed work keeps its immutable pickup/delivery identities and timestamps, with the removed account reference detached. Physically picked-up work must first be completed or explicitly deleted. |
-| Package without an invoice | Package, linked private retired cash details, notices and an empty import batch |
+| Package without an invoice | Package, notices and an empty import batch |
 | Invoice or already-invoiced package | **The entire invoice and all its packages**, all payment states, allocations, paid copies, sends, timeline, receipts and notices. Removing the packages prevents automatic invoicing from recreating debt for the same deliveries. The partner remains. |
 
-Shared archived cash handovers are retained while other archived packages refer
-to them. A rider with such retained cash history cannot be deleted until those
-test packages are deleted; suspension remains available. Rates, destinations,
-business settings, independent admin grants and Clerk identities are preserved.
-Deleting a delivery role does not delete a shared sign-in or its admin access.
+Rates, destinations, business settings, independent admin grants and Clerk
+identities are preserved. Deleting a delivery role does not delete a shared sign-in or its admin access.
 Active admins automatically receive both operational roles. Deleting one of
 their profiles recreates an empty role on their next sign-in; deleted package
 and financial data do not return. The confirmation shows this exception.

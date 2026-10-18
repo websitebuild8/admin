@@ -1,6 +1,6 @@
 # Phase 1 rider website
 
-The seller delivery platform now has a separate rider website at `/rider`, with registration at `/rider/join` and sign-in at `/rider/sign-in`. It uses the existing Clerk application and Supabase database. The Flutter apps remain Phase 2.
+The seller delivery platform now has a separate rider website at `/rider`, with registration at `/rider/join` and sign-in at `/rider/sign-in`. It uses the existing Clerk application and Supabase database. The retired native/restaurant project is removed.
 
 ## How it works
 
@@ -64,7 +64,7 @@ For retries to run while no one is using the site:
 4. Run `npm run rider:cron`. The installer first checks that the deployed endpoint accepts a signed request and has valid VAPID configuration. It then installs/updates only the named `igo-rider-push` job, every minute. Other jobs are preserved.
 5. Run `npm run rider:push-status` to inspect queue totals and recent scheduler runs. A successful cron SQL run means an HTTP request was queued; also inspect the HTTP status in Supabase's `net._http_response` when diagnosing failures. Investigate `FAILED` messages rather than assuming every notification was delivered.
 
-Vault stores the signing secret encrypted at rest. The scheduler puts a timestamped HMAC signature, valid for 90 seconds, into the outbound queue; it never puts the reusable signing secret or the shared billing/maintenance `CRON_SECRET` there. The dispatch endpoint accepts no unsigned request and returns no package data. See [Supabase scheduling](https://supabase.com/docs/guides/functions/schedule-functions) and its [pg_net request-header visibility guidance](https://supabase.com/docs/guides/troubleshooting/database-roles-can-read-request-headers-queued-by-pg_net-ad6357).
+Vault stores the signing secret encrypted at rest. The scheduler puts a timestamped HMAC signature, valid for 90 seconds, into the outbound queue; it never puts the reusable signing secret or any reusable billing credential there. The dispatch endpoint accepts no unsigned request and returns no package data. See [Supabase scheduling](https://supabase.com/docs/guides/functions/schedule-functions) and its [pg_net request-header visibility guidance](https://supabase.com/docs/guides/troubleshooting/database-roles-can-read-request-headers-queued-by-pg_net-ad6357).
 
 ## Deployment and acceptance checks
 

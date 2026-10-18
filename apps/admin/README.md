@@ -1,64 +1,55 @@
-# iGO Admin
+# iGO Delivery web platform
 
-**Shared demo** in the top bar connects fictional mobile purchases to all admin
-workspace pages. An allowlisted Clerk admin creates an isolated, expiring session;
-phones join it with a private key and choose a fictional role. Real checkout stays
-disabled. See [demo setup and the full order flow](../../docs/demo-purchases.md).
+Next.js App Router, React, TypeScript, Tailwind, shadcn/ui, Clerk, Prisma 7 and
+Supabase PostgreSQL/private Storage. This package serves the public website and
+the current Admin, Partner and Rider portals; it has no restaurant/mobile API.
 
+Read [the root guide](../../README.md), [deployment](../../docs/netlify-deployment.md)
+and [launch checklist](../../docs/phase-one-launch.md).
 
-Next.js App Router, React, TypeScript, Tailwind CSS, shadcn/ui, Clerk, Supabase PostgreSQL and Prisma 7. Zod validates form inputs and API commands. One repository also reserves the future role-based Flutter application.
+## Local development
 
-## Local preview
+Use Node 22. Run commands sequentially to limit CPU use. The production build
+uses one worker. Configure ignored `.env.local` from `.env.example`; never replace
+an existing file or commit its values.
 
-Use Node 22.18+ (or a compatible supported Node version).
-
-```bash
-cd apps/admin
+```sh
 npm ci
-cp .env.example .env.local
-npm run db:generate
-npm run dev -- --hostname localhost
+npm run db:deploy
+npm run dev
 ```
 
-Open http://localhost:3000. `IGO_DEMO_MODE=true` intentionally exposes fictional sample data without sign-in. Demo changes are stored only in this browser; Settings can reset them. The live database APIs refuse access while demo mode is enabled. Use a dedicated demo origin if sharing it; do not enter real personal information.
-
-## Connect Clerk and Supabase
-
-1. Create/configure your Clerk application. Set its publishable and secret keys in `.env.local`. Never use `NEXT_PUBLIC_` for a secret key or database URL.
-2. Create the administrator in Clerk; put the exact Clerk user ID in `ADMIN_CLERK_USER_IDS`. Comma-separated IDs are supported. No other signed-in user gets admin access. Enable MFA in your Clerk sign-in policy before real operations.
-3. Create a separate Supabase development project. Disable its Data API for this server-only Prisma integration before migrating. Set `DATABASE_URL` to the transaction pooler URL (port 6543), and `DIRECT_URL` to the session pooler URL (port 5432). Preserve TLS settings. See `../../docs/supabase-setup.md` for the complete setup.
-4. Both Next.js and Prisma read `.env.local`. Prisma also loads `.env` as a fallback; injected shell/deployment variables take precedence. Do not paste credentials into chat or commit them.
-5. Run `npm run db:deploy` to apply all included migrations to your development project. Use `npm run db:migrate -- --name change_name` for future schema changes in development; never run development migrations against production. Review migrations before deploying to a production database.
-6. Set `IGO_DEMO_MODE=false`, restart, and verify sign-in, non-admin denial, data reads and writes. Live mode begins with an empty database; demo data is never automatically copied into it.
-
-The schema supports the initial admin records. Ingestion/onboarding APIs and a full checkout schema are the next backend phase. See `../../docs/architecture.md` for boundaries. The current complete-state queries need pagination before operating at scale.
-
-## Current screens
-
-- Data lists show at most 10 records per page, with previous/next controls and result counts. Search/filter changes reset to page one; CSV exports include all matching orders. This is display pagination; live API queries still load the complete dataset.
-- Overview with metrics computed from records, daily activity, attention queues, and CSV export.
-- Orders with separate preparation/delivery milestones, shared pickup events, approximate ETA and rider assignment.
-- Admin-only Dispatch page, nearby rider offers, expiring acceptance windows, status inbox events and a role-scoped mobile API. See `../../docs/live-tracking.md` for activation requirements and limits.
-- Restaurant/rider application reviews with verification acknowledgement and audit records.
-- Customer summaries grouped by customer ID.
-- Card-payment records and validated refund-review requests. No bank refund is issued.
-- Support resolution queue, activity history and service settings.
+Clerk identifies the user; server-owned approval, admin grants and tenant scope
+control access. No demo switch bypasses authentication. `/sign-in` redirects to
+the current `/delivery/sign-in` route.
 
 ## Verification
 
-```bash
+```sh
 npm test
-npm run typecheck
 npm run lint
 npm run build
+npm run delivery:integration
 ```
 
-Run checks sequentially to keep resource use moderate. The Next.js build is configured to use one build worker. Avoid concurrent dev servers and builds on a constrained machine.
+The build includes TypeScript checking and generates Prisma Client. Integration
+checks create/remove a disposable database schema. They do not change operational
+records or send real rider notifications. `npm run delivery:verify` is different:
+it checks the configured operational database and invokes due billing cycles.
 
-## Security and unfinished integrations
+## Operational setup
 
-Clerk middleware/proxy handles sessions. Both protected layouts and server endpoints check the server-owned admin allowlist. API writes validate same-origin requests and use Zod; commands run in serializable transactions with audit entries. Pending review amounts are included in refund limits. The backend never accepts a client claim of payment success.
+```sh
+npm run delivery:storage
+npm run delivery:logo-storage
+npm run delivery:cron
+```
 
-Clerk and Supabase credentials are not included. Until configured, only demo mode can be exercised. BML callbacks/charging/refunding, verified document uploads, real notifications, GPS, granular finance/support permissions, production observability and account-deletion execution remain future work. The sample document-verification checkbox does not inspect any actual documents. Do not deploy for real operations until these requirements and the launch checklist are addressed.
+These configure private receipt/logo buckets and named database schedules. See
+[Supabase setup](../../docs/supabase-setup.md) and [rider setup](../../docs/rider-web-setup.md)
+for required permissions, credentials and separate background-push configuration.
+Netlify does not run migrations or install schedules during a build.
 
-No application password, Clerk secret, bank secret or connection string belongs in Git. Legal drafts contain deliberate placeholders and are not published policies.
+The source folder retains the package name `admin` to preserve hosting settings;
+it contains all three current workspaces. Applied migration files are immutable
+history, not active legacy features. Do not delete or rewrite them.

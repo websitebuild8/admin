@@ -18,7 +18,6 @@ const primaryKey: Record<string, string> = {
   DeliveryInvoiceDispatch: "invoiceId",
   DeliveryPaidInvoice: "invoiceId",
   DeliveryPaidInvoiceDispatch: "invoiceId",
-  DeliveryRetiredCodParcel: "parcelId",
 };
 function schema() {
   const test = process.env.IGO_DELIVERY_TEST_SCHEMA ?? "";
@@ -254,47 +253,6 @@ async function deletionGraph(tx: Tx, target: Target) {
     )})) AND NOT EXISTS (SELECT 1 FROM ${tableSql("DeliveryParcel")} p WHERE p."importId"=t.id AND NOT (p.id::text IN (${Prisma.join(parcelIds.length ? parcelIds : [""])})))`,
   );
 
-  // The old COD system is private/read-only. Remove only the explicitly linked
-  // archives; shared historical handovers stay until their last parcel is gone.
-  graph.DeliveryRetiredCodParcel = await read(
-    tx,
-    "DeliveryRetiredCodParcel",
-    inIds("parcelId", parcelIds),
-  );
-  const archives = graph.DeliveryRetiredCodParcel.map((r) => r.snapshot as Row);
-  graph.DeliveryCodRemittance = await read(
-    tx,
-    "DeliveryCodRemittance",
-    Prisma.sql`((${inIds("partnerId", partnerId ? [partnerId] : [])}) OR (${inIds(
-      "id",
-      archives.filter((r) => r.remittanceId).map((r) => String(r.remittanceId)),
-    )})) AND NOT EXISTS (SELECT 1 FROM ${tableSql("DeliveryRetiredCodParcel")} a WHERE a.snapshot->>'remittanceId'=t.id::text AND NOT (a."parcelId"::text IN (${Prisma.join(parcelIds.length ? parcelIds : [""])})))`,
-  );
-  graph.DeliveryCodReceipt = await read(
-    tx,
-    "DeliveryCodReceipt",
-    inIds("id", ids(graph.DeliveryCodRemittance)),
-  );
-  graph.DeliveryCashHandover = await read(
-    tx,
-    "DeliveryCashHandover",
-    Prisma.sql`((${inIds("driverId", target.kind === "RIDER" ? [target.id] : [])}) OR (${inIds(
-      "id",
-      archives.filter((r) => r.handoverId).map((r) => String(r.handoverId)),
-    )})) AND NOT EXISTS (SELECT 1 FROM ${tableSql("DeliveryRetiredCodParcel")} a WHERE a.snapshot->>'handoverId'=t.id::text AND NOT (a."parcelId"::text IN (${Prisma.join(parcelIds.length ? parcelIds : [""])})))`,
-  );
-  if (target.kind === "RIDER") {
-    const handovers = await read(
-      tx,
-      "DeliveryCashHandover",
-      inIds("driverId", [target.id]),
-    );
-    if (handovers.length !== graph.DeliveryCashHandover.length)
-      throw new DeliveryError(
-        "This rider has archived cash records linked to existing packages. Delete those test packages first, or keep the rider suspended.",
-        409,
-      );
-  }
   graph.DeliveryPushSubscription = await read(
     tx,
     "DeliveryPushSubscription",
@@ -374,12 +332,6 @@ async function deletionGraph(tx: Tx, target: Target) {
       ["Paid invoice copies", graph.DeliveryPaidInvoice.length],
       ["Private files", files.length],
       ["Notifications", graph.DeliveryNotification.length],
-      [
-        "Archived cash records",
-        graph.DeliveryRetiredCodParcel.length +
-          graph.DeliveryCodRemittance.length +
-          graph.DeliveryCashHandover.length,
-      ],
     ]
       .map(([label, count]) => ({ label: String(label), count: Number(count) }))
       .filter((v) => v.count),
@@ -484,10 +436,6 @@ export async function deleteDeliveryData(
         "DeliveryInvoiceLine",
         "DeliveryInvoice",
         "DeliveryBillingCycle",
-        "DeliveryRetiredCodParcel",
-        "DeliveryCodReceipt",
-        "DeliveryCodRemittance",
-        "DeliveryCashHandover",
         "DeliveryParcel",
         "DeliveryImport",
         "DeliveryReceipt",

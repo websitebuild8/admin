@@ -42,8 +42,11 @@ async function main() {
       await db.query(
         "SELECT cron.schedule('igo-delivery-invoices','*/5 * * * *','SELECT public.igo_invoice_due();')",
       );
+      await db.query(
+        "SELECT cron.schedule('igo-delivery-request-prune','17 * * * *','SELECT public.igo_prune_delivery_requests();')",
+      );
       console.log(
-        "Installed named invoice job; existing other jobs preserved.",
+        "Installed named invoice and expired-request cleanup jobs; other jobs preserved.",
       );
     }
     console.log(

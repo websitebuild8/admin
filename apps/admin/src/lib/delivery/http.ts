@@ -80,7 +80,7 @@ export async function limitRequests(
 ) {
   const bucket = Math.floor(Date.now() / (minutes * 60000));
   const key = `delivery:${createHash("sha256").update(actor.userId).digest("hex")}:${operation}:${bucket}`;
-  const entry = await database().mapUsageBucket.upsert({
+  const entry = await database().deliveryRequestBucket.upsert({
     where: { key },
     create: {
       key,

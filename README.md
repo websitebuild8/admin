@@ -1,41 +1,52 @@
 # iGO Delivery
 
-Phase 1 is the responsive seller delivery website for Facebook/Instagram businesses,
-with approved partner, driver and admin workspaces. Next.js, Clerk, Prisma and
-Supabase remain the shared stack. Delivery fees use the partner operating location
-and package destination, and are invoiced after delivery. No recipient payment
-collection is offered. Mobile/restaurant work is preserved for Phase 2.
+Responsive delivery management for online sellers in the Maldives. The current
+web platform includes Admin, Partner and Rider workspaces backed by Next.js,
+TypeScript, Tailwind, shadcn/ui, Clerk, Prisma and Supabase PostgreSQL/Storage.
+Currency is MVR; dates and invoice cutoffs use Maldives Time (UTC+5).
 
-- [Phase 1 architecture and business rules](docs/phase-one-delivery.md)
-- [Phase 1 deployment, verified checks and launch gates](docs/phase-one-launch.md)
-- [Rider website, Google Maps and background alert setup](docs/rider-web-setup.md)
-- [Operating locations, route pricing and rider self-assignment](docs/origin-pricing-and-rider-jobs.md)
-- [Super admin controls, role switching and optional application assets](docs/admin-access-and-workspaces.md)
+- Public website and applications: `/`, `/join`, `/rider/join`
+- Administration: `/delivery`
+- Partner workspace: `/partner`
+- Rider workspace: `/rider`
 
-The public website is `/`, admin uses `/delivery`, partners use `/partner`,
-and riders use `/rider` (apply at `/rider/join`). Preserved
-Phase 2 administration is `/legacy`. No deployment or legal approval is implied
-by the presence of this code. Business/legal/bank details remain launch inputs.
+Partners register or import packages. Riders claim/receive assignments, explicitly
+confirm physical pickup, and complete deliveries. Only delivered packages are
+invoiced. Only admin-verified delivery-fee transfers reduce debt. The platform
+does not collect recipient goods payments or track live rider GPS.
 
-## Preserved Phase 2 references
+## Development
 
-The following documents describe the earlier restaurant/mobile product. Its
-card-only checkout rules do not apply to Phase 1 delivery-fee bank invoices.
+Use Node 22, then run these from `apps/admin`:
 
-- [Admin setup and capabilities](apps/admin/README.md)
-- [Shared demo purchases and simulated bank gateway](docs/demo-purchases.md)
-- [Current architecture and implementation limits](docs/architecture.md)
+```sh
+npm ci
+cp .env.example .env.local
+# Configure private values before migrating or starting the platform.
+npm run db:deploy
+npm run dev
+```
 
-- [Product and checkout specification](docs/product-and-checkout.md)
-- [Draft customer terms and privacy notices](docs/legal-drafts.md)
-- [Implementation and launch requirements](docs/launch-requirements.md)
-- [Research sources and limits](docs/sources.md)
+Never overwrite an existing `.env.local`. Keep credentials outside Git.
+The current protected super-admin IDs remain in the server environment; only
+super admins grant administrator access. Active admins can switch between all
+three workspaces; ordinary users receive only their approved role.
 
-Agreed scope: one Flutter app with approved customer, restaurant, and rider modes; an admin-only Next.js web dashboard; one shared backend. Customers pay by card through BML before an order is submitted. No bank-transfer checkout, cash on delivery, or wallet. No customer change-of-mind cancellation after verified payment and confirmation; support and valid remedies remain available.
+## Guides
 
-All `{{PLACEHOLDERS}}` are intentional. Business registration is in progress. Do not publish these drafts until business identity, payment arrangements, tax treatment, privacy practices, and legal review are complete. Public policy/support/account-deletion pages are informational companions to the native app, not additional customer or restaurant web apps.
+- [Architecture and operating rules](docs/phase-one-delivery.md)
+- [Setup and launch checklist](docs/phase-one-launch.md)
+- [Netlify deployment](docs/netlify-deployment.md)
+- [Supabase setup](docs/supabase-setup.md)
+- [Partner onboarding](docs/partner-onboarding.md)
+- [Rider website, directions and background alerts](docs/rider-web-setup.md)
+- [Pricing and rider self-assignment](docs/origin-pricing-and-rider-jobs.md)
+- [Administrator controls](docs/admin-access-and-workspaces.md)
+- [Date filters](docs/date-period-filters.md)
+- [Legacy removal and database migration](docs/legacy-retirement.md)
+- [Verification record](docs/verification.md)
 
-- [Mobile preview setup](apps/mobile/README.md)
-- [Latest mobile design and navigation decisions](docs/mobile-design.md)
-
-- [Google Maps search, credentials and retention](docs/google-maps-setup.md)
+The retired restaurant dashboard, native mobile project and their APIs are
+removed. Applied Prisma migration history remains intact so existing and fresh
+databases can reach the current schema safely. Business identity, policies,
+production credentials and operational acceptance remain launch requirements.

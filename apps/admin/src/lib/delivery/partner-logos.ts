@@ -1,7 +1,7 @@
 import "server-only";
 import sharp from "sharp";
 import { database } from "../db";
-import { storageSettings } from "../menu-image-storage";
+import { storageSettings } from "./storage-client";
 import { storageConfigurationStatus } from "../storage-configuration";
 import { DeliveryError, requireRole, type Actor } from "./domain";
 

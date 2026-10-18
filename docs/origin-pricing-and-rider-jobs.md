@@ -1,7 +1,7 @@
 # Operating locations, delivery pricing and rider jobs
 
 Updated 17 October 2026. Phase 1 handles delivery fees only. iGO does not collect
-recipient payments for goods. The existing restaurant/mobile product stays parked.
+recipient payments for goods. The repository now contains only the current delivery web platform.
 
 ## Rates in MVR
 
@@ -53,19 +53,12 @@ registration, admin review, invitation and account setup. A pending application
 does not grant access. Clerk’s configured identifier/abuse protections remain in
 force; this app adds no public database email-lookup endpoint.
 
-## Retiring recipient cash collection
+## Recipient payments
 
-Migration `20261017000000_origin_pricing_retire_cod` copies old package cash links
-and amounts to `DeliveryRetiredCodParcel`. Original cash transfer and immutable
-receipt tables remain private, read-only archives. Active ORM models, operational
-columns, commands, routes, UI and import fields are removed. Do not drop the
-archive tables in a future generated migration or rewrite applied migrations.
-Delivery-fee bank receipt uploads, verification, partial payments, paid invoices,
-invoice history and earnings are retained.
-
-Deploy this migration before serving the new application. Redeploy the website
-after the user commits/pushes. Existing open tabs should be refreshed so they
-load the new six-column template and no longer submit retired fields.
+Package registration/import and operational screens have no goods-value collection.
+The unused private cash archive tables are removed by the 19 October retirement
+migration. Current delivery-fee invoices, verified payments and paid documents
+remain intact. See [legacy retirement](legacy-retirement.md).
 
 ## Release steps
 
@@ -75,8 +68,8 @@ database on 17 October 2026**, after the new website was published and its
 dashboard encountered the old schema. Live database reads now pass for overview,
 notifications, packages, partners, applications, riders, administrators, rates,
 destinations, invoices and payments. Record fingerprints confirm existing packages
-and financial history were preserved, including retired cash details in their
-private archive. No business invoice or payment was created by verification.
+and delivery-fee financial history were preserved. The previously retained empty
+cash archives are removed by the later retirement migration. No business invoice or payment was created by verification.
 
 The second migration adds independent admin grants, workspace-scoped notifications
 and optional application assets. The repository's Netlify build only builds the

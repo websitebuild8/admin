@@ -4,7 +4,7 @@ import {
   type NextRequest,
   type NextFetchEvent,
 } from "next/server";
-import { hasClerkKeys, isDemoMode } from "./lib/mode";
+import { hasClerkKeys } from "./lib/mode";
 const isPublic = createRouteMatcher([
   "/",
   "/sign-in(.*)",
@@ -18,7 +18,6 @@ const isPublic = createRouteMatcher([
   "/rider/privacy",
   "/api/partner-applications",
   "/setup",
-  "/legal(.*)",
 ]);
 const secured = clerkMiddleware(async (auth, request) => {
   if (request.nextUrl.pathname.startsWith("/api/delivery/")) {
@@ -38,31 +37,8 @@ const secured = clerkMiddleware(async (auth, request) => {
     });
 });
 export default function proxy(request: NextRequest, event: NextFetchEvent) {
-  const phaseOne =
-    request.nextUrl.pathname.startsWith("/delivery") ||
-    request.nextUrl.pathname.startsWith("/api/delivery/") ||
-    request.nextUrl.pathname.startsWith("/join") ||
-    request.nextUrl.pathname.startsWith("/partner") ||
-    request.nextUrl.pathname.startsWith("/driver/join") ||
-    request.nextUrl.pathname.startsWith("/rider") ||
-    request.nextUrl.pathname === "/api/partner-applications" ||
-    request.nextUrl.pathname === "/";
-  if (isDemoMode() && !phaseOne) return NextResponse.next();
-  // Native APIs authenticate bearer session tokens themselves and return JSON
-  // errors; Clerk's page redirects must not intercept them or CORS preflights.
-  if (request.nextUrl.pathname.startsWith("/api/mobile/"))
-    return NextResponse.next();
-  // A demo key grants access only to an isolated fictional DemoSession. It is
-  // never accepted by real mobile or administrator APIs.
-  if (request.nextUrl.pathname.startsWith("/api/demo/mobile/"))
-    return NextResponse.next();
-  if (
-    [
-      "/api/dispatch/tick",
-      "/api/maintenance/menu-images",
-      "/api/push/dispatch",
-    ].includes(request.nextUrl.pathname)
-  )
+  // Push dispatch verifies its scheduler signature in the route handler.
+  if (request.nextUrl.pathname === "/api/push/dispatch")
     return NextResponse.next();
   if (!hasClerkKeys()) {
     if (request.nextUrl.pathname === "/") return NextResponse.next();

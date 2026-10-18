@@ -952,11 +952,6 @@ function DeliveryPortalContent({
         <strong>{actor.name}</strong>
         <p>Maldives · MVR · UTC+5</p>
         <p>You order. I go.</p>
-        {actor.role === "ADMIN" && (
-          <Link href="/legacy">
-            Phase 2 administration <ArrowUpRight size={11} />
-          </Link>
-        )}
       </div>
     </aside>
   );

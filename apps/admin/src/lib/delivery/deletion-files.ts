@@ -1,6 +1,6 @@
 import "server-only";
 import { database } from "../db";
-import { storageSettings } from "../menu-image-storage";
+import { storageSettings } from "./storage-client";
 
 export async function cleanupDeletedFiles(fetcher: typeof fetch = fetch) {
   if (fetcher !== fetch && process.env.NODE_ENV !== "test")

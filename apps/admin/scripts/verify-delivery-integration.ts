@@ -28,6 +28,7 @@ import { verifyAdminWorkspaces } from "./verify-admin-workspaces";
 import { verifyDashboardNavigation } from "./verify-dashboard-navigation";
 import { verifyReportingPeriods } from "./verify-reporting-periods";
 import { verifyPaidInvoiceMigration } from "./verify-paid-invoice-migration";
+import { limitRequests } from "../src/lib/delivery/http";
 import {
   nextCutoff,
   type Actor,
@@ -77,6 +78,7 @@ async function main() {
       "20261017010000_admin_access_optional_partner_assets",
       "20261018000000_super_admin_deletion",
       "20261018010000_admin_multiple_operational_roles",
+      "20261019000000_remove_legacy_platform",
     ]) {
       if (
         folder === "20261016090000_paid_invoice_history" &&
@@ -183,6 +185,19 @@ async function main() {
         description: "Not a real delivery",
       },
     });
+    if (process.argv.includes("--request-limits")) {
+      const attempts = await Promise.allSettled(
+        Array.from({ length: 6 }, () => limitRequests(partner, "retirement-qa", 2)),
+      );
+      assert.equal(attempts.filter(v => v.status === "fulfilled").length, 2);
+      assert.equal(attempts.filter(v => v.status === "rejected" && v.reason.status === 429).length, 4);
+      assert.equal((await db.deliveryRequestBucket.findFirstOrThrow()).count, 6);
+      ok("delivery request limits remain atomic through the mapped shared table");
+      await limitRequests(other, "retirement-qa", 2);
+      assert.equal(await db.deliveryRequestBucket.count(), 2);
+      ok("rate counters isolate partner identities after legacy retirement");
+      return;
+    }
     if (process.argv.includes("--dashboard-and-periods")) {
       await verifyDashboardNavigation(db, admin, ok);
       await verifyReportingPeriods(db, admin, ok);
