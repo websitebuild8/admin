@@ -12,9 +12,6 @@ export function LandingMotion({ children }: { children: ReactNode }) {
 
     const preference = window.matchMedia("(prefers-reduced-motion: reduce)");
     const phone = window.matchMedia("(max-width: 760px)");
-    const targets = Array.from(
-      root.querySelectorAll<HTMLElement>("[data-reveal]"),
-    );
     const hero = root.querySelector<HTMLElement>(".d-hero");
     const visual = root.querySelector<HTMLElement>(".d-hero-visual");
     let stopMotion = () => {};
@@ -22,6 +19,7 @@ export function LandingMotion({ children }: { children: ReactNode }) {
     function configureMotion() {
       stopMotion();
       if (preference.matches || !("IntersectionObserver" in window)) return;
+      const targets = new Set<HTMLElement>();
 
       const observer = new IntersectionObserver(
         (entries) => {
@@ -44,7 +42,9 @@ export function LandingMotion({ children }: { children: ReactNode }) {
         { rootMargin: "32px 0px", threshold: 0 },
       );
 
-      for (const target of targets) {
+      function observeTarget(target: HTMLElement) {
+        if (targets.has(target)) return;
+        targets.add(target);
         // Keep initial and restored scroll positions readable immediately.
         const { top, bottom } = target.getBoundingClientRect();
         if (bottom <= 0 || top >= window.innerHeight) {
@@ -53,6 +53,30 @@ export function LandingMotion({ children }: { children: ReactNode }) {
         }
         observer.observe(target);
       }
+      function observeTree(node: Element) {
+        if (node instanceof HTMLElement && node.matches("[data-reveal]"))
+          observeTarget(node);
+        node
+          .querySelectorAll<HTMLElement>("[data-reveal]")
+          .forEach(observeTarget);
+      }
+      observeTree(root!);
+      // Suspense can stream rate cards after this effect has mounted. Observe
+      // just inserted elements, without polling or handling attribute changes.
+      const streamed = new MutationObserver((records) => {
+        for (const record of records) {
+          for (const node of record.addedNodes)
+            if (node instanceof Element) observeTree(node);
+          for (const node of record.removedNodes)
+            if (node instanceof Element)
+              for (const target of targets)
+                if (node === target || node.contains(target)) {
+                  observer.unobserve(target);
+                  targets.delete(target);
+                }
+        }
+      });
+      streamed.observe(root!, { childList: true, subtree: true });
 
       let frame = 0;
       function updateParallax() {
@@ -86,6 +110,7 @@ export function LandingMotion({ children }: { children: ReactNode }) {
       root!.addEventListener("focusin", revealFocusedContent);
 
       stopMotion = () => {
+        streamed.disconnect();
         observer.disconnect();
         window.cancelAnimationFrame(frame);
         window.removeEventListener("scroll", scheduleParallax);

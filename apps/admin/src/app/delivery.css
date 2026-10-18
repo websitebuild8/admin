@@ -2448,49 +2448,214 @@ html:has(.d-site) {
   border-radius: 10px !important;
 }
 
+.d-public-rates {
+  display: block;
+  padding-block: clamp(48px, 7vw, 88px);
+}
+.d-rate-section-intro {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 40px;
+  margin-bottom: 38px;
+}
+.d-rate-section-intro h2 {
+  margin: 15px 0 0;
+  font-size: clamp(34px, 4vw, 50px);
+  font-weight: 750;
+  line-height: 1.08;
+  letter-spacing: -2px;
+  text-wrap: balance;
+}
+.d-rate-section-note {
+  max-width: 370px;
+  padding-bottom: 4px;
+}
+.d-rate-section-note p {
+  color: #62665e;
+  font-size: 14px;
+  line-height: 1.8;
+}
+.d-rate-section-note a {
+  width: fit-content;
+  font-size: 13px;
+  margin-top: 18px;
+}
 .d-origin-rate-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
-  grid-column: 1/-1;
+  align-items: stretch;
+  gap: 20px;
 }
-.d-origin-rate-grid article {
-  padding: 24px;
-  border: 1px solid #e2e4de;
-  border-radius: 24px;
-  background: #ffffffc9;
-  box-shadow: 0 8px 32px #12121204;
+.d-origin-rate-card {
+  min-width: 0;
+  display: grid;
+  grid-template-areas: "heading" "local" "destinations";
+  grid-template-rows: auto auto 1fr;
+  padding: clamp(24px, 2.5vw, 32px);
+  border: 1px solid #e2e4db;
+  border-radius: 28px;
+  background: #ffffffcf;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow: 0 3px 5px #10160b02, 0 16px 40px -22px #1922121c, inset 0 1px 0 #fff;
 }
-.d-origin-rate-grid h3 {
-  font-size: 22px;
-  letter-spacing: -0.6px;
-  margin: 10px 0 20px;
+.d-site .d-origin-rate-card[data-reveal] {
+  transition:
+    opacity 650ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 650ms cubic-bezier(0.22, 1, 0.36, 1),
+    translate 220ms ease,
+    box-shadow 220ms ease,
+    border-color 220ms ease;
 }
-.d-origin-rate-grid dl > div {
+.d-origin-rate-card:nth-child(2) { --d-reveal-delay: 80ms; }
+.d-origin-rate-card:nth-child(3) { --d-reveal-delay: 160ms; }
+.d-site .d-origin-rate-card[data-reveal-state="pending"] { transition: none; }
+.d-rate-card-header { grid-area: heading; }
+.d-rate-card-header .d-eyebrow {
+  color: #73766a;
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: 1.7px;
+}
+.d-rate-card-header h3 {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+  min-height: 40px;
+  margin: 10px 0 0;
+  color: #11130f;
+  font-size: clamp(25px, 2.3vw, 30px);
+  line-height: 1.2;
+  letter-spacing: -1px;
+  font-weight: 700;
+}
+.d-rate-phase {
+  border: 1px solid #e5e7df;
+  border-radius: 8px;
+  padding: 5px 8px;
+  color: #53594d;
+  background: #f5f6f0a8;
+  font-size: 11px;
+  line-height: 1.2;
+  font-weight: 550;
+  letter-spacing: 0;
+}
+.d-origin-rate-card dl { margin: 0; }
+.d-origin-rate-card .d-rate-local {
+  grid-area: local;
+  margin: 26px 0 28px;
+}
+.d-rate-local dt {
+  display: inline-block;
+  padding: 5px 10px;
+  border-radius: 8px;
+  background: #fff6ac;
+  color: #5a520e;
+  font-size: 11px;
+  line-height: 1.5;
+  font-weight: 600;
+}
+.d-rate-amount {
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 5px;
+  margin: 0;
+  white-space: nowrap;
+  color: #161912;
+  font-variant-numeric: tabular-nums;
+}
+.d-rate-currency {
+  color: #74796c;
+  font-size: 10px;
+  line-height: 1;
+  font-weight: 550;
+  letter-spacing: 0.3px;
+}
+.d-rate-amount strong {
+  font-size: 23px;
+  line-height: 1.2;
+  font-weight: 650;
+  letter-spacing: -0.8px;
+}
+.d-rate-local .d-rate-amount {
+  justify-content: flex-start;
+  gap: 8px;
+  margin-top: 13px;
+}
+.d-rate-local .d-rate-currency { font-size: 12px; }
+.d-rate-local .d-rate-amount strong {
+  font-size: 64px;
+  line-height: 1;
+  font-weight: 650;
+  letter-spacing: -3.5px;
+}
+.d-rate-destinations {
+  grid-area: destinations;
+  align-self: end;
+}
+.d-rate-destinations > div {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 12px;
-  padding: 12px 0;
-  border-top: 1px solid #eceee7;
+  gap: 14px;
+  padding: 17px 0;
+  border-top: 1px solid #e9ece3;
 }
-.d-origin-rate-grid dt {
+.d-rate-destinations > div:last-child { padding-bottom: 0; }
+.d-rate-destinations dt {
+  color: #62685b;
   font-size: 13px;
-  color: #59605a;
+  font-weight: 450;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
 }
-.d-origin-rate-grid dd {
-  font-size: 18px;
-  font-weight: 750;
-  white-space: nowrap;
-  letter-spacing: -0.5px;
+.d-public-rates .d-rate-unavailable { font-size: 13px; color: #62685b; }
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .d-origin-rate-card:hover {
+    translate: 0 -4px;
+    border-color: #cdd2c3;
+    box-shadow: 0 4px 8px #10160b03, 0 22px 44px -22px #19221229, inset 0 1px 0 #fff;
+  }
 }
-@media (max-width: 800px) {
-  .d-origin-rate-grid {
-    grid-template-columns: 1fr;
+@media (min-width: 620px) and (max-width: 1039px) {
+  .d-origin-rate-grid { grid-template-columns: 1fr; gap: 18px; }
+  .d-origin-rate-card {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-areas: "heading destinations" "local destinations";
+    grid-template-rows: auto 1fr;
+    column-gap: 40px;
   }
-  .d-origin-rate-grid article {
-    padding: 22px;
-  }
+  .d-rate-destinations { align-self: center; }
+  .d-rate-destinations > div:first-child { border-top: 0; }
+  .d-origin-rate-card .d-rate-local { margin: 20px 0 0; }
+  .d-origin-rate-card { --d-reveal-delay: 0ms !important; }
+}
+@media (max-width: 760px) {
+  .d-rate-section-intro { align-items: flex-start; flex-direction: column; gap: 20px; margin-bottom: 28px; }
+  .d-rate-section-intro h2 { letter-spacing: -1.4px; }
+  .d-rate-section-note { max-width: 430px; }
+  .d-rate-section-note p { font-size: 13px; }
+}
+@media (max-width: 619px) {
+  .d-origin-rate-grid { grid-template-columns: 1fr; gap: 18px; }
+  .d-origin-rate-card { padding: 26px; border-radius: 24px; --d-reveal-delay: 0ms !important; }
+  .d-rate-card-header h3 { font-size: 28px; }
+  .d-origin-rate-card .d-rate-local { margin: 24px 0; }
+  .d-rate-local .d-rate-amount strong { font-size: 58px; }
+  .d-rate-destinations > div { padding: 16px 0; }
+}
+@media (max-width: 359px) {
+  .d-origin-rate-card { padding: 22px; }
+  .d-rate-card-header h3 { font-size: 25px; }
+  .d-rate-local .d-rate-amount strong { font-size: 48px; letter-spacing: -2.5px; }
+  .d-rate-amount strong { font-size: 21px; }
+  .d-rate-destinations dt { font-size: 12px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .d-site .d-origin-rate-card[data-reveal] { transition: none; }
 }
 
 .d-workspace-switch {

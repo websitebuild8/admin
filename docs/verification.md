@@ -1,5 +1,27 @@
 # Delivery platform verification
 
+## Public delivery-rate card redesign — 19 October 2026
+
+The rate section now gives all three origin cards the full content width, with
+a separate headline and explanatory note. Frosted white cards use larger local
+rate figures, smaller MVR labels, phase badges and aligned destination rows.
+Existing database rates remain authoritative; no fee or billing rule changed.
+There are no card icons, gradients, yellow rules or per-package captions.
+The loading skeleton follows the new card structure.
+
+Desktop uses three columns, tablet uses individual horizontal cards, and phone
+uses stacked cards. The actual local production homepage was checked at 1440,
+1024, 768, 390 and 320 pixels: no horizontal page/card/price-row overflow was
+observed. Desktop and phone cards reset to pending outside the viewport and
+return to shown on re-entry. The observer discovers cards inserted by streaming
+without a timer or React updates on scroll. Reduced-motion settings retain the
+existing readable, unanimated fallback. No browser console errors were recorded.
+
+Changed-source ESLint, whitespace checks and the single-worker production build,
+including TypeScript, pass. No database migration, credential change, automated
+financial operation, Git commit/push or hosted deployment was performed. The
+owner can commit/push through VS Code and let Netlify deploy the changes.
+
 ## Loading performance — 19 October 2026
 
 Reduced repeated authorization, overview aggregates and recent-package relation

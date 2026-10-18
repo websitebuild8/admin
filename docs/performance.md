@@ -44,8 +44,8 @@ the device and its network also affect the full page load.
 6. Partner and Rider loading boundaries provide a navigation shell. The landing
    page streams its public rate cards separately and caches only public rate
    labels/prices for 60 seconds. Successful admin rate edits invalidate that
-   cache. A stable reveal wrapper preserves repeatable scroll animation while
-   the rates stream in.
+   cache. The motion observer also discovers streamed cards, preserving their
+   individual repeatable scroll reveals after the rate data arrives.
 
 There is no persistent shared cache of accounts, role permissions, packages,
 invoices, balances, payments or private notifications. This work makes no

@@ -185,26 +185,32 @@ export default function Page() {
               ))}
             </div>
           </section>
-          <section id="delivery-rates" className="d-public-rates">
-            <div data-reveal>
-              <span className="d-eyebrow">SIMPLE STARTING RATES</span>
-              <h2>
-                Small fees.
-                <br />A big weight off.
-              </h2>
-              <p>
-                Delivery fees depend on where your business operates and where
-                your package is going. Billed after confirmed delivery.
-              </p>
-              <Link href="/join" transitionTypes={["igo-forward"]}>
-                Apply for your partner account <ArrowUpRight size={17} />
-              </Link>
+          <section
+            id="delivery-rates"
+            className="d-public-rates"
+            aria-labelledby="delivery-rates-title"
+          >
+            <div className="d-rate-section-intro">
+              <div data-reveal>
+                <span className="d-eyebrow">SIMPLE STARTING RATES</span>
+                <h2 id="delivery-rates-title">
+                  Small fees.
+                  <br />A big weight off.
+                </h2>
+              </div>
+              <div className="d-rate-section-note" data-reveal>
+                <p>
+                  Delivery fees depend on where your business operates and where
+                  your package is going. Billed after confirmed delivery.
+                </p>
+                <Link href="/join" transitionTypes={["igo-forward"]}>
+                  Apply for your partner account <ArrowUpRight size={17} />
+                </Link>
+              </div>
             </div>
-            <div data-reveal>
-              <Suspense fallback={<PublicRatesSkeleton />}>
-                <PublicRates />
-              </Suspense>
-            </div>
+            <Suspense fallback={<PublicRatesSkeleton />}>
+              <PublicRates />
+            </Suspense>
           </section>
           <section className="d-final-cta" data-reveal>
             <div>
