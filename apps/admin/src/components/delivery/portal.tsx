@@ -1,4 +1,5 @@
 "use client";
+import { ThemeSwitcher } from "@/components/theme/switcher";
 import dynamic from "next/dynamic";
 import { WorkspaceSwitcher } from "./workspace-switcher";
 import {
@@ -17,6 +18,7 @@ const WorkspaceProfiles = dynamic(
   { loading: () => <DeliverySkeleton /> },
 );
 import { deliveryFetch } from "@/lib/delivery/fetch";
+import { ClearNotifications } from "./clear-notifications";
 import {
   useEffect,
   useRef,
@@ -1735,6 +1737,19 @@ function DeliveryPortalContent({
       const d = request.data as List<Notice>;
       return (
         <section className="d-card">
+          <div className="d-card-header d-notification-header">
+            <div>
+              <h2>Your notifications</h2>
+              <p>
+                Clear your entire inbox, across all dates and pages. Messages
+                are permanently deleted.
+              </p>
+            </div>
+            <ClearNotifications
+              total={notices.data?.total ?? d.total}
+              onCleared={() => setPage(1)}
+            />
+          </div>
           {d.items.length ? (
             d.items.map((n) => (
               <div className="d-info-row" key={n.id}>
@@ -2179,6 +2194,7 @@ function DeliveryPortalContent({
           </div>
           <div className="d-top-actions">
             <span className="d-mvt">Maldives · UTC+5</span>
+            <ThemeSwitcher inHeader />
             <Link
               href={`${workspaceBase}/notifications`}
               aria-label="Notifications"

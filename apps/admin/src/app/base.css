@@ -1,23 +1,23 @@
 :root {
-  --igo-yellow: #ffea00;
-  --ink: #0d0d0d;
-  --muted-ink: #7a7f74;
+  --igo-yellow: var(--appearance-accent, #ffea00);
+  --ink: var(--appearance-text, #0d0d0d);
+  --muted-ink: var(--appearance-muted, #7a7f74);
 }
 * { box-sizing: border-box; }
-body { margin: 0; color: var(--ink); font-family: Arial, Helvetica, sans-serif; background: #f7f8f3; font-size: 14px; line-height: 1.5; }
+body { margin: 0; color: var(--ink); font-family: Arial, Helvetica, sans-serif; background: var(--appearance-canvas, #f7f8f3); font-size: 14px; line-height: 1.5; }
 button, a, input, textarea { touch-action: manipulation; }
 button, a { transition: background .16s, box-shadow .16s, transform .16s; }
 button:not(:disabled), a { cursor: pointer; }
 a { text-decoration: none; color: inherit; }
-button:focus-visible, a:focus-visible { outline: 3px solid #b3a22a; outline-offset: 3px; }
+button:focus-visible, a:focus-visible { outline: 3px solid var(--appearance-focus, #b3a22a); outline-offset: 3px; }
 h1, h2, h3, p { margin: 0; }
 h1 { font-size: 30px; line-height: 1.25; letter-spacing: -1.2px; font-weight: 600; }
 h2 { font-size: 17px; letter-spacing: -.4px; font-weight: 600; }
 h3 { font-size: 16px; font-weight: 600; }
 .muted { color: var(--muted-ink); }
-.setup-page { min-height: 100dvh; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 30px; background: #f7f8f3; padding: 24px; }
-.setup-card { width: 100%; max-width: 530px; background: #ffffffbd; backdrop-filter: blur(20px); border: 1px solid #fff; border-radius: 25px; padding: clamp(24px, 5vw, 45px); box-shadow: 0 12px 50px #4c55100a; }
+.setup-page { min-height: 100dvh; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 30px; background: var(--appearance-canvas, #f7f8f3); padding: 24px; }
+.setup-card { width: 100%; max-width: 530px; background: var(--appearance-glass, #ffffffbd); backdrop-filter: blur(20px); border: 1px solid var(--appearance-border, #fff); border-radius: 25px; padding: clamp(24px, 5vw, 45px); box-shadow: 0 12px 50px var(--appearance-shadow, #4c55100a); }
 .setup-logo { object-fit: contain; border-radius: 16px; }
 .setup-card h1 { margin: 25px 0 15px; }
-.setup-card p { color: #727a66; margin-bottom: 16px; font-size: 14px; line-height: 1.8; }
+.setup-card p { color: var(--appearance-secondary, #727a66); margin-bottom: 16px; font-size: 14px; line-height: 1.8; }
 .error-retry { background: var(--igo-yellow); padding: 10px 17px; border-radius: 8px; }

@@ -1,5 +1,51 @@
 # Delivery platform verification
 
+## Mark all read and clear — 19 October 2026
+
+Added one shared clear-all action to Admin, Partner and Rider notification pages.
+It deletes the current recipient/workspace inbox across all pages and dates,
+including read messages and shared ACCOUNT notices. Server-selected scope,
+rechecked privileges, serializable/idempotent commands, a fixed request boundary,
+audit counts and cascaded push-job deletion protect the operation. Invoice dispatch
+links are nullable with narrowly constrained database cleanup; sent history,
+payment proof and invoice debt remain unchanged.
+
+All 27 targeted notification/invoice-history checks and eight super-admin deletion
+regression checks pass in disposable schemas, which were removed. All 68 unit
+tests, lint and the final production build pass. Browser
+checks use fictional in-memory messages in the real portal components: the single
+button clears the list, unread count and pagination for all three workspaces;
+Partner clearing also works by keyboard in dark mode. Narrow mobile layouts were
+checked at 320 and 390 pixels. No operational inbox was cleared.
+
+The one pending migration `20261019010000_clear_notifications` was applied to the
+configured Supabase database successfully; no other migration was pending.
+Source changes remain for the owner's manual commit/push and Netlify deployment.
+See [notification behavior and release details](notification-clearing.md).
+
+## Shared Light / Dark / System appearance — 19 October 2026
+
+Added a shared, persistent appearance control to the homepage, Admin, Partner
+and Rider headers, with a fallback for sign-in, onboarding and utility pages.
+Charcoal surfaces, soft text, restrained yellow accents and semantic status
+colors cover feature styles, shadcn controls, portalled dialogs, toasts and Clerk
+UI. Native controls and mobile browser colors follow the selected appearance.
+Theme preferences stay in the browser; role, billing and delivery logic are
+unchanged. Existing light colors and print declarations are preserved.
+
+Actual local production Admin, Partner and Rider screens, a package-details
+dialog and the Clerk account menu were checked with the existing signed-in
+session. Reload persistence, cross-tab synchronization and the browser's System
+preference were verified. Registration and invoice styling were also checked
+with fictional preview data and substituted route/navigation wrappers; no form
+was submitted. Twelve shared text-color pairs pass the 4.5:1 target, with a
+4.91:1 minimum. This is not a complete accessibility audit. Changed-source lint,
+whitespace checks and the production build including TypeScript pass. No
+database integration suite or actual print export was run for this visual change.
+
+See [appearance operation and verification](dark-mode.md). Manual commit/push
+and Netlify deployment remain with the owner; no deployment was performed here.
+
 ## Public delivery-rate card redesign — 19 October 2026
 
 The rate section now gives all three origin cards the full content width, with

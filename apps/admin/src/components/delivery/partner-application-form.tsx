@@ -1,4 +1,5 @@
 "use client";
+import { ThemeSwitcher } from "@/components/theme/switcher";
 
 import {
   ViewTransition,
@@ -183,12 +184,15 @@ export function PartnerApplicationForm({
               priority
             />
           </Link>
-          <Link href="/partner/sign-in">
-            Already approved?{" "}
-            <strong>
-              Partner sign in <ArrowRight size={15} />
-            </strong>
-          </Link>
+          <div className="d-join-header-actions">
+            <ThemeSwitcher inHeader />
+            <Link href="/partner/sign-in">
+              Already approved?{" "}
+              <strong>
+                Partner sign in <ArrowRight size={15} />
+              </strong>
+            </Link>
+          </div>
         </header>
       </ViewTransition>
       <div className="d-join-layout">

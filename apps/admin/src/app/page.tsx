@@ -19,6 +19,7 @@ import {
 } from "@/components/delivery/public-rates";
 import { LandingMotion } from "@/components/delivery/landing-motion";
 import { PublicPageTransition } from "@/components/delivery/public-page-transition";
+import { ThemeSwitcher } from "@/components/theme/switcher";
 export const dynamic = "force-dynamic";
 export default function Page() {
   return (
@@ -41,6 +42,7 @@ export default function Page() {
             <a className="d-nav-section" href="#delivery-rates">
               Delivery rates
             </a>
+            <ThemeSwitcher inHeader />
             <Link
               className="d-nav-rider"
               href="/rider/join"

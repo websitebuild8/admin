@@ -238,6 +238,8 @@ export async function deliveryCommand(
   key: string,
   command: DeliveryCommandInput,
 ) {
+  // Hold this boundary across serialization retries. Newer messages survive.
+  const clearThrough = new Date();
   return serialized(actor, key, command, async (tx) => {
     switch (command.type) {
       case "createPartnerInvoice": {
@@ -950,6 +952,35 @@ export async function deliveryCommand(
         return {
           message:
             "Destination saved. Configure a rate for each operating location before using it.",
+        };
+      }
+      case "clearNotices": {
+        requireRole(actor, "ADMIN", "PARTNER", "DRIVER");
+        const removed = await tx.deliveryNotification.deleteMany({
+          where: {
+            recipient: actor.userId,
+            workspace: { in: ["ACCOUNT", actor.role] },
+            createdAt: { lte: clearThrough },
+          },
+        });
+        if (removed.count)
+          await audit(
+            tx,
+            actor,
+            "NOTIFICATIONS_CLEARED",
+            actor.userId,
+            {
+              workspace: actor.role,
+              count: removed.count,
+              through: clearThrough.toISOString(),
+            },
+            actor.partnerId ?? undefined,
+          );
+        return {
+          message: removed.count
+            ? "All notifications marked read and cleared."
+            : "Your notifications are already clear.",
+          count: removed.count,
         };
       }
       case "readNotice": {

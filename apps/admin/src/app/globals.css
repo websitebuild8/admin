@@ -5,6 +5,7 @@
 @import "./delivery.css";
 @import "./invoice-document.css";
 @import "./partner-history.css";
+@import "./theme.css";
 
 @custom-variant dark (&:is(.dark *));
 

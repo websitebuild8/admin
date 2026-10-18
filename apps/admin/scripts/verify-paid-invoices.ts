@@ -394,4 +394,60 @@ export async function verifyPaidInvoices(
   ok(
     "paid documents, sends and timeline events are append-only and all three tables deny public client access",
   );
+  const sent = await db.deliveryPaidInvoiceDispatch.findUniqueOrThrow({
+    where: { invoiceId: id },
+  });
+  const timeline = await db.deliveryInvoiceEvent.findMany({
+    where: { invoiceId: id },
+    orderBy: { id: "asc" },
+  });
+  await assert.rejects(
+    db.deliveryPaidInvoiceDispatch.update({
+      where: { invoiceId: id },
+      data: { notificationId: null },
+    }),
+  );
+  await cmd(partner, { type: "clearNotices" });
+  assert.equal(
+    await db.deliveryNotification.count({
+      where: { recipient: partner.userId },
+    }),
+    0,
+  );
+  assert.deepEqual(
+    await db.deliveryPaidInvoiceDispatch.findUniqueOrThrow({
+      where: { invoiceId: id },
+    }),
+    { ...sent, notificationId: null },
+  );
+  assert.deepEqual(await paidInvoiceDocument(partner, id), paid);
+  assert.deepEqual(
+    await db.deliveryInvoiceEvent.findMany({
+      where: { invoiceId: id },
+      orderBy: { id: "asc" },
+    }),
+    timeline,
+  );
+  await cmd(admin, { type: "sendPaidInvoice", invoiceId: id });
+  assert.equal(
+    await db.deliveryNotification.count({
+      where: { recipient: partner.userId },
+    }),
+    0,
+  );
+  await assert.rejects(
+    db.deliveryPaidInvoiceDispatch.update({
+      where: { invoiceId: id },
+      data: { sentBy: "tampered" },
+    }),
+  );
+  await assert.rejects(
+    db.deliveryPaidInvoiceDispatch.update({
+      where: { invoiceId: id },
+      data: { notificationId: foreignNotice.id },
+    }),
+  );
+  ok(
+    "clearing paid-invoice notices preserves payment proof, immutable dispatch and full timeline without resending a duplicate",
+  );
 }

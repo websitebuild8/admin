@@ -1,0 +1,173 @@
+/* Explicit light colors remain as fallbacks in the feature stylesheets.
+   These shared roles provide one dark palette, including portalled UI.
+   Screen-only tokens keep invoices and receipts light when printed. */
+@media screen {
+  .invoice-document-status:is([data-payment-status="due"], [data-payment-status="partial"]) {
+    background: var(--appearance-accent-surface, #fff5d1);
+    color: var(--appearance-warning-text, #786128);
+  }
+  html.dark {
+    color-scheme: dark;
+    --appearance-canvas: #11151b;
+    --appearance-surface: #1b222c;
+    --appearance-raised: #252e3b;
+    --appearance-sidebar: #10141a;
+    --appearance-glass: #1b222cdb;
+    --appearance-overlay: #ffffff09;
+    --appearance-ambient: #d2bb3c08;
+    --appearance-text: #e7eaf0;
+    --appearance-secondary: #c3cbd6;
+    --appearance-muted: #a5afbe;
+    --appearance-border: #364151;
+    --appearance-accent: #e8d254;
+    --appearance-on-accent: #17190e;
+    --appearance-accent-surface: #332f20;
+    --appearance-accent-text: #f0e3a2;
+    --appearance-accent-border: #6b6038;
+    --appearance-focus: #e8d254;
+    --appearance-warning-text: #e8d49c;
+    --appearance-danger-text: #ffaaa1;
+    --appearance-danger-surface: #352326;
+    --appearance-danger-border: #724345;
+    --appearance-danger-fill: #b13b35;
+    --appearance-success-text: #b3d9b3;
+    --appearance-success-surface: #22332b;
+    --appearance-success-border: #43624d;
+    --appearance-shadow: #00000045;
+
+    /* shadcn/Base UI menus, dialogs, skeletons, inputs and toast portals. */
+    --background: #11151b;
+    --foreground: #e7eaf0;
+    --card: #1b222c;
+    --card-foreground: #e7eaf0;
+    --popover: #222b37;
+    --popover-foreground: #e7eaf0;
+    --primary: #e8d254;
+    --primary-foreground: #17190e;
+    --secondary: #293443;
+    --secondary-foreground: #e7eaf0;
+    --muted: #293443;
+    --muted-foreground: #a5afbe;
+    --accent: #393522;
+    --accent-foreground: #f0e3a2;
+    --destructive: #ffaaa1;
+    --border: #364151;
+    --input: #425067;
+    --ring: #e8d254;
+  }
+  html.dark body { background: var(--background); color: var(--foreground); }
+  html.dark input::placeholder,
+  html.dark textarea::placeholder { color: #929ead; opacity: 1; }
+  html.dark input,
+  html.dark textarea { caret-color: #e8d254; }
+  html.dark input:-webkit-autofill {
+    -webkit-text-fill-color: #e7eaf0;
+    -webkit-box-shadow: 0 0 0 1000px #222b37 inset;
+    caret-color: #e8d254;
+  }
+  html.dark ::selection { background: #71632b; color: #fff9d9; }
+  html.dark { scrollbar-color: #536074 #11151b; }
+  html.dark .d-topbar,
+  html.dark .r-header { border-color: #364151; }
+  html.dark .d-sidebar { border-right: 1px solid #2b3543; }
+  html.dark .d-hero h1 > span {
+    background: linear-gradient(transparent 80%, #84752970 80%);
+  }
+  html.dark .d-stat-yellow,
+  html.dark .d-rate-local dt,
+  html.dark .d-note,
+  html.dark .r-alerts { color: #f0e3a2; }
+  html.dark .d-delete-danger { color: #ffaaa1; }
+  html.dark .error-retry { color: #17190e; }
+  html.dark :is(.d-app, .d-site, .d-partner-join, .d-application, .d-modal, .invoice-document-actions) [data-variant="outline"]:not(.d-delete-button),
+  html.dark :is(.d-app, .d-site, .d-partner-join, .d-application, .d-modal) [data-variant="ghost"]:not(.d-delete-button),
+  html.dark :is(.r-app, .r-dialog, .r-onboarding) [data-variant="outline"],
+  html.dark :is(.r-app, .r-dialog, .r-onboarding) [data-variant="ghost"] { color: #e7eaf0; }
+  html.dark [data-slot="dialog-overlay"],
+  html.dark [data-slot="sheet-overlay"] { background: #0009; }
+}
+
+/* Clerk's default theme responds to the root color-scheme without JS remounts. */
+:root {
+  --clerk-color-primary: var(--primary);
+  --clerk-color-primary-foreground: var(--primary-foreground);
+  --clerk-color-ring: var(--ring);
+}
+.theme-switcher { display: inline-flex; flex: 0 0 auto; }
+.theme-switcher .theme-trigger {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--card);
+  color: var(--foreground);
+  cursor: pointer;
+  box-shadow: 0 1px 2px #00000005;
+}
+.theme-trigger > svg:last-child { display: none; }
+.theme-trigger [data-slot="select-value"] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.theme-switcher .theme-trigger:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
+}
+.theme-switcher .theme-trigger:hover { background: var(--muted); }
+.theme-menu { min-width: 170px; padding: 5px; border-radius: 14px; border: 1px solid var(--border); }
+.theme-menu [data-slot="select-item"] { min-height: 42px; padding-left: 12px; gap: 10px; border-radius: 9px; }
+.theme-fallback {
+  position: fixed;
+  z-index: 35;
+  top: max(16px, env(safe-area-inset-top));
+  right: max(16px, env(safe-area-inset-right));
+}
+body:has(.theme-in-header) .theme-fallback { display: none; }
+.d-join-header-actions { display: flex; align-items: center; justify-content: flex-end; gap: 16px; }
+.d-join-header-actions > a { text-align: right; font-size: 12px; color: var(--appearance-muted, #777d70); }
+.invoice-print-toolbar .theme-switcher { margin-left: auto; }
+@media (max-width: 760px) {
+  .d-site-header nav { gap: 8px; }
+  .d-site-header .d-nav-rider svg { display: none; }
+  .d-join-header-actions { gap: 10px; max-width: 65%; }
+  .d-topbar { gap: 10px; }
+  .d-top-actions { gap: 8px; }
+  .r-header-actions { gap: 8px; flex-shrink: 0; }
+  .r-header .d-workspace-switch { min-width: 84px; flex-shrink: 0; }
+  .r-header .r-bell, .r-header .r-brand { flex-shrink: 0; }
+}
+@media (max-width: 380px) {
+  .r-app .r-header { padding-inline: 12px; gap: 8px; }
+  .r-header .r-brand img { width: 52px; max-width: none; height: auto; }
+  .r-header .r-brand > span { display: none; }
+  .r-header .r-header-actions { gap: 6px; }
+  .r-header .d-workspace-switch { width: 76px; min-width: 76px; max-width: 76px; }
+  .r-header .r-bell { width: 36px; min-width: 36px; }
+  .d-stats { grid-template-columns: 1fr; }
+}
+@media screen and (prefers-contrast: more) {
+  html.dark {
+    --appearance-text: #ffffff;
+    --appearance-muted: #c8d0dc;
+    --appearance-border: #8492a5;
+    --appearance-glass: #1b222c;
+    --foreground: #ffffff;
+    --muted-foreground: #c8d0dc;
+    --border: #8492a5;
+  }
+}
+@media print {
+  :root { color-scheme: light !important; }
+  .theme-switcher, .theme-fallback { display: none !important; }
+}

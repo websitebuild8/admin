@@ -1,6 +1,8 @@
 "use client";
+import { ThemeSwitcher } from "@/components/theme/switcher";
 import { WorkspaceSwitcher } from "@/components/delivery/workspace-switcher";
 import { deliveryFetch } from "@/lib/delivery/fetch";
+import { ClearNotifications } from "@/components/delivery/clear-notifications";
 import type { RiderInitial } from "@/lib/delivery/portal-initial";
 import {
   useCallback,
@@ -374,6 +376,7 @@ function RiderWorkspaceContent({
           <span>RIDER WORKSPACE</span>
         </Link>
         <div className="r-header-actions">
+          <ThemeSwitcher inHeader />
           <Link
             href="/rider/notifications"
             aria-label={`Notifications, ${snapshot?.notices.unread ?? 0} unread`}
@@ -540,7 +543,13 @@ function RiderWorkspaceContent({
                   </Link>
                 </nav>
               )}
-              <div className="r-list-caption">
+              <div
+                className={
+                  screen === "notifications"
+                    ? "r-list-caption r-notification-header"
+                    : "r-list-caption"
+                }
+              >
                 <h2>
                   {screen === "collections"
                     ? "Collection stops"
@@ -554,11 +563,23 @@ function RiderWorkspaceContent({
                           ? "Available deliveries"
                           : "Notifications"}
                 </h2>
+                {screen === "notifications" && (
+                  <ClearNotifications
+                    total={snapshot.notices.total}
+                    onCleared={() => setPage(1)}
+                  />
+                )}
                 <span>
                   {snapshot.work.total}{" "}
                   {screen === "notifications" ? "updates" : "packages"}
                 </span>
               </div>
+              {screen === "notifications" && (
+                <p className="r-map-note">
+                  Clear your entire inbox, across all dates and pages. Messages
+                  are permanently deleted.
+                </p>
+              )}
               {!snapshot.work.items.length ? (
                 <div className="r-empty">
                   <div>

@@ -6,7 +6,6 @@ export const metadata: Metadata = {
   appleWebApp: { capable: true, title: "iGO Rider", statusBarStyle: "default" },
 };
 export const viewport: Viewport = {
-  themeColor: "#f7f8f5",
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",

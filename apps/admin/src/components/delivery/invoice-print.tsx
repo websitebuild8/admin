@@ -1,4 +1,5 @@
 "use client";
+import { ThemeSwitcher } from "@/components/theme/switcher";
 import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
@@ -70,6 +71,7 @@ export function InvoicePrint({
         <Link href={partner ? "/partner/invoices" : "/delivery/invoices"}>
           ← Back to invoices
         </Link>
+        <ThemeSwitcher inHeader />
         <Button onClick={() => window.print()}>
           <Printer size={16} /> Print / save PDF
         </Button>
@@ -87,7 +89,16 @@ export function InvoicePrint({
             <p>You order. I go.</p>
           </div>
           <div>
-            <span className="invoice-document-status">
+            <span
+              className="invoice-document-status"
+              data-payment-status={
+                document.paid === document.total
+                  ? "paid"
+                  : document.paid
+                    ? "partial"
+                    : "due"
+              }
+            >
               {document.paid === document.total
                 ? "Paid"
                 : document.paid
@@ -194,9 +205,8 @@ export function InvoicePrint({
         )}
         <footer>
           <p>
-            Delivery fees only. Parcel payments and payouts are recorded
-            separately. Earlier unpaid invoices remain due. A submitted bank
-            receipt reduces the balance only after admin verification.
+            Delivery fees only. Earlier unpaid invoices remain due. A submitted
+            bank receipt reduces the balance only after admin verification.
           </p>
           {!paidProof && business?.bankAccount && (
             <p>

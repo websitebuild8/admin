@@ -182,6 +182,7 @@ export const commandInput = z.discriminatedUnion("type", [
     reason: text(3, 500),
   }),
   z.object({ type: z.literal("readNotice"), id: uuid }),
+  z.object({ type: z.literal("clearNotices") }).strict(),
   z.object({
     type: z.literal("createPartnerInvoice"),
     partnerId: uuid,

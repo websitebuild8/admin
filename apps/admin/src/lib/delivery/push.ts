@@ -137,6 +137,12 @@ export async function dispatchRiderPush(sender?: PushSender) {
       return;
     }
     try {
+      // The batch may have been leased before the rider cleared their inbox.
+      // Never send a deleted/read message from that stale in-memory snapshot.
+      const current = await db.deliveryPushMessage.count({
+        where: { ...where, notification: { readAt: null } },
+      });
+      if (!current) return;
       await send(
         {
           endpoint: subscription.endpoint,

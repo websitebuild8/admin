@@ -30,6 +30,7 @@ import { verifyReportingPeriods } from "./verify-reporting-periods";
 import { verifyPaidInvoiceMigration } from "./verify-paid-invoice-migration";
 import { limitRequests } from "../src/lib/delivery/http";
 import { verifyPerformance } from "./verify-performance";
+import { verifyNotificationClearing } from "./verify-notification-clearing";
 import {
   nextCutoff,
   type Actor,
@@ -80,9 +81,13 @@ async function main() {
       "20261018000000_super_admin_deletion",
       "20261018010000_admin_multiple_operational_roles",
       "20261019000000_remove_legacy_platform",
+      "20261019010000_clear_notifications",
     ]) {
       if (
-        folder === "20261016090000_paid_invoice_history" &&
+        [
+          "20261016090000_paid_invoice_history",
+          "20261019010000_clear_notifications",
+        ].includes(folder) &&
         process.argv.includes("--paid-migration")
       )
         continue;
@@ -190,6 +195,15 @@ async function main() {
       await verifyPerformance(db, admin, partner, other, driver, ok);
       console.log(
         `Verified ${checks} performance correctness checks in a disposable schema.`,
+      );
+      return;
+    }
+    if (process.argv.includes("--notifications")) {
+      await verifyNotificationClearing(db, admin, partner, driver, ok);
+      await verifyPartnerInvoices(db, admin, other, driver, ok);
+      await verifyPaidInvoices(db, admin, other, driver, ok);
+      console.log(
+        `Verified ${checks} notification and invoice-history checks in a disposable schema.`,
       );
       return;
     }
@@ -655,6 +669,7 @@ async function main() {
     await verifyAdminWorkspaces(db, admin, partner, driver, ok);
     await verifyDashboardNavigation(db, admin, ok);
     await verifyReportingPeriods(db, admin, ok);
+    await verifyNotificationClearing(db, admin, partner, driver, ok);
     console.log(
       `Verified ${checks} database integration checks in an isolated disposable schema.`,
     );

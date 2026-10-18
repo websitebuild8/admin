@@ -227,6 +227,7 @@ export async function verifyPartnerInvoices(
     where: { invoiceId: invoice.id },
     include: { notification: true },
   });
+  assert(dispatch.notification);
   assert.equal(dispatch.notification.recipient, partner.userId);
   assert(dispatch.notification.message.includes(invoice.publicId));
   assert.equal(
@@ -436,5 +437,65 @@ export async function verifyPartnerInvoices(
   );
   ok(
     "concurrent automatic and manual invoicing share a lock and charge each delivery exactly once",
+  );
+  await assert.rejects(
+    db.deliveryInvoiceDispatch.update({
+      where: { invoiceId: invoice.id },
+      data: { notificationId: null },
+    }),
+  );
+  const eventsBeforeClear = await db.deliveryInvoiceEvent.findMany({
+    where: { invoiceId: invoice.id },
+    orderBy: { id: "asc" },
+  });
+  const documentBeforeClear = await invoiceDocument(partner, invoice.id);
+  await cmd(partner, { type: "clearNotices" });
+  assert.equal(
+    await db.deliveryNotification.count({
+      where: { recipient: partner.userId },
+    }),
+    0,
+  );
+  const clearedDispatch = await db.deliveryInvoiceDispatch.findUniqueOrThrow({
+    where: { invoiceId: invoice.id },
+  });
+  assert.equal(clearedDispatch.notificationId, null);
+  assert.equal(clearedDispatch.sentBy, dispatch.sentBy);
+  assert.deepEqual(clearedDispatch.sentAt, dispatch.sentAt);
+  assert.deepEqual(
+    {
+      ...(await invoiceDocument(partner, invoice.id)),
+      generatedAt: documentBeforeClear.generatedAt,
+    },
+    documentBeforeClear,
+  );
+  assert.deepEqual(
+    await db.deliveryInvoiceEvent.findMany({
+      where: { invoiceId: invoice.id },
+      orderBy: { id: "asc" },
+    }),
+    eventsBeforeClear,
+  );
+  await cmd(admin, send);
+  assert.equal(
+    await db.deliveryNotification.count({
+      where: { recipient: partner.userId },
+    }),
+    0,
+  );
+  await assert.rejects(
+    db.deliveryInvoiceDispatch.update({
+      where: { invoiceId: invoice.id },
+      data: { sentBy: "tampered" },
+    }),
+  );
+  await assert.rejects(
+    db.deliveryInvoiceDispatch.update({
+      where: { invoiceId: invoice.id },
+      data: { notificationId: foreignNotice.id },
+    }),
+  );
+  ok(
+    "clearing invoice notices preserves sent history, invoice debt and events; detaching/relinking history is forbidden and send-once does not recreate cleared notices",
   );
 }
