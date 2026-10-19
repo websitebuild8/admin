@@ -21,7 +21,10 @@ export function failure(error: unknown) {
     return json(
       {
         error: error.issues
-          .map((i) => `${i.path.join(".")}: ${i.message}`)
+          .map(
+            (i) =>
+              `${i.path.map((part) => (part === "recipientName" ? "Customer name" : part === "recipientPhone" ? "Customer phone" : String(part))).join(".")}: ${i.message}`,
+          )
           .join("; ")
           .slice(0, 1500),
       },

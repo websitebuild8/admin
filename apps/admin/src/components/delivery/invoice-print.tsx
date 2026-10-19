@@ -31,7 +31,7 @@ function Lines({ lines }: { lines: InvoiceDocument["lines"] }) {
         <TableHeader>
           <TableRow>
             <TableHead>Package / reference</TableHead>
-            <TableHead>Recipient</TableHead>
+            <TableHead>Customer</TableHead>
             <TableHead>Delivered (MVT)</TableHead>
             <TableHead>Fee (MVR)</TableHead>
           </TableRow>

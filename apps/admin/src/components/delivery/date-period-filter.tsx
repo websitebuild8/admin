@@ -72,8 +72,9 @@ function PeriodForm({
       <div className="d-period-caption">
         <CalendarDays size={17} aria-hidden="true" />
         <div>
-          <strong>{label}</strong>
-          <p>{basis} · Maldives Time (UTC+5)</p>
+          <strong aria-label={`${label} · ${basis} · Maldives Time (UTC+5)`}>
+            {label}
+          </strong>
         </div>
       </div>
       <form onSubmit={submit} className="d-period-controls">

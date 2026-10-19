@@ -2,12 +2,24 @@ import { z } from "zod";
 
 export const riderScreens = [
   "collections",
-  "deliveries",
   "history",
-  "available",
   "notifications",
 ] as const;
 export type RiderScreen = (typeof riderScreens)[number];
+export const riderStages = [
+  "ALL",
+  "AVAILABLE",
+  "TO_PICKUP",
+  "TO_DELIVER",
+] as const;
+export type RiderStage = (typeof riderStages)[number];
+export const riderStage = (value: string | null) =>
+  z.enum(riderStages).parse(value ?? "ALL");
+export const riderWorkspaceKey = (
+  screen: RiderScreen,
+  period: string,
+  stage: RiderStage = "ALL",
+) => `${screen}:${period}${screen === "collections" ? `:stage=${stage}` : ""}`;
 export type RiderParcel = {
   id: string;
   publicId: string;
@@ -53,9 +65,19 @@ export type AvailableJob = {
   registeredAt: string;
   partner: { businessName: string; pickupAddress: string; pickupArea: string };
 };
+export type RiderWorkItem =
+  | (RiderParcel & { available: false })
+  | (AvailableJob & {
+      available: true;
+      state: "REGISTERED";
+      partnerId: string;
+    });
 export type RiderSnapshot = {
   work:
-    RiderList<RiderParcel> | RiderList<RiderNotice> | RiderList<AvailableJob>;
+    | RiderList<RiderParcel>
+    | RiderList<RiderNotice>
+    | RiderList<AvailableJob>
+    | RiderList<RiderWorkItem>;
   notices: RiderList<RiderNotice> & { unread: number };
   summary: {
     collections: number;

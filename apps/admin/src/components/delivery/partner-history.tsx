@@ -240,7 +240,7 @@ export function PartnerHistoryModal({
           <DialogTitle>
             <History size={19} /> {name}
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="sr-only">
             Delivery history, issued invoices and outstanding delivery fees for
             this business.
           </DialogDescription>
@@ -344,15 +344,11 @@ export function PartnerHistoryModal({
                 {busy ? "Creating…" : "Create invoice"}
               </Button>
             </div>
-            <p className="d-history-hint">
-              Creating an invoice records the charge and makes it visible in the
-              partner’s Invoices. Review it, then select “Send invoice” to
-              notify them.
-            </p>
+
             <div className="d-history-filters">
               <Input
                 aria-label="Search partner deliveries"
-                placeholder="Package ID, reference or recipient"
+                placeholder="Package ID, reference or customer"
                 value={q}
                 maxLength={100}
                 disabled={busy}
@@ -384,7 +380,7 @@ export function PartnerHistoryModal({
               <TableHeader>
                 <TableRow>
                   {[
-                    "Package / recipient",
+                    "Package / customer",
                     "Status / rider",
                     "Delivered (MVT)",
                     "Delivery fee",
@@ -457,10 +453,6 @@ export function PartnerHistoryModal({
           </>
         ) : invoices ? (
           <>
-            <p className="d-history-hint">
-              Invoices issued in the selected period. Earlier unpaid invoices
-              remain outstanding.
-            </p>
             <Table>
               <TableHeader>
                 <TableRow>

@@ -109,10 +109,6 @@ export function PartnerApplications({
       <div className="d-card-header">
         <div>
           <h2>Business applications</h2>
-          <p>
-            Review first. Then send a secure setup invitation. No passwords are
-            emailed.
-          </p>
         </div>
       </div>
       {error && !selected && (
@@ -193,10 +189,6 @@ export function PartnerApplications({
       ) : (
         <div className="d-empty">
           <strong>No business applications yet</strong>
-          <p>
-            Applications submitted through Become a partner will appear here for
-            your review.
-          </p>
         </div>
       )}
       <Dialog
@@ -211,7 +203,7 @@ export function PartnerApplications({
         <DialogContent className="d-modal d-review-modal">
           <DialogHeader>
             <DialogTitle>Review business application</DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="sr-only">
               Approval alone does not create a login. Send the invitation
               afterwards.
             </DialogDescription>

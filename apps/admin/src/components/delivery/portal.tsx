@@ -399,18 +399,11 @@ function Pick({
     </div>
   );
 }
-function Empty({
-  title = "Nothing here yet",
-  text = "Your records will appear here as deliveries move forward.",
-}: {
-  title?: string;
-  text?: string;
-}) {
+function Empty({ title = "Nothing here yet" }: { title?: string }) {
   return (
     <div className="d-empty">
       <Package />
       <strong>{title}</strong>
-      <p>{text}</p>
     </div>
   );
 }
@@ -554,30 +547,6 @@ const navItems = [
     roles: ["ADMIN", "PARTNER", "DRIVER"],
   },
 ];
-const descriptions: Record<string, string> = {
-  "my-workspaces":
-    "One sign-in for Admin, Partner and Rider. No additional registration.",
-  overview: "A clear view of your deliveries and what comes next.",
-  packages: "Every package, from registration to doorstep.",
-  collections:
-    "Select only the packages physically handed to you, then confirm pickup.",
-  deliveries:
-    "Your picked-up packages. Confirm delivery after physical handover.",
-  partners: "Review the businesses joining your delivery network.",
-  applications:
-    "Review business details and send invitations to approved page owners.",
-  drivers: "Approve and manage your delivery team.",
-  administrators:
-    "Manage administrator access without changing partner or rider accounts.",
-  invoices: "Daily delivery invoices. Older unpaid balances stay outstanding.",
-  payments:
-    "Bank evidence stays pending until an authorized admin verifies it.",
-  reports: "Operational totals from your actual delivery records.",
-  audit: "An append-only record of operational and financial changes.",
-  settings: "Business details, bank information and delivery rates.",
-  notifications: "Updates from your delivery workspace.",
-  import: "A faster way to register your next collection.",
-};
 
 export function DeliveryApplication({ actor }: { actor: Actor }) {
   const [role] = useState("DRIVER"),
@@ -1010,7 +979,7 @@ function DeliveryPortalContent({
           <small>{p.externalReference}</small>
         </div>
       </div>,
-      <div key="recipient">
+      <div key="customer">
         <strong>{p.recipientName}</strong>
         <small>{p.recipientPhone}</small>
       </div>,
@@ -1165,7 +1134,7 @@ function DeliveryPortalContent({
             <Stat
               label="Invoiced balance due"
               value={money(d.outstanding)}
-              note="All time · confirmed payments deducted only"
+
               icon={<ReceiptText />}
               href={`${workspaceBase}/invoices?state=OUTSTANDING`}
               destination="View outstanding invoices"
@@ -1174,7 +1143,7 @@ function DeliveryPortalContent({
             <Stat
               label="Pending deliveries"
               value={String(d.registered + d.pickedUp)}
-              note={`${d.registered} registered · ${d.pickedUp} picked up`}
+
               icon={<Package />}
               href={datedHref(`${workspaceBase}/packages?state=PENDING`)}
               destination="View pending deliveries"
@@ -1182,7 +1151,7 @@ function DeliveryPortalContent({
             <Stat
               label="Delivered packages"
               value={String(d.delivered)}
-              note="Completed by assigned drivers"
+
               icon={<PackageCheck />}
               href={datedHref(`${workspaceBase}/packages?state=DELIVERED`)}
               destination="View delivered packages"
@@ -1190,7 +1159,7 @@ function DeliveryPortalContent({
             <Stat
               label="Delivered, awaiting billing"
               value={money(d.awaitingBilling)}
-              note="Completed deliveries not yet invoiced"
+
               icon={<Wallet />}
               href={datedHref(`${workspaceBase}/packages?state=UNINVOICED`)}
               destination="View delivered packages awaiting billing"
@@ -1205,11 +1174,6 @@ function DeliveryPortalContent({
                       ? "Operational summary"
                       : "Latest packages"}
                   </h2>
-                  <p>
-                    {screen === "reports"
-                      ? "Counts, income and exports follow the selected period. Total balance due always includes older unpaid invoices."
-                      : "Packages registered in the selected period"}
-                  </p>
                 </div>
                 <Link href={datedHref(`${workspaceBase}/packages`)}>
                   View all <ArrowUpRight size={13} />
@@ -1250,7 +1214,7 @@ function DeliveryPortalContent({
                 <GridTable
                   headings={[
                     "Package",
-                    "Recipient",
+                    "Customer",
                     "Area",
                     "Status",
                     "Delivery fee",
@@ -1259,39 +1223,26 @@ function DeliveryPortalContent({
                   rows={parcelRows(d.latest)}
                 />
               ) : (
-                <Empty
-                  title="Your first package starts here"
-                  text="Register a package or import an Excel list to start your delivery workflow."
-                />
+                <Empty title="Your first package starts here" />
               )}
             </section>
             <section className="d-card">
               <div className="d-card-header">
                 <div>
                   <h2>A clear view of your money</h2>
-                  <p>Your delivery fees, invoices and verified payments</p>
                 </div>
                 <ShieldCheck size={18} />
               </div>
               {[
-                [
-                  "Pending delivery estimate",
-                  d.pendingEstimate,
-                  "Unpicked or in transit; not invoice debt",
-                ],
-                [
-                  "Delivered, awaiting billing",
-                  d.awaitingBilling,
-                  "Included only at the next eligible cutoff",
-                ],
-              ].map(([label, value, note]) => (
+                ["Pending delivery estimate", d.pendingEstimate],
+                ["Delivered, awaiting billing", d.awaitingBilling],
+              ].map(([label, value]) => (
                 <div className="d-info-row" key={String(label)}>
                   <div className="d-info-icon">
                     <Wallet size={17} />
                   </div>
                   <div>
                     <strong>{label}</strong>
-                    <p>{note}</p>
                   </div>
                   <span>{money(Number(value))}</span>
                 </div>
@@ -1301,14 +1252,12 @@ function DeliveryPortalContent({
                   <div className="d-info-row">
                     <div>
                       <strong>Partner / driver applications</strong>
-                      <p>Awaiting review</p>
                     </div>
                     <span>{d.awaitingApproval}</span>
                   </div>
                   <div className="d-info-row">
                     <div>
                       <strong>Bank transfers</strong>
-                      <p>Awaiting verification</p>
                     </div>
                     <span>{d.paymentReview}</span>
                   </div>
@@ -1338,7 +1287,7 @@ function DeliveryPortalContent({
               <Search />
               <Input
                 aria-label="Search packages"
-                placeholder="Search package, reference, recipient…"
+                placeholder="Search package, reference, customer…"
                 value={q}
                 onChange={(e) => {
                   setQ(e.target.value);
@@ -1362,19 +1311,6 @@ function DeliveryPortalContent({
                   </Link>
                 ))}
               </nav>
-            )}
-          </div>
-          <div className="d-note">
-            {screen === "collections" ? (
-              <>
-                <strong>Selection does not record pickup.</strong> Check only
-                the packages physically received, then use Confirm Pickup.
-              </>
-            ) : (
-              <>
-                Registration and driver assignment do not mean pickup. Pending
-                delivery fees are estimates.
-              </>
             )}
           </div>
           {d.items.length ? (
@@ -1406,7 +1342,7 @@ function DeliveryPortalContent({
                 <GridTable
                   headings={[
                     "Package",
-                    "Recipient",
+                    "Customer",
                     "Area / partner",
                     "Status",
                     "Delivery fee",
@@ -1424,11 +1360,6 @@ function DeliveryPortalContent({
                     ? "No collections assigned"
                     : "No matching packages"
                 }
-                text={
-                  screen === "collections"
-                    ? "An admin assigns packages before they appear in your collection list."
-                    : "Try another search, register a package or wait for the next delivery update."
-                }
               />
             </div>
           )}
@@ -1437,7 +1368,6 @@ function DeliveryPortalContent({
             <div className="d-selection-bar">
               <div>
                 <strong>{chosen.length} packages selected</strong>
-                <p>Selection has not changed any status</p>
               </div>
               <div className="d-row-actions">
                 {screen === "collections" ? (
@@ -1465,11 +1395,6 @@ function DeliveryPortalContent({
           <div className="d-card-header">
             <div>
               <h2>{title}</h2>
-              <p>
-                {screen === "partners"
-                  ? "Open a business’s deliveries and invoices to review its history, create an invoice and send it to that partner."
-                  : "Only an admin can approve or suspend access"}
-              </p>
             </div>
           </div>
           {d.items.length ? (
@@ -1547,7 +1472,6 @@ function DeliveryPortalContent({
                   ? "No accounts yet"
                   : "No accounts registered in this period"
               }
-              text="Try another date period, or review new applications as they arrive."
             />
           )}
           <Pager list={d} onPage={changePage} />
@@ -1655,13 +1579,6 @@ function DeliveryPortalContent({
                       ? "No outstanding invoices"
                       : "No invoices yet"
                 }
-                text={
-                  selection.period !== "ALL_TIME"
-                    ? "Try another period or open all outstanding invoices to review any earlier unpaid delivery fees."
-                    : filter === "OUTSTANDING"
-                      ? "There are no invoiced delivery fees left to pay. Pending receipts still need admin verification before they reduce a balance."
-                      : "Delivered packages are invoiced automatically at your partner’s daily cutoff. Registered and picked-up packages are estimates only."
-                }
               />
             )}
             <Pager list={d} onPage={changePage} />
@@ -1726,10 +1643,7 @@ function DeliveryPortalContent({
                 ])}
               />
             ) : (
-              <Empty
-                title="No bank transfers submitted"
-                text="Partners submit evidence from an outstanding invoice. Admins verify transfers against actual bank records."
-              />
+              <Empty title="No bank transfers submitted" />
             )}
             <Pager list={d} onPage={changePage} />
           </section>
@@ -1743,10 +1657,6 @@ function DeliveryPortalContent({
           <div className="d-card-header d-notification-header">
             <div>
               <h2>Your notifications</h2>
-              <p>
-                Clear your entire inbox, across all dates and pages. Messages
-                are permanently deleted.
-              </p>
             </div>
             <ClearNotifications
               total={notices.data?.total ?? d.total}
@@ -1782,7 +1692,6 @@ function DeliveryPortalContent({
                   ? "You’re all caught up"
                   : "No notifications in this period"
               }
-              text="Pickup, delivery, application and invoice updates appear here."
             />
           )}
           <Pager list={d} onPage={changePage} />
@@ -1989,7 +1898,7 @@ function DeliveryPortalContent({
             </p>
             <Label className="d-check-label full">
               <Checkbox required />
-              The recipient has physically received this package.
+              The customer has physically received this package.
             </Label>
           </>
         );
@@ -2211,13 +2120,6 @@ function DeliveryPortalContent({
         <main className="d-content d-content-enter">
           <div className="d-heading">
             <div>
-              <span className="d-eyebrow">
-                {actor.role === "ADMIN"
-                  ? "YOUR DELIVERY NETWORK"
-                  : actor.role === "DRIVER"
-                    ? "LET’S GET MOVING"
-                    : "YOUR BUSINESS, DELIVERED"}
-              </span>
               <h1>
                 {screen === "overview"
                   ? `Good to see you${actor.role === "PARTNER" ? `, ${actor.name.split(" ")[0]}` : ""}.`
@@ -2238,7 +2140,6 @@ function DeliveryPortalContent({
                   <span>Partner workspace</span>
                 </div>
               )}
-              <p>{descriptions[screen]}</p>
             </div>
             <div className="d-heading-actions">
               <Button
@@ -2362,7 +2263,7 @@ function DeliveryPortalContent({
                 )[action?.kind ?? ""]
               }
             </DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="sr-only">
               {action?.kind === "detail"
                 ? "Saved details and recorded delivery milestones."
                 : "Changes are validated and recorded securely by the server."}
@@ -2435,7 +2336,6 @@ function DeliveryPortalContent({
 function Stat({
   label,
   value,
-  note,
   icon,
   href,
   destination,
@@ -2443,7 +2343,6 @@ function Stat({
 }: {
   label: string;
   value: string;
-  note: string;
   icon: ReactNode;
   href: string;
   destination: string;
@@ -2460,7 +2359,6 @@ function Stat({
         {icon}
       </div>
       <strong>{value}</strong>
-      <small>{note}</small>
     </Link>
   );
 }
@@ -2612,7 +2510,7 @@ function InvoiceModal({
       <DialogContent className="d-modal">
         <DialogHeader>
           <DialogTitle>Invoice details</DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="sr-only">
             Delivered package fees and bank-confirmed payments only.
           </DialogDescription>
         </DialogHeader>
@@ -2679,7 +2577,7 @@ function InvoiceModal({
             {tab === "packages" ? (
               <>
                 <GridTable
-                  headings={["Package", "Recipient", "Delivered (MVT)", "Fee"]}
+                  headings={["Package", "Customer", "Delivered (MVT)", "Fee"]}
                   rows={data.items.map((l) => [
                     <div key="id">
                       <strong>{l.parcel.publicId}</strong>
@@ -2818,10 +2716,7 @@ function SettingsPanel({
       {actor.role === "PARTNER" && actor.workspaces?.includes("ADMIN") && (
         <section className="d-card d-card-pad">
           <h2>Your business details</h2>
-          <p>
-            Update your pickup address, contact number and operating location in
-            Workspace details.
-          </p>
+
           <Button
             variant="outline"
             render={<Link href="/delivery/my-workspaces" />}
@@ -2848,11 +2743,6 @@ function SettingsPanel({
         <div className="d-card-header">
           <div>
             <h2>Business & bank details</h2>
-            <p>
-              {actor.role === "ADMIN"
-                ? "Complete these before accepting live partner transfers."
-                : "Use these beneficiary details for your invoice payments."}
-            </p>
           </div>
         </div>
         {actor.role === "ADMIN" ? (
@@ -2891,9 +2781,6 @@ function SettingsPanel({
         ) : (
           <div className="d-card-pad">
             <BankDetails />
-            <p>
-              Only verified delivery-fee payments reduce your invoice balances.
-            </p>
           </div>
         )}
       </section>
@@ -2912,10 +2799,6 @@ function ScheduleHealth({ revision }: { revision: number }) {
       <div className="d-card-header">
         <div>
           <h2>Automatic daily invoicing</h2>
-          <p>
-            Each partner’s cutoff uses Maldives Time. The scheduler checks every
-            five minutes.
-          </p>
         </div>
       </div>
       <div className="d-card-pad">
@@ -3015,10 +2898,6 @@ function ImportPanel({
       <div className="d-heading">
         <div>
           <h2>One list. Every delivery.</h2>
-          <p>
-            Download the template, enter your package details, then validate
-            before importing.
-          </p>
         </div>
         <Link href="/api/delivery/template" prefetch={false} download>
           <Button variant="outline">
@@ -3063,11 +2942,6 @@ function ImportPanel({
             key.current = null;
           }}
         />
-        <p>
-          .xlsx · up to 1 MB · maximum 500 packages
-          <br />
-          Use one unique parcel reference for every package.
-        </p>
       </div>
       {error && (
         <div className="d-error mt-5" role="alert">
@@ -3104,7 +2978,7 @@ function ImportPanel({
             </div>
           ) : (
             <GridTable
-              headings={["Reference", "Recipient", "Destination"]}
+              headings={["Reference", "Customer", "Destination"]}
               rows={result.examples.map((r) => [
                 String(r.externalReference),
                 String(r.recipientName),
@@ -3192,17 +3066,10 @@ function RegisterPackageFields({
           />
         </div>
       )}
-      <Field
-        name="externalReference"
-        label="Unique parcel reference from your page"
-      />
-      <Field name="recipientName" label="Recipient name" />
-      <Field name="recipientPhone" label="Recipient phone" type="tel" />
-      <Field
-        name="destination"
-        label="Building, street, island and delivery instructions"
-        full
-      />
+      <Field name="externalReference" label="Package reference" />
+      <Field name="recipientName" label="Customer name" />
+      <Field name="recipientPhone" label="Customer phone" type="tel" />
+      <Field name="destination" label="Customer address" full />
       <Pick
         key={partner}
         name="zone"
@@ -3223,17 +3090,7 @@ function RegisterPackageFields({
               ? "Loading delivery rates…"
               : "Choose your partner page to see its delivery rates.")}
       </div>
-      <Field
-        name="description"
-        label="Parcel description / handling notes"
-        full
-        required={false}
-      />
-      <p className="full">
-        The fee is saved at registration using the business operating location
-        and destination. You are billed only after confirmed delivery.
-        Registration does not record pickup.
-      </p>
+      <Field name="description" label="Handling notes" full required={false} />
     </>
   );
 }
@@ -3245,13 +3102,6 @@ function PartnerRates({ revision }: { revision: number }) {
       <div className="d-card-header">
         <div>
           <h2>Your delivery rates</h2>
-          <p>
-            From{" "}
-            {operatingLocationLabels[
-              quote.data?.partner.operatingLocation ?? ""
-            ] ?? "your operating location"}
-            . Changes apply to future packages only.
-          </p>
         </div>
       </div>
       {quote.error && (
@@ -3309,10 +3159,6 @@ function PricingManager({
         <div className="d-card-header">
           <div>
             <h2>Delivery rates</h2>
-            <p>
-              Origin + destination determine the fee. Existing packages keep
-              their registered fee.
-            </p>
           </div>
         </div>
         {rates.error && (
@@ -3379,10 +3225,6 @@ function PricingManager({
         <div className="d-card-header">
           <div>
             <h2>Destinations</h2>
-            <p>
-              Add unlisted areas here, then configure each origin’s rate.
-              Inactive areas cannot accept new packages.
-            </p>
           </div>
         </div>
         {destinations.error && (

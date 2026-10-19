@@ -31,6 +31,7 @@ import { verifyPaidInvoiceMigration } from "./verify-paid-invoice-migration";
 import { limitRequests } from "../src/lib/delivery/http";
 import { verifyPerformance } from "./verify-performance";
 import { verifyNotificationClearing } from "./verify-notification-clearing";
+import { verifyRiderCollect } from "./verify-rider-collect";
 import {
   nextCutoff,
   type Actor,
@@ -191,6 +192,16 @@ async function main() {
         description: "Not a real delivery",
       },
     });
+    if (process.argv.includes("--rider-collect")) {
+      await verifyPerformance(db, admin, partner, other, driver, ok);
+      await verifyRiderCollect(db, admin, ok);
+      await verifyRiderWorkflows(db, admin, partner, ok);
+      await verifyDashboardNavigation(db, admin, ok);
+      console.log(
+        `Verified ${checks} Collect and related workflow checks in a disposable schema.`,
+      );
+      return;
+    }
     if (process.argv.includes("--performance")) {
       await verifyPerformance(db, admin, partner, other, driver, ok);
       console.log(
@@ -670,6 +681,7 @@ async function main() {
     await verifyDashboardNavigation(db, admin, ok);
     await verifyReportingPeriods(db, admin, ok);
     await verifyNotificationClearing(db, admin, partner, driver, ok);
+    await verifyRiderCollect(db, admin, ok);
     console.log(
       `Verified ${checks} database integration checks in an isolated disposable schema.`,
     );

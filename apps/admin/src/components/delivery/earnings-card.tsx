@@ -230,7 +230,7 @@ export function EarningsCard({
           )}
         </div>
       )}
-      <small>Verified delivery-fee payments · Maldives Time</small>
+
       <p className="d-earnings-caption">
         {data?.label ??
           (current?.error

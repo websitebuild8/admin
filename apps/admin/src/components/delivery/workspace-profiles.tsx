@@ -103,11 +103,6 @@ export function WorkspaceProfiles() {
       <section className="d-card d-card-pad">
         <span className="d-eyebrow">ONE SIGN-IN · THREE WORKSPACES</span>
         <h2>Your workspaces are already included.</h2>
-        <p>
-          Admin access automatically includes Partner and Rider. Use Switch
-          workspace to move between them. Business and contact details below can
-          be edited without registering again.
-        </p>
       </section>
       {error && (
         <div className="d-error" role="alert">
@@ -137,7 +132,6 @@ export function WorkspaceProfiles() {
                     ? "Partner workspace"
                     : "Rider workspace"}
                 </h2>
-                <p>Included with your administrator access</p>
               </div>
               <Button
                 variant="outline"

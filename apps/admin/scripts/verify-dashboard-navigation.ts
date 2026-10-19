@@ -290,7 +290,7 @@ export async function verifyDashboardNavigation(
     deliveryQuery(
       rider,
       "rider-workspace",
-      new URLSearchParams({ screen, period }),
+      new URLSearchParams({ screen, period, stage: "TO_PICKUP" }),
     ) as Promise<{
       work: List;
       summary: { collections: number; onBoard: number; deliveredToday: number };

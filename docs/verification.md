@@ -1,5 +1,36 @@
 # Delivery platform verification
 
+## Collect / History tables and simpler workspace copy — 20 October 2026
+
+Rider now uses Collect for available jobs, assigned pickup and picked-up delivery,
+with stage filters and a separate delivered History table. Both are paginated on
+the server at ten items. Old Find jobs/Deliver URLs redirect to Collect filters.
+Unclaimed jobs omit private customer/contact/reference data; search uses the same
+privacy boundary. Existing explicit pickup and delivery commands remain unchanged.
+
+Removed explanatory captions across Admin, Partner and Rider while retaining real
+data, validation/errors and consequential confirmations. Visible Recipient labels
+now say Customer. The downloadable workbook has Customer headers and still imports;
+older Recipient-header templates remain accepted without a database migration.
+
+All 69 unit tests and 28 targeted disposable-schema integration checks passed.
+Checks include cross-rider isolation, safe unclaimed search, ten-item pagination,
+competing claims, state/date filters, pickup-before-delivery, completed history,
+push regressions and initial snapshot behavior. Disposable schemas were removed.
+The production build (including TypeScript) and lint pass.
+
+Real client components were exercised with fictional in-memory backend/auth data:
+claim → local checkbox → explicit pickup → explicit delivery → History, plus next/
+previous pagination and private detail dialogs. Responsive checks cover 320, 390,
+768 and 1440 pixels, with no horizontal page overflow. Admin/Partner overview
+captions and Customer name/phone/address form labels were checked in the real
+components too. No operational delivery, payment or notification was modified;
+these component checks do not constitute a live Clerk browser test.
+
+Source remains for the owner's manual commit/push and Netlify deployment. No new
+migration, environment variable or deployment was performed by this change.
+See [Rider Collect and History](rider-collect.md).
+
 ## Appearance button alignment and logo placement — 19 October 2026
 
 Moved the theme selector beside the logo on the homepage, partner application,

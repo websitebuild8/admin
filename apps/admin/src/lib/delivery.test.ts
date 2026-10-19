@@ -187,6 +187,20 @@ test("Excel import parses plain values, normalizes references, and detects dupli
   assert.equal(data.errors[0].row, 3);
   assert.match(data.errors[0].message, /Duplicate/);
 });
+test("Excel uses customer headings and still accepts previously downloaded templates", async () => {
+  assert.deepEqual(importColumns.slice(1, 3), [
+    "Customer name",
+    "Customer phone",
+  ]);
+  for (const headings of [
+    importColumns,
+    importColumns.map((v) => v.replace("Customer", "Recipient")),
+  ]) {
+    const parsed = await parsePackagesWorkbook(await workbook([row], headings));
+    assert.equal(parsed.errors.length, 0);
+    assert.equal(parsed.rows[0].recipientName, "Customer");
+  }
+});
 test("Excel import rejects formulas, headers, excessive rows and non-Excel input", async () => {
   const formula = [...row];
   formula[0] = { formula: "1+1", result: 2 } as unknown as string;

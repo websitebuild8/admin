@@ -141,23 +141,11 @@ export function AdminAccessPanel({
       <section className="d-card d-card-pad">
         <span className="d-eyebrow">SUPER ADMIN</span>
         <h2>Your account stays protected.</h2>
-        <p>
-          Only the super admin can add or remove administrators. The current
-          super admin is protected and cannot be removed here. Removing admin
-          access retains one operational workspace and suspends the extra one.
-          Delivery and financial history are preserved.
-        </p>
       </section>
       <section className="d-card">
         <div className="d-card-header">
           <div>
             <h2>Add an administrator</h2>
-            <p>
-              Use the verified primary email of an existing Clerk account. A
-              approved administrator automatically receives Admin, Partner and
-              Rider workspaces with the same sign-in. No extra registration is
-              required.
-            </p>
           </div>
         </div>
         <form className="d-form d-card-pad" onSubmit={grant}>
@@ -210,9 +198,6 @@ export function AdminAccessPanel({
         <div className="d-card-header">
           <div>
             <h2>Administrators</h2>
-            <p>
-              Active access and removed-access history. Ten records per page.
-            </p>
           </div>
         </div>
         {!data ? (

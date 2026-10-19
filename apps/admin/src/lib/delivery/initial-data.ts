@@ -2,7 +2,12 @@ import "server-only";
 import { deliveryQuery } from "./queries";
 import type { Actor } from "./domain";
 import type { EarningsResult } from "./earnings-period";
-import type { RiderSnapshot, RiderScreen } from "./rider-contract";
+import {
+  riderStage,
+  riderWorkspaceKey,
+  type RiderSnapshot,
+  type RiderScreen,
+} from "./rider-contract";
 import { periodSelection, periodQuery } from "./reporting-period";
 import {
   portalResource,
@@ -67,15 +72,16 @@ export async function riderInitialData(
   screen: RiderScreen,
   search: URLSearchParams,
 ): Promise<RiderInitial | undefined> {
-  let period;
+  let period, stage;
   try {
     period = periodQuery(periodSelection(search));
+    stage = riderStage(search.get("stage"));
   } catch {
     return undefined;
   }
-  const query = `${new URLSearchParams({ screen, page: "1", q: "" })}&${period}`;
+  const query = `${new URLSearchParams({ screen, stage, page: "1", q: "" })}&${period}`;
   const initial = await seed<RiderSnapshot>(actor, "rider-workspace", query);
   return initial
-    ? { key: `${screen}:${period}`, data: initial.data }
+    ? { key: riderWorkspaceKey(screen, period, stage), data: initial.data }
     : undefined;
 }

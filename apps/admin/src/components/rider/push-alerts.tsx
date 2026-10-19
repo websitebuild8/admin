@@ -139,15 +139,15 @@ export function PushAlerts({
       </div>
       <div>
         <strong>
-          {enabled ? "You’re connected" : "Don’t miss your next collection"}
+          {enabled ? "Assignment alerts on" : "Assignment alerts"}
         </strong>
-        <p>
-          {!publicKey
-            ? "Background alerts need server setup. Assignments remain available here."
-            : !supported
-              ? "On iPhone, add this site to your Home Screen and open it there (iOS 16.4+). Otherwise use a browser that supports web push."
-              : "Get an alert when iGO assigns work, even when this page is closed."}
-        </p>
+        {(!publicKey || !supported) && (
+          <p role="status">
+            {!publicKey
+              ? "Alerts unavailable"
+              : "Push notifications unsupported"}
+          </p>
+        )}
         {message && <p role="status">{message}</p>}
       </div>
       {supported && publicKey && (

@@ -17,6 +17,17 @@ async function Workspace({
 }) {
   const { section } = await params;
   if (!section?.length) redirect("/rider/collections");
+  if (
+    section.length === 1 &&
+    ["available", "deliveries"].includes(section[0])
+  ) {
+    const search = pageSearch(await searchParams);
+    search.set(
+      "stage",
+      section[0] === "available" ? "AVAILABLE" : "TO_DELIVER",
+    );
+    redirect(`/rider/collections?${search}`);
+  }
   let actor;
   try {
     actor = await deliveryActor("DRIVER", false);

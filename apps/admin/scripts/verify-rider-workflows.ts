@@ -167,12 +167,12 @@ export async function verifyRiderWorkflows(
     const first = (await deliveryQuery(
       rider,
       "rider-workspace",
-      new URLSearchParams("screen=collections&page=1"),
+      new URLSearchParams("screen=collections&stage=TO_PICKUP&page=1"),
     )) as RiderSnapshot;
     const second = (await deliveryQuery(
       rider,
       "rider-workspace",
-      new URLSearchParams("screen=collections&page=2"),
+      new URLSearchParams("screen=collections&stage=TO_PICKUP&page=2"),
     )) as RiderSnapshot;
     assert.equal(first.work.items.length, 10);
     assert.equal(second.work.items.length, 2);
@@ -187,7 +187,7 @@ export async function verifyRiderWorkflows(
         (await deliveryQuery(
           foreign,
           "rider-workspace",
-          new URLSearchParams(),
+          new URLSearchParams("stage=TO_PICKUP"),
         )) as RiderSnapshot
       ).work.total,
       0,

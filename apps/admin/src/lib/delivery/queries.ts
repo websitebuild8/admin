@@ -7,7 +7,7 @@ import { z } from "zod";
 import { Prisma } from "@/generated/prisma/client";
 import { database } from "../db";
 import { DeliveryError, requireRole, type Actor } from "./domain";
-import { riderScreens } from "./rider-contract";
+import { riderScreens, riderStage } from "./rider-contract";
 import { riderClientConfig } from "./push-settings";
 import { applicationSelection } from "./partner-applications";
 import { storageConfigurationStatus } from "../storage-configuration";
@@ -117,10 +117,15 @@ export async function deliveryQuery(
   if (resource === "rider-workspace") {
     requireRole(actor, "DRIVER");
     const screen = z
-      .enum(riderScreens)
+      .enum([...riderScreens, "available", "deliveries"])
       .parse(search.get("screen") ?? "collections");
     const workSearch = new URLSearchParams(search);
-    const workResource = screen === "history" ? "deliveries" : screen;
+    const workResource =
+      screen === "history"
+        ? "deliveries"
+        : screen === "collections"
+          ? "rider-work"
+          : screen;
     if (screen === "history") workSearch.set("state", "DELIVERED");
     if (screen !== "history" && workSearch.get("period") === "TODAY") {
       workSearch.delete("period");
@@ -219,6 +224,111 @@ export async function deliveryQuery(
     return { ...summary, latest, periodLabel: reportingRange(search).label };
   }
 
+  if (resource === "rider-work") {
+    requireRole(actor, "DRIVER");
+    const stage = riderStage(search.get("stage"));
+    const query = search.get("q")?.trim().slice(0, 100);
+    const available: Prisma.DeliveryParcelWhereInput = {
+      state: "REGISTERED",
+      driverId: null,
+      partner: { account: { status: "APPROVED" } },
+    };
+    const assigned: Prisma.DeliveryParcelWhereInput = {
+      driverId: actor.id!,
+      state: { in: ["REGISTERED", "PICKED_UP"] },
+    };
+    const where: Prisma.DeliveryParcelWhereInput = {
+      AND: [
+        stage === "AVAILABLE"
+          ? available
+          : stage === "TO_PICKUP"
+            ? { ...assigned, state: "REGISTERED" }
+            : stage === "TO_DELIVER"
+              ? { ...assigned, state: "PICKED_UP" }
+              : { OR: [available, assigned] },
+        {
+          OR: [
+            { state: "REGISTERED", registeredAt: range },
+            { state: "PICKED_UP", pickedUpAt: range },
+          ],
+        },
+        ...(query
+          ? [
+              {
+                OR: [
+                  {
+                    publicId: { contains: query, mode: "insensitive" as const },
+                  },
+                  {
+                    partner: {
+                      businessName: {
+                        contains: query,
+                        mode: "insensitive" as const,
+                      },
+                    },
+                  },
+                  {
+                    destination: {
+                      contains: query,
+                      mode: "insensitive" as const,
+                    },
+                  },
+                  // Searching must not reveal an unclaimed customer's identity either.
+                  {
+                    driverId: actor.id!,
+                    OR: [
+                      {
+                        externalReference: {
+                          contains: query,
+                          mode: "insensitive" as const,
+                        },
+                      },
+                      {
+                        recipientName: {
+                          contains: query,
+                          mode: "insensitive" as const,
+                        },
+                      },
+                    ],
+                  },
+                ],
+              },
+            ]
+          : []),
+      ],
+    };
+    const [rows, total] = await Promise.all([
+      db.deliveryParcel.findMany({
+        where,
+        select: parcelSelection,
+        take,
+        skip,
+        orderBy: [{ registeredAt: "asc" }, { id: "asc" }],
+      }),
+      db.deliveryParcel.count({ where }),
+    ]);
+    const items = rows.map((p) =>
+      p.driverId === actor.id
+        ? { ...p, available: false }
+        : {
+            available: true,
+            state: "REGISTERED",
+            id: p.id,
+            publicId: p.publicId,
+            partnerId: p.partnerId,
+            zone: p.zone,
+            destinationLabel: p.destinationLabel,
+            destination: p.destination,
+            registeredAt: p.registeredAt,
+            partner: {
+              businessName: p.partner.businessName,
+              pickupAddress: p.partner.pickupAddress,
+              pickupArea: p.partner.pickupArea,
+            },
+          },
+    );
+    return { items, total, page, pageSize: take };
+  }
   if (resource === "available") {
     requireRole(actor, "DRIVER");
     const where: Prisma.DeliveryParcelWhereInput = {

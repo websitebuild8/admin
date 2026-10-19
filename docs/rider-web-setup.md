@@ -7,11 +7,15 @@ The seller delivery platform now has a separate rider website at `/rider`, with 
 1. A rider chooses **Become a rider** on the home page, creates a Clerk account and submits their name and Maldives phone number. Their account is pending, without access to packages.
 2. Admin opens **Delivery → Riders → Review access**, checks the application and approves it. Partners and riders cannot approve accounts.
 3. Admin selects registered packages in **Packages**, then **Assign rider**. Only approved riders appear in the selector.
-4. The rider sees their own assigned packages, grouped by business. Each package shows pickup and destination contacts, the recipient amount to collect, and the separate fee billed to the partner. Lists contain at most 10 packages per page.
-5. Checkboxes are local selections. **Confirm pickup**, followed by the explicit physical-receipt confirmation, records pickup for only those selected packages.
-6. **Find jobs** lists registered, unassigned packages (10 per page). Take delivery claims one atomically; recipient contact details then appear in the rider’s private collection list. A claim is not pickup.
-7. **Deliver** shows picked-up packages. Confirm delivery only after the recipient physically receives the package. Server time and rider attribution are recorded; no recipient payment is collected.
-8. **History** and **Notifications** contain only that rider’s information.
+4. **Collect** contains available jobs and the rider's own active packages in one table, with **All active**, **Available jobs**, **To pickup** and **To deliver** filters. Each page contains at most 10 packages. **Details** opens pickup/destination information and directions; narrow screens keep Package, Stage and Actions visible.
+5. **Take job** atomically claims an unassigned package. Customer names, phone numbers and business references become visible only to the assigned rider. A claim is not pickup.
+6. Checkboxes are local selections. **Confirm pickup**, followed by the explicit physical-receipt confirmation, records pickup for only those selected packages. Picked-up packages remain in Collect under **To deliver**.
+7. **Deliver** requires confirmation that the customer physically received the package. Server time and rider attribution are recorded; no customer payment is collected.
+8. Completed packages move to the paginated **History** table. Notifications remain accessible through the bell and contain only that rider's information.
+
+The former Find jobs and Deliver routes redirect to the matching Collect filter.
+See [Collect and History behavior](rider-collect.md) for query compatibility,
+privacy rules and verification details.
 
 There is no live GPS tracking. Directions open in the rider's Google Maps application/browser; iGO does not request or store their device location. Addresses are the partner's saved pickup address and the package's saved destination, rather than surveyed coordinates. Riders should confirm building/entrance details when necessary. Boat packages show the destination on a place map, without inventing a ferry route.
 

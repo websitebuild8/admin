@@ -18,7 +18,7 @@ export default function Page() {
         <p>
           We use your account identity, name and phone number to review rider
           applications and coordinate assignments. Approved riders see the
-          pickup and recipient information needed for their assigned packages.
+          pickup and customer information needed for their assigned packages.
           Package events record who confirmed pickup and delivery and when. Delivery fees and verified payments are retained for operational and
           financial reconciliation.
         </p>
@@ -27,7 +27,7 @@ export default function Page() {
           Background notifications are optional. Enabling them stores a browser
           push endpoint and encryption keys with your rider account so we can
           send assignment and account alerts through your browser’s push
-          provider. Notification previews omit recipient details. Disable alerts
+          provider. Notification previews omit customer details. Disable alerts
           in the rider workspace or browser settings to stop them on that
           device. Browser providers also process push delivery metadata.
         </p>
@@ -52,8 +52,8 @@ export default function Page() {
         <p>
           Access is limited to authorized operational users and service
           providers including Clerk (identity), Supabase (database) and the
-          website host. Use recipient information only to fulfill assigned
-          deliveries. Never share login credentials or export recipient details
+          website host. Use customer information only to fulfill assigned
+          deliveries. Never share login credentials or export customer details
           for unrelated purposes.
         </p>
         <br />

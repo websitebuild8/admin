@@ -4,8 +4,8 @@ import { createHash } from "node:crypto";
 import { DeliveryError, parcelInput, type ParcelInput } from "./domain";
 export const importColumns = [
   "Parcel reference",
-  "Recipient name",
-  "Recipient phone",
+  "Customer name",
+  "Customer phone",
   "Destination",
   "Delivery zone",
   "Description",
@@ -115,13 +115,19 @@ export async function parsePackagesWorkbook(bytes: Buffer) {
       "Use the Packages sheet with at most 500 packages and the six template columns.",
     );
   if (
-    importColumns.some(
-      (name, i) =>
-        sheet
-          .getRow(1)
-          .getCell(i + 1)
-          .text.trim() !== name,
-    )
+    importColumns.some((name, i) => {
+      const heading = sheet
+        .getRow(1)
+        .getCell(i + 1)
+        .text.trim();
+      return (
+        heading !== name &&
+        !(
+          [1, 2].includes(i) &&
+          heading === name.replace("Customer", "Recipient")
+        )
+      );
+    })
   )
     throw new DeliveryError(
       "Column headings do not match. Download the latest iGO template.",
@@ -161,7 +167,10 @@ export async function parsePackagesWorkbook(bytes: Buffer) {
       errors.push({
         row,
         message: parsed.error.issues
-          .map((i) => `${i.path.join(".")}: ${i.message}`)
+          .map(
+            (i) =>
+              `${i.path.map((part) => (part === "recipientName" ? "Customer name" : part === "recipientPhone" ? "Customer phone" : String(part))).join(".")}: ${i.message}`,
+          )
           .join("; "),
       });
       continue;

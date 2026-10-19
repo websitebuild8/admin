@@ -104,8 +104,12 @@ export async function verifyPerformance(
     parcelIds: [own.id],
     driverId: driver.id!,
   });
-  const rider = await riderInitialData(driver, "collections", selection);
-  assert.equal(rider?.key, "collections:period=ALL_TIME");
+  const rider = await riderInitialData(
+    driver,
+    "collections",
+    new URLSearchParams({ period: "ALL_TIME", stage: "TO_PICKUP" }),
+  );
+  assert.equal(rider?.key, "collections:period=ALL_TIME:stage=TO_PICKUP");
   assert.equal(rider?.data.work.items.length, 1);
   assert.equal(rider?.data.work.items[0].id, own.id);
   assert(!JSON.stringify(rider).includes("PERF-FOREIGN"));

@@ -65,6 +65,7 @@ export function ClearNotifications({
       onClick={() => void clear()}
       disabled={busy || !total}
       aria-busy={busy}
+      title="Permanently clear all notifications in this workspace"
     >
       {busy ? (
         <Loader2 size={16} className="animate-spin" />
