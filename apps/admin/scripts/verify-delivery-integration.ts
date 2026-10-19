@@ -32,6 +32,7 @@ import { limitRequests } from "../src/lib/delivery/http";
 import { verifyPerformance } from "./verify-performance";
 import { verifyNotificationClearing } from "./verify-notification-clearing";
 import { verifyRiderCollect } from "./verify-rider-collect";
+import { verifyFinance } from "./verify-finance";
 import {
   nextCutoff,
   type Actor,
@@ -192,6 +193,14 @@ async function main() {
         description: "Not a real delivery",
       },
     });
+    if (process.argv.includes("--finance")) {
+      await verifyFinance(db, admin, driver, ok);
+      await verifyPaidInvoices(db, admin, other, driver, ok);
+      console.log(
+        `Verified ${checks} finance and paid-invoice checks in a disposable schema.`,
+      );
+      return;
+    }
     if (process.argv.includes("--rider-collect")) {
       await verifyPerformance(db, admin, partner, other, driver, ok);
       await verifyRiderCollect(db, admin, ok);
@@ -682,6 +691,7 @@ async function main() {
     await verifyReportingPeriods(db, admin, ok);
     await verifyNotificationClearing(db, admin, partner, driver, ok);
     await verifyRiderCollect(db, admin, ok);
+    await verifyFinance(db, admin, driver, ok);
     console.log(
       `Verified ${checks} database integration checks in an isolated disposable schema.`,
     );

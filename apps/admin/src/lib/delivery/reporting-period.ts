@@ -69,6 +69,8 @@ export const parcelDateLabel = (state: string | null) =>
       ? "Pickup date"
       : "Package registration date";
 export const datedScreens: Record<string, string> = {
+  finance:
+    "Invoices: issue date · transfers: submission date · deliveries: completion date",
   overview:
     "Pending: registration date · completed: delivery date · balance due: all time",
   reports:

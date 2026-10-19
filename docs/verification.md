@@ -1,5 +1,37 @@
 # Delivery platform verification
 
+## Admin Finance workspace and delivery reports — 20 October 2026
+
+Added `/delivery/finance` with invoice, bank-transfer and completed-delivery tables,
+partner search, status/date filters and ten-row server pagination. Old Admin invoice/
+transfer links redirect to matching tabs. Invoice, transfer review, private receipt,
+paid copy and full history are connected directly; existing super-admin invoice
+deletion and bank-verification confirmations remain available.
+
+CSV exports all completed packages in the chosen partner/completion-date scope.
+Excel adds Summary, Invoices and Transfers sheets with unique invoice/payment rows,
+numeric MVR values, frozen/filterable headers and sortable Maldives Time dates.
+Related whole-invoice totals are labeled separately from selected package fees.
+Exports recheck live admin access, read a consistent database snapshot, use private/
+no-store responses, limit request size explicitly and neutralize CSV formula text.
+
+All 73 unit tests and 14 targeted finance/paid-invoice database checks passed. The
+latter use disposable schemas, which were removed. They verify pagination, billing
+eligibility, pending/rejected/partial/full verification, exact reconciliation,
+concurrent paid-copy creation, history, revoked admin access and partner isolation.
+The final production build (including TypeScript), lint and diff checks passed.
+
+Actual client components were checked with fictional backend/auth fixtures at 320,
+390, 768 and 1440 pixels. Checked invoice-to-transfer review, invoice history/paid
+document controls, per-partner filtering, completed deliveries, next-page behavior,
+and mobile status/actions without horizontal page overflow. Both download buttons
+produced files identical to the generated fixture reports. Workbook previews were
+inspected for sheet structure, dates, numbers and clipped text. These checks do not
+constitute a signed-in production session or real private-storage verification.
+
+No operational financial record, database migration, Git commit/push or deployment
+was performed. See [Finance workflow and report scope](finance-workspace.md).
+
 ## Collect / History tables and simpler workspace copy — 20 October 2026
 
 Rider now uses Collect for available jobs, assigned pickup and picked-up delivery,

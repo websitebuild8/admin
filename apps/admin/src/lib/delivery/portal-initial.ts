@@ -16,7 +16,7 @@ export type PortalInitial = {
 };
 export type RiderInitial = ResourceSeed<RiderSnapshot>;
 export function portalResource(screen: string) {
-  if (["import", "administrators", "my-workspaces"].includes(screen))
+  if (["import", "administrators", "my-workspaces", "finance"].includes(screen))
     return null;
   return screen;
 }

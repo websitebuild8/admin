@@ -53,6 +53,32 @@ export async function GET(request: Request, context: Context) {
     if (resource === "workspaces")
       return json({ workspaces: actor.workspaces ?? [], role: actor.role });
     const params = new URL(request.url).searchParams;
+    if (resource === "finance-export") {
+      requireRole(actor, "ADMIN");
+      const format = z
+        .enum(["csv", "xlsx"])
+        .parse(params.get("format") ?? "xlsx");
+      await limitRequests(actor, "finance-export", 5, 1);
+      const { financeReport } = await import("@/lib/delivery/finance-report");
+      const { deliveriesCsv, financeWorkbook } =
+        await import("@/lib/delivery/finance-export");
+      const report = await financeReport(actor, params);
+      const bytes =
+        format === "csv"
+          ? Buffer.from(deliveriesCsv(report), "utf8")
+          : await financeWorkbook(report);
+      return new Response(new Uint8Array(bytes), {
+        headers: {
+          "Content-Type":
+            format === "csv"
+              ? "text/csv; charset=utf-8"
+              : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "Content-Disposition": `attachment; filename="igo-completed-deliveries.${format}"`,
+          "Cache-Control": "private, no-store",
+          "X-Content-Type-Options": "nosniff",
+        },
+      });
+    }
     if (resource === "workspace-profiles")
       return json(await workspaceProfiles(actor));
     if (resource === "deletion-preview") {

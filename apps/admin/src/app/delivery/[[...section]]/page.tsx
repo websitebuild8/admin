@@ -48,6 +48,18 @@ async function Workspace({
     redirect(`/rider${section?.length ? `/${section.join("/")}` : ""}`);
   if (actor.status !== "APPROVED") return <DeliveryApplication actor={actor} />;
   const screen = section?.[0] ?? "overview";
+  if (
+    actor.role === "ADMIN" &&
+    section?.length === 1 &&
+    ["invoices", "payments"].includes(screen)
+  ) {
+    const search = pageSearch(await searchParams);
+    search.set("tab", screen === "payments" ? "transfers" : "invoices");
+    if (search.get("state") === "OUTSTANDING")
+      search.set("status", "OUTSTANDING");
+    search.delete("state");
+    redirect(`/delivery/finance?${search}`);
+  }
   const allowed =
     actor.role === "ADMIN"
       ? [
@@ -60,6 +72,7 @@ async function Workspace({
           ...(actor.superAdmin ? ["administrators"] : []),
           "invoices",
           "payments",
+          "finance",
 
           "reports",
           "audit",

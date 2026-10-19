@@ -61,6 +61,10 @@ export async function deliveryQuery(
   resource: string,
   search: URLSearchParams,
 ): Promise<unknown> {
+  if (["finance", "finance-summary", "finance-partners"].includes(resource)) {
+    const { financeQuery } = await import("./finance");
+    return financeQuery(actor, resource, search);
+  }
   if (resource === "earnings") return deliveryEarnings(actor, search);
   if (resource === "storage-status") {
     requireRole(actor, "ADMIN");

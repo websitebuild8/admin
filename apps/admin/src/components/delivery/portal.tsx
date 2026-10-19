@@ -115,6 +115,10 @@ const PartnerHistoryModal = dynamic(() =>
 const InvoiceRecords = dynamic(() =>
   import("./invoice-records").then((m) => m.InvoiceRecords),
 );
+const FinancePanel = dynamic(
+  () => import("./finance-panel").then((m) => m.FinancePanel),
+  { loading: () => <DeliverySkeleton /> },
+);
 import {
   invoicePaymentStatus,
   invoiceStatusLabels,
@@ -521,16 +525,22 @@ const navItems = [
     roles: ["ADMIN"],
   },
   {
+    key: "finance",
+    label: "Finance",
+    icon: Wallet,
+    roles: ["ADMIN"],
+  },
+  {
     key: "invoices",
     label: "Invoices",
     icon: ReceiptText,
-    roles: ["ADMIN", "PARTNER"],
+    roles: ["PARTNER"],
   },
   {
     key: "payments",
     label: "Bank transfers",
     icon: Wallet,
-    roles: ["ADMIN", "PARTNER"],
+    roles: ["PARTNER"],
   },
   { key: "reports", label: "Reports", icon: ClipboardList, roles: ["ADMIN"] },
   { key: "audit", label: "Activity log", icon: History, roles: ["ADMIN"] },
@@ -742,11 +752,12 @@ export function DeliveryPortal({
       initial={initial}
       filter={filter}
       selection={selection}
-      changePeriod={(next) =>
-        router.push(withPeriod(`${pathname}?${params}`, next), {
-          scroll: false,
-        })
-      }
+      changePeriod={(next) => {
+        const [path, query] = withPeriod(`${pathname}?${params}`, next).split("?");
+        const search = new URLSearchParams(query);
+        if (screen === "finance") search.delete("page");
+        router.push(`${path}?${search}`, { scroll: false });
+      }}
     />
   );
 }
@@ -773,6 +784,9 @@ function DeliveryPortalContent({
     [mobileOpen, setMobileOpen] = useState(false),
     [action, setAction] = useState<Action | null>(null),
     [invoiceId, setInvoiceId] = useState<string | null>(null),
+    [invoiceTab, setInvoiceTab] = useState<"packages" | "payments" | "history">(
+      "packages",
+    ),
     [partnerHistoryId, setPartnerHistoryId] = useState<string | null>(null),
     [invoiceReturnPartnerId, setInvoiceReturnPartnerId] = useState<
       string | null
@@ -887,6 +901,7 @@ function DeliveryPortalContent({
   }
   function closeInvoice() {
     setInvoiceId(null);
+    setInvoiceTab("packages");
     if (invoiceReturnPartnerId) setPartnerHistoryId(invoiceReturnPartnerId);
     setInvoiceReturnPartnerId(null);
   }
@@ -1090,6 +1105,20 @@ function DeliveryPortalContent({
   }
   function mainContent() {
     if (screen === "my-workspaces") return <WorkspaceProfiles />;
+    if (screen === "finance" && actor.role === "ADMIN")
+      return (
+        <FinancePanel
+          selection={selection}
+          revision={revision}
+          superAdmin={!!actor.superAdmin}
+          changed={refresh}
+          viewInvoice={(id, tab = "packages") => {
+            setInvoiceTab(tab);
+            setInvoiceId(id);
+          }}
+          review={(payment) => open({ kind: "reviewPayment", payment })}
+        />
+      );
     if (request.error)
       return (
         <div className="d-error" role="alert">
@@ -1425,6 +1454,18 @@ function DeliveryPortalContent({
                   >
                     Review access
                   </Button>
+                  {a.partner && (
+                    <Button
+                      variant="outline"
+                      render={
+                        <Link
+                          href={`/delivery/finance?partnerId=${a.partner.id}`}
+                        />
+                      }
+                    >
+                      <Wallet size={14} /> Finance
+                    </Button>
+                  )}
                   {a.partner && (
                     <Button
                       variant="outline"
@@ -2035,6 +2076,10 @@ function DeliveryPortalContent({
       case "reviewPayment":
         return (
           <>
+            <div className="full">
+              <strong>{action.payment!.invoice.publicId}</strong>
+              <p>{action.payment!.partner.businessName}</p>
+            </div>
             <div className="d-note full">
               <strong>{action.payment!.bankReference}</strong>
               <p>
@@ -2142,6 +2187,15 @@ function DeliveryPortalContent({
               )}
             </div>
             <div className="d-heading-actions">
+              {actor.role === "ADMIN" &&
+                ["overview", "reports", "partners"].includes(screen) && (
+                  <Button
+                    variant="outline"
+                    render={<Link href={datedHref("/delivery/finance")} />}
+                  >
+                    <Wallet size={15} /> Finance & exports
+                  </Button>
+                )}
               <Button
                 variant="outline"
                 aria-label="Refresh records"
@@ -2161,14 +2215,15 @@ function DeliveryPortalContent({
                   </Button>
                 </>
               )}
-              {screen === "overview" && actor.role === "ADMIN" && (
-                <Button
-                  variant="outline"
-                  render={<Link href="/delivery/partners" />}
-                >
-                  <Store size={16} /> Partner deliveries & invoices
-                </Button>
-              )}
+              {["overview", "finance"].includes(screen) &&
+                actor.role === "ADMIN" && (
+                  <Button
+                    variant="outline"
+                    render={<Link href="/delivery/partners" />}
+                  >
+                    <Store size={16} /> Partner deliveries & invoices
+                  </Button>
+                )}
               {screen === "overview" && (
                 <Link href={datedHref(`${workspaceBase}/packages`)}>
                   <Button>
@@ -2176,38 +2231,39 @@ function DeliveryPortalContent({
                   </Button>
                 </Link>
               )}
-              {screen === "invoices" && actor.role === "ADMIN" && (
-                <Button
-                  variant="outline"
-                  disabled={busy}
-                  onClick={async () => {
-                    setBusy(true);
-                    try {
-                      const r = await deliveryFetch(
-                        "/api/delivery/invoice-run",
-                        {
-                          method: "POST",
-                          headers: { "Idempotency-Key": crypto.randomUUID() },
-                        },
-                      );
-                      const value = await r.json();
-                      if (!r.ok) throw new Error(value.error);
-                      toast.success(value.message);
-                      refresh();
-                    } catch (e) {
-                      toast.error(
-                        e instanceof Error
-                          ? e.message
-                          : "Could not run billing.",
-                      );
-                    } finally {
-                      setBusy(false);
-                    }
-                  }}
-                >
-                  Process due cycles <Clock3 size={15} />
-                </Button>
-              )}
+              {["invoices", "finance"].includes(screen) &&
+                actor.role === "ADMIN" && (
+                  <Button
+                    variant="outline"
+                    disabled={busy}
+                    onClick={async () => {
+                      setBusy(true);
+                      try {
+                        const r = await deliveryFetch(
+                          "/api/delivery/invoice-run",
+                          {
+                            method: "POST",
+                            headers: { "Idempotency-Key": crypto.randomUUID() },
+                          },
+                        );
+                        const value = await r.json();
+                        if (!r.ok) throw new Error(value.error);
+                        toast.success(value.message);
+                        refresh();
+                      } catch (e) {
+                        toast.error(
+                          e instanceof Error
+                            ? e.message
+                            : "Could not run billing.",
+                        );
+                      } finally {
+                        setBusy(false);
+                      }
+                    }}
+                  >
+                    Process due cycles <Clock3 size={15} />
+                  </Button>
+                )}
             </div>
           </div>
           {datedScreens[screen] && (
@@ -2313,8 +2369,9 @@ function DeliveryPortalContent({
       )}
       {invoiceId && (
         <InvoiceModal
-          key={invoiceId}
+          key={`${invoiceId}:${invoiceTab}`}
           id={invoiceId}
+          initialTab={invoiceTab}
           close={closeInvoice}
           changed={refresh}
           workspaceRevision={revision}
@@ -2447,6 +2504,7 @@ function InvoiceModal({
   changed,
   review,
   workspaceRevision,
+  initialTab = "packages",
 }: {
   id: string;
   close: () => void;
@@ -2455,9 +2513,10 @@ function InvoiceModal({
   changed: () => void;
   review: (payment: Payment) => void;
   workspaceRevision: number;
+  initialTab?: "packages" | "payments" | "history";
 }) {
   const [page, setPage] = useState(1),
-    [tab, setTab] = useState<"packages" | "payments" | "history">("packages"),
+    [tab, setTab] = useState<"packages" | "payments" | "history">(initialTab),
     [revision, setRevision] = useState(0),
     [sending, setSending] = useState(false),
     [sendError, setSendError] = useState("");
