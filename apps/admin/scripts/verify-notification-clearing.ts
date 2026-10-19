@@ -263,10 +263,9 @@ export async function verifyNotificationClearing(
       message: "Disposable assignment",
     },
   });
-  await db.deliveryPushMessage.create({
+  await db.deliveryPushMessage.update({
+    where: { notificationId_subscriptionId: { notificationId: driverNotice.id, subscriptionId: subscription.id } },
     data: {
-      subscriptionId: subscription.id,
-      notificationId: driverNotice.id,
       leaseToken: randomUUID(),
       leaseUntil: new Date(Date.now() + 120000),
     },

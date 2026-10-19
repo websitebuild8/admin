@@ -51,12 +51,20 @@ async function Workspace({
   if (actor.status !== "APPROVED") return <DeliveryApplication actor={actor} />;
   const { section } = await params;
   const screen = section?.[0] ?? "overview";
+  if (section?.length === 1 && ["invoices", "payments"].includes(screen)) {
+    const search = pageSearch(await searchParams);
+    search.set("tab", screen === "payments" ? "transfers" : "invoices");
+    if (search.get("state") === "OUTSTANDING") search.set("status", "OUTSTANDING");
+    search.delete("state");
+    redirect(`/partner/finance?${search}`);
+  }
   if (
     (section && section.length > 1) ||
     ![
       "overview",
       "packages",
       "import",
+      "finance",
       "invoices",
       "payments",
       "notifications",

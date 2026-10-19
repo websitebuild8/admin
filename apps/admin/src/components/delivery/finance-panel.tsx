@@ -41,6 +41,7 @@ import {
 } from "@/components/ui/table";
 import { DeliverySkeleton } from "./skeleton";
 import { DeleteDataButton } from "./delete-data-button";
+import { PartnerMessageButton } from "./partner-messages";
 import type { Payment } from "./portal";
 
 const labels: Record<string, string> = {
@@ -87,6 +88,7 @@ function useFinance<T>(
   resource: string,
   query: string,
   revision: number,
+  enabled = true,
 ): { data?: T; error?: string } {
   const key = `${resource}?${query}&revision=${revision}`;
   const [state, setState] = useState<{
@@ -95,6 +97,7 @@ function useFinance<T>(
     error?: string;
   }>();
   useEffect(() => {
+    if (!enabled) return;
     const c = new AbortController();
     deliveryFetch(`/api/delivery/${key}`, {
       signal: c.signal,
@@ -110,7 +113,7 @@ function useFinance<T>(
         if (!c.signal.aborted) setState({ key, error: e.message });
       });
     return () => c.abort();
-  }, [key]);
+  }, [key, enabled]);
   return state?.key === key ? state : {};
 }
 export function FinancePanel({
@@ -120,7 +123,11 @@ export function FinancePanel({
   review,
   superAdmin,
   changed,
+  workspace = "ADMIN",
+  pay,
 }: {
+  workspace?: "ADMIN" | "PARTNER";
+  pay?: (invoice: FinanceInvoice) => void;
   selection: PeriodSelection;
   revision: number;
   viewInvoice: (id: string, tab?: "packages" | "payments" | "history") => void;
@@ -128,6 +135,7 @@ export function FinancePanel({
   superAdmin: boolean;
   changed: () => void;
 }) {
+  const admin = workspace === "ADMIN", base = admin ? "/delivery" : "/partner";
   const params = useSearchParams(),
     router = useRouter();
   const tab: FinanceTab = financeTabs.includes(params.get("tab") as FinanceTab)
@@ -138,7 +146,7 @@ export function FinancePanel({
   )
     ? params.get("status")!
     : "ALL";
-  const partnerId = params.get("partnerId") ?? "",
+  const partnerId = admin ? params.get("partnerId") ?? "" : "",
     q = params.get("q") ?? "";
   const page = Math.max(1, Number(params.get("page")) || 1);
   const [partnerSearch, setPartnerSearch] = useState(""),
@@ -146,12 +154,12 @@ export function FinancePanel({
     [exportError, setExportError] = useState("");
   const scope = `partnerId=${encodeURIComponent(partnerId)}&${periodQuery(selection)}`;
   const data = useFinance<FinanceList>(
-    "finance",
+    admin ? "finance" : "partner-finance",
     `${scope}&tab=${tab}&status=${status}&q=${encodeURIComponent(q)}&page=${page}`,
     revision,
   );
   const summary = useFinance<FinanceSummary>(
-    "finance-summary",
+    admin ? "finance-summary" : "partner-finance-summary",
     scope,
     revision,
   );
@@ -159,6 +167,7 @@ export function FinancePanel({
     "finance-partners",
     `q=${encodeURIComponent(partnerSearch)}`,
     revision,
+    admin && !!partnerSearch,
   );
   function navigate(values: Record<string, string>) {
     const next = new URLSearchParams(params.toString());
@@ -167,7 +176,7 @@ export function FinancePanel({
       if (v) next.set(k, v);
       else next.delete(k);
     }
-    router.push(`/delivery/finance?${next}`, { scroll: false });
+    router.push(`${base}/finance?${next}`, { scroll: false });
   }
   function find(e: FormEvent) {
     e.preventDefault();
@@ -206,7 +215,7 @@ export function FinancePanel({
   const s = summary.data;
   return (
     <div className="d-finance">
-      <div className="d-finance-toolbar">
+      {admin && <div className="d-finance-toolbar">
         <div className="d-finance-partner">
           {partnerId ? (
             <Button
@@ -270,6 +279,7 @@ export function FinancePanel({
           </Button>
         </div>
       </div>
+      }
       {exportError && (
         <div className="d-error" role="alert">
           {exportError}
@@ -306,7 +316,7 @@ export function FinancePanel({
             })
           }
         >
-          <span>Needs verification · all dates</span>
+          <span>{admin ? "Needs verification" : "Awaiting verification"} · all dates</span>
           <strong>{s ? String(s.pendingCount) : "—"}</strong>
           {s && <span>{money(s.pendingAmount)}</span>}
         </button>
@@ -452,11 +462,11 @@ export function FinancePanel({
                           Open invoice
                         </Button>
                         <Button
-                          variant={i._count.payments ? "default" : "ghost"}
+                          variant={i._count.payments ? "outline" : "ghost"}
                           onClick={() => viewInvoice(i.id, "payments")}
                         >
                           {i._count.payments
-                            ? `Review transfers (${i._count.payments})`
+                            ? `${admin ? "Review transfers" : "Submitted transfers"} (${i._count.payments})`
                             : "Transfers"}
                         </Button>
                         <Button
@@ -465,6 +475,8 @@ export function FinancePanel({
                         >
                           History
                         </Button>
+                        {!admin && i.paid < i.total && <Button onClick={() => pay?.(i)}>Submit bank transfer</Button>}
+                        {admin && i.paid < i.total && <PartnerMessageButton partner={{ id: i.partnerId, businessName: i.partner.businessName }} invoice={i} changed={changed}/>}
                         {superAdmin && (
                           <DeleteDataButton
                             kind="INVOICE"
@@ -474,7 +486,7 @@ export function FinancePanel({
                           />
                         )}
                       </div>
-                      {i.paidInvoice && !i.paidInvoice.dispatch && (
+                      {admin && i.paidInvoice && !i.paidInvoice.dispatch && (
                         <small>Paid invoice ready to send</small>
                       )}
                     </TableCell>
@@ -528,7 +540,7 @@ export function FinancePanel({
                         >
                           Receipt
                         </Button>
-                        {p.status === "PENDING" && (
+                        {admin && p.status === "PENDING" && (
                           <Button onClick={() => review(p)}>
                             Verify transfer
                           </Button>

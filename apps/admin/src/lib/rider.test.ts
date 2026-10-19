@@ -118,6 +118,8 @@ test("service worker always displays an alert and restricts notification navigat
     shown: unknown[] = [],
     opened: string[] = [];
   const worker = {
+    IGO_WORKSPACE: "DRIVER",
+    location: { origin: "https://igo.example" },
     addEventListener: (name: string, handler: (event: unknown) => void) => {
       handlers[name] = handler;
     },
@@ -133,7 +135,7 @@ test("service worker always displays an alert and restricts notification navigat
       },
     },
   };
-  vm.runInNewContext(await readFile("public/rider/sw.js", "utf8"), {
+  vm.runInNewContext(await readFile("public/delivery-notifications-sw.js", "utf8"), {
     self: worker,
     URL,
   });

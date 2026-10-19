@@ -1,4 +1,7 @@
 import "server-only";
+import { pushSettings } from "./push-settings";
+import type { NoticeTarget } from "./notification-contract";
+import { notificationDestination } from "./notifications";
 import { assertAdministrator } from "./admin-authorization";
 import { superAdminIds } from "./admin-policy";
 import { commandSubjects } from "./deletion-contract";
@@ -54,44 +57,20 @@ export async function notify(
   title: string,
   message: string,
   workspace: "ACCOUNT" | "ADMIN" | "PARTNER" | "DRIVER" = "ACCOUNT",
+  target?: NoticeTarget,
 ) {
-  const notification = await tx.deliveryNotification.create({
-    data: { recipient, title, message, workspace },
+  return tx.deliveryNotification.create({
+    data: { recipient, title, message, workspace, ...target },
   });
-  const subscriptions =
-    workspace === "ADMIN" || workspace === "PARTNER"
-      ? []
-      : await tx.deliveryPushSubscription.findMany({
-          where: {
-            driver: {
-              clerkUserId: recipient,
-              role: "DRIVER",
-              status: "APPROVED",
-            },
-          },
-          select: { id: true },
-        });
-  if (subscriptions.length)
-    await tx.deliveryPushMessage.createMany({
-      data: subscriptions.map((subscription) => ({
-        notificationId: notification.id,
-        subscriptionId: subscription.id,
-      })),
-      skipDuplicates: true,
-    });
-  return notification;
 }
-export async function notifyAdmins(tx: Tx, title: string, message: string) {
+export async function notifyAdmins(tx: Tx, title: string, message: string, target?: NoticeTarget) {
   const grants = await tx.deliveryAdminGrant.findMany({
-    where: { active: true },
-    select: { clerkUserId: true },
+    where: { active: true }, select: { clerkUserId: true },
   });
-  for (const recipient of new Set([
-    ...superAdminIds(),
-    ...grants.map((grant) => grant.clerkUserId),
-  ]))
-    await notify(tx, recipient, title, message, "ADMIN");
+  for (const recipient of new Set([...superAdminIds(), ...grants.map((g) => g.clerkUserId)]))
+    await notify(tx, recipient, title, message, "ADMIN", target);
 }
+
 export async function serialized<T extends Prisma.InputJsonValue>(
   actor: Actor,
   key: string,
@@ -337,6 +316,7 @@ export async function deliveryCommand(
           "Delivery invoice received",
           `Invoice ${invoice.publicId}: ${money(invoice.total)} for completed deliveries. View the package details and outstanding amount in Invoices. Earlier unpaid invoices remain due.`,
           "PARTNER",
+          { targetType: "INVOICE", targetId: invoice.id },
         );
         await tx.deliveryInvoiceDispatch.create({
           data: {
@@ -386,6 +366,7 @@ export async function deliveryCommand(
           "Paid invoice received",
           `Invoice ${invoice.publicId} is fully paid: ${money(invoice.total)} verified, ${money(0)} outstanding. Your paid invoice and payment history are available in Invoices.`,
           "PARTNER",
+          { targetType: "INVOICE", targetId: invoice.id },
         );
         await tx.deliveryPaidInvoiceDispatch.create({
           data: {
@@ -434,6 +415,7 @@ export async function deliveryCommand(
           tx,
           "New account application",
           `${a.name} applied for ${a.role.toLowerCase()} access. Approval is required.`,
+          { targetType: "ACCOUNT", targetId: account.id },
         );
         return {
           message: "Application submitted. Your account needs admin approval.",
@@ -485,6 +467,7 @@ export async function deliveryCommand(
           "Application update",
           `Your ${account.role.toLowerCase()} account is ${command.status.toLowerCase()}. ${command.note}`,
           account.role,
+          { targetType: "SETTINGS" },
         );
         return { message: "Account review saved." };
       }
@@ -519,6 +502,7 @@ export async function deliveryCommand(
           "Collection assigned",
           `${changed.count} packages are ready for your collection list. Confirm pickup only after physical receipt.`,
           "DRIVER",
+          { targetType: "COLLECTION" },
         );
         return {
           message: `${changed.count} packages assigned. No pickup has been recorded.`,
@@ -565,6 +549,7 @@ export async function deliveryCommand(
           "Rider assigned",
           `${actor.name} will collect ${parcel.publicId}. Pickup has not yet been confirmed.`,
           "PARTNER",
+          { targetType: "PACKAGE", targetId: parcel.id },
         );
         await notify(
           tx,
@@ -572,6 +557,7 @@ export async function deliveryCommand(
           "Delivery added to your collections",
           `${parcel.publicId} is assigned to you. Confirm pickup only after physically receiving it.`,
           "DRIVER",
+          { targetType: "PACKAGE", targetId: parcel.id },
         );
         return {
           message:
@@ -625,6 +611,7 @@ export async function deliveryCommand(
             "Package picked up",
             `${p.publicId} was physically received by ${actor.name}.`,
             "PARTNER",
+            { targetType: "PACKAGE", targetId: p.id },
           );
         }
         return { message: `${parcels.length} physical pickups confirmed.` };
@@ -667,6 +654,7 @@ export async function deliveryCommand(
           "Package delivered",
           `${p.publicId} delivered by ${actor.name}. Delivery fees enter the next eligible invoice cycle.`,
           "PARTNER",
+          { targetType: "PACKAGE", targetId: p.id },
         );
         return {
           message:
@@ -746,6 +734,7 @@ export async function deliveryCommand(
           tx,
           "Bank transfer awaiting review",
           `Evidence for ${invoice.publicId} is ready for bank verification. The invoice balance has not changed.`,
+          { targetType: "PAYMENT", targetId: payment.id },
         );
         return {
           message:
@@ -821,6 +810,7 @@ export async function deliveryCommand(
           "Bank transfer reviewed",
           `Your transfer for ${payment.invoice.publicId} was ${command.decision === "REJECT" ? "rejected" : "verified"}. ${command.note}`,
           "PARTNER",
+          { targetType: "PAYMENT", targetId: payment.id },
         );
         return {
           message:
@@ -924,6 +914,7 @@ export async function deliveryCommand(
           "Operating location updated",
           `Your business now operates from ${operatingLocationLabels[command.location]}. This affects new packages only.`,
           "PARTNER",
+          { targetType: "SETTINGS" },
         );
         return {
           message:
@@ -982,6 +973,45 @@ export async function deliveryCommand(
             : "Your notifications are already clear.",
           count: removed.count,
         };
+      }
+      case "sendPartnerMessage": {
+        requireRole(actor, "ADMIN");
+        const partner = await tx.deliveryPartner.findUnique({ where: { id: command.partnerId }, include: { account: true } });
+        if (!partner || partner.account.status !== "APPROVED")
+          throw new DeliveryError("Choose an approved partner.", 409);
+        let title = command.title, message = command.message;
+        let target: NoticeTarget | undefined;
+        if (command.invoiceId) {
+          await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${"invoice-reminder:" + command.invoiceId},0))`;
+          const invoice = await tx.deliveryInvoice.findFirst({ where: { id: command.invoiceId, partnerId: partner.id } });
+          if (!invoice || invoice.paid >= invoice.total)
+            throw new DeliveryError("This invoice has no outstanding balance. Refresh finance before sending a reminder.", 409);
+          title = `Payment reminder · ${invoice.publicId}`;
+          message = `${invoice.publicId} has ${money(invoice.total - invoice.paid)} outstanding. Pending bank transfers are credited after verification.${message ? "\n\n" + message : ""}`;
+          target = { targetType: "INVOICE", targetId: invoice.id };
+        }
+        const notice = await notify(tx, partner.account.clerkUserId, title, message, "PARTNER", target);
+        await audit(tx, actor, "PARTNER_MESSAGE_SENT", notice.id,
+          { title, message, invoiceId: command.invoiceId ?? null, businessName: partner.businessName }, partner.id);
+        return { message: "Message sent to the partner inbox.", notificationId: notice.id };
+      }
+      case "testPush": {
+        requireRole(actor, "PARTNER", "DRIVER");
+        if (!pushSettings()) throw new DeliveryError("Browser alerts need server configuration.", 503);
+        const subscriptions = await tx.deliveryPushSubscription.count({ where: { driverId: actor.id! } });
+        if (!subscriptions) throw new DeliveryError("Enable browser alerts on this device first.", 409);
+        await notify(tx, actor.userId, "Browser alerts test", "Browser alerts are connected to your iGO workspace.", actor.role as "PARTNER" | "DRIVER");
+        return { message: "Test alert queued. Check this device’s notifications." };
+      }
+      case "openNotice": {
+        requireRole(actor, "ADMIN", "PARTNER", "DRIVER");
+        const notice = await tx.deliveryNotification.findFirst({ where: {
+          id: command.id, recipient: actor.userId, workspace: { in: ["ACCOUNT", actor.role] },
+        } });
+        if (!notice) throw new DeliveryError("This notification has been cleared or is unavailable.", 404);
+        const href = await notificationDestination(tx, actor, notice);
+        await tx.deliveryNotification.update({ where: { id: notice.id }, data: { readAt: notice.readAt ?? new Date() } });
+        return { message: "Notification opened.", href };
       }
       case "readNotice": {
         const changed = await tx.deliveryNotification.updateMany({

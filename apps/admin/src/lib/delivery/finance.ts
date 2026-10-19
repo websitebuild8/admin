@@ -2,6 +2,7 @@ import "server-only";
 import { Prisma } from "@/generated/prisma/client";
 import { database } from "../db";
 import { requireRole, type Actor } from "./domain";
+import { assertOperationalActor } from "./role-authorization";
 import { assertAdministrator } from "./admin-authorization";
 import { financeFilters } from "./finance-contract";
 import { dateFilter } from "./reporting-period";
@@ -107,12 +108,16 @@ export async function financeQuery(
   resource: string,
   search: URLSearchParams,
 ) {
-  requireRole(actor, "ADMIN");
+  const partnerWorkspace = resource.startsWith("partner-");
+  requireRole(actor, partnerWorkspace ? "PARTNER" : "ADMIN");
+  search = new URLSearchParams(search);
+  if (partnerWorkspace) search.set("partnerId", actor.partnerId!);
   const { tab, status, partnerId, q, page } = financeFilters(search),
     range = dateFilter(search);
   return database().$transaction(
     async (tx) => {
-      await assertAdministrator(tx, actor);
+      if (partnerWorkspace) await assertOperationalActor(tx, actor);
+      else await assertAdministrator(tx, actor);
       if (resource === "finance-partners") {
         return tx.deliveryPartner.findMany({
           where: q
@@ -123,7 +128,7 @@ export async function financeQuery(
           take: 10,
         });
       }
-      if (resource === "finance-summary") {
+      if (resource === "finance-summary" || resource === "partner-finance-summary") {
         const [invoices, pending, deliveries, confirmed] = await Promise.all([
           tx.deliveryInvoice.aggregate({
             where: { partnerId },

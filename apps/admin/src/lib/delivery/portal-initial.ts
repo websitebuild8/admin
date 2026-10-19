@@ -30,7 +30,7 @@ export function portalInitialQuery(screen: string, search: URLSearchParams) {
         : "";
   return {
     selection,
-    query: `page=1&q=&state=${filter}&${periodQuery(selection)}`,
+    query: `page=1&q=&state=${filter}&${periodQuery(selection)}${screen === "applications" && search.get("applicationId") ? `&applicationId=${search.get("applicationId")}` : ""}${["partners", "drivers"].includes(screen) && search.get("accountId") ? `&accountId=${search.get("accountId")}` : ""}`,
   };
 }
 export function pageSearch(

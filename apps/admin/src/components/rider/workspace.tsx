@@ -2,6 +2,7 @@
 import { ThemeSwitcher } from "@/components/theme/switcher";
 import { WorkspaceSwitcher } from "@/components/delivery/workspace-switcher";
 import { deliveryFetch } from "@/lib/delivery/fetch";
+import { NotificationNavigation } from "@/components/delivery/notification-navigation";
 import { ClearNotifications } from "@/components/delivery/clear-notifications";
 import type { RiderInitial } from "@/lib/delivery/portal-initial";
 import {
@@ -558,11 +559,11 @@ function RiderWorkspaceContent({
                         className={n.readAt ? "r-notice" : "r-notice r-unread"}
                       >
                         <span className="r-dot" />
-                        <div>
+                        <Link className="d-notice-link" href={`/rider/notifications?open=${n.id}`}>
                           <h3>{n.title}</h3>
                           <p>{n.message}</p>
                           <time>{date(n.createdAt)} MVT</time>
-                        </div>
+                        </Link>
                         {!n.readAt && (
                           <Button
                             variant="ghost"
@@ -641,6 +642,7 @@ function RiderWorkspaceContent({
           )}
         </main>
       </div>
+      <NotificationNavigation />
       <Dialog
         open={!!action}
         onOpenChange={(value) => {

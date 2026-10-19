@@ -1,4 +1,5 @@
 "use client";
+import { useSearchParams } from "next/navigation";
 import { deliveryFetch } from "@/lib/delivery/fetch";
 import { operatingLocationLabels } from "@/lib/delivery/domain";
 import { useRef, useState, type FormEvent } from "react";
@@ -55,8 +56,9 @@ export function PartnerApplications({
   items: PartnerApplicationRecord[];
   onRefresh: () => void;
 }) {
+  const params = useSearchParams();
   const [selected, setSelected] = useState<PartnerApplicationRecord | null>(
-    null,
+    items.find(i => i.id === params.get("applicationId")) ?? null,
   );
   const [decision, setDecision] = useState("APPROVED");
   const [busy, setBusy] = useState(false);

@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "../rider.css";
 export const metadata: Metadata = {
   title: "iGO Rider — Your next delivery",
+  icons: { apple: "/brand/igo-icon-192.png" },
   manifest: "/rider.webmanifest",
   appleWebApp: { capable: true, title: "iGO Rider", statusBarStyle: "default" },
 };

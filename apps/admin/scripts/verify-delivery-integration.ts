@@ -32,6 +32,7 @@ import { limitRequests } from "../src/lib/delivery/http";
 import { verifyPerformance } from "./verify-performance";
 import { verifyNotificationClearing } from "./verify-notification-clearing";
 import { verifyRiderCollect } from "./verify-rider-collect";
+import { verifyWorkspaceNotifications } from "./verify-workspace-notifications";
 import { verifyFinance } from "./verify-finance";
 import {
   nextCutoff,
@@ -84,6 +85,7 @@ async function main() {
       "20261018010000_admin_multiple_operational_roles",
       "20261019000000_remove_legacy_platform",
       "20261019010000_clear_notifications",
+      "20261020000000_workspace_notifications",
     ]) {
       if (
         [
@@ -193,6 +195,19 @@ async function main() {
         description: "Not a real delivery",
       },
     });
+    if (process.argv.includes("--notification-targets")) {
+      await verifyWorkspaceNotifications(db, admin, partner, other, driver, ok);
+      console.log(`Verified ${checks} notification target and scheduled-invoice checks in a disposable schema.`);
+      return;
+    }
+    if (process.argv.includes("--workspace-notifications")) {
+      await verifyWorkspaceNotifications(db, admin, partner, other, driver, ok);
+      await verifyNotificationClearing(db, admin, partner, driver, ok);
+      await verifyRiderWorkflows(db, admin, other, ok);
+      await verifyFinance(db, admin, driver, ok);
+      console.log(`Verified ${checks} notification, push and partner finance checks in a disposable schema.`);
+      return;
+    }
     if (process.argv.includes("--finance")) {
       await verifyFinance(db, admin, driver, ok);
       await verifyPaidInvoices(db, admin, other, driver, ok);
@@ -692,6 +707,7 @@ async function main() {
     await verifyNotificationClearing(db, admin, partner, driver, ok);
     await verifyRiderCollect(db, admin, ok);
     await verifyFinance(db, admin, driver, ok);
+    await verifyWorkspaceNotifications(db, admin, partner, other, driver, ok);
     console.log(
       `Verified ${checks} database integration checks in an isolated disposable schema.`,
     );

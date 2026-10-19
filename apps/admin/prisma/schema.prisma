@@ -322,6 +322,8 @@ model DeliveryNotification {
   workspace       String                   @default("ACCOUNT")
   title           String
   message         String
+  targetType      String?
+  targetId        String?                  @db.Uuid
   readAt          DateTime?                @db.Timestamptz(3)
   createdAt       DateTime                 @default(now()) @db.Timestamptz(3)
   pushMessages    DeliveryPushMessage[]

@@ -18,6 +18,10 @@ const WorkspaceProfiles = dynamic(
   { loading: () => <DeliverySkeleton /> },
 );
 import { deliveryFetch } from "@/lib/delivery/fetch";
+import { noticeId } from "@/lib/delivery/notification-contract";
+import { NotificationNavigation } from "./notification-navigation";
+import { PartnerMessageButton, SentPartnerMessages } from "./partner-messages";
+import { PushAlerts } from "@/components/rider/push-alerts";
 import { ClearNotifications } from "./clear-notifications";
 import {
   useEffect,
@@ -528,19 +532,7 @@ const navItems = [
     key: "finance",
     label: "Finance",
     icon: Wallet,
-    roles: ["ADMIN"],
-  },
-  {
-    key: "invoices",
-    label: "Invoices",
-    icon: ReceiptText,
-    roles: ["PARTNER"],
-  },
-  {
-    key: "payments",
-    label: "Bank transfers",
-    icon: Wallet,
-    roles: ["PARTNER"],
+    roles: ["ADMIN", "PARTNER"],
   },
   { key: "reports", label: "Reports", icon: ClipboardList, roles: ["ADMIN"] },
   { key: "audit", label: "Activity log", icon: History, roles: ["ADMIN"] },
@@ -746,7 +738,7 @@ export function DeliveryPortal({
   // including browser Back/Forward or a card on the current workspace.
   return (
     <DeliveryPortalContent
-      key={`${filter}:${periodQuery(selection)}`}
+      key={`${filter}:${periodQuery(selection)}:${params.get("invoiceId") ?? ""}:${params.get("view") ?? ""}`}
       actor={actor}
       screen={screen}
       initial={initial}
@@ -776,6 +768,7 @@ function DeliveryPortalContent({
   selection: PeriodSelection;
   changePeriod: (selection: PeriodSelection) => void;
 }) {
+  const targetParams = useSearchParams(), targetRouter = useRouter(), targetPath = usePathname();
   const [revision, setRevision] = useState(0),
     [page, setPage] = useState(1),
     [q, setQ] = useState(""),
@@ -783,9 +776,9 @@ function DeliveryPortalContent({
     [selected, setSelected] = useState<string[]>([]),
     [mobileOpen, setMobileOpen] = useState(false),
     [action, setAction] = useState<Action | null>(null),
-    [invoiceId, setInvoiceId] = useState<string | null>(null),
+    [invoiceId, setInvoiceId] = useState<string | null>(noticeId(targetParams.get("invoiceId"))),
     [invoiceTab, setInvoiceTab] = useState<"packages" | "payments" | "history">(
-      "packages",
+      targetParams.get("view") === "payments" ? "payments" : targetParams.get("view") === "history" ? "history" : "packages",
     ),
     [partnerHistoryId, setPartnerHistoryId] = useState<string | null>(null),
     [invoiceReturnPartnerId, setInvoiceReturnPartnerId] = useState<
@@ -795,9 +788,16 @@ function DeliveryPortalContent({
     [error, setError] = useState(""),
     [decision, setDecision] = useState("CONFIRM");
   const retry = useRef<{ body: string; key: string } | null>(null);
+  useEffect(() => {
+    if (!("serviceWorker" in navigator)) return;
+    const update = (event: MessageEvent) => { if (event.data?.type === "IGO_PARTNER_UPDATE") setRevision(r => r+1); };
+    navigator.serviceWorker.addEventListener("message", update);
+    return () => navigator.serviceWorker.removeEventListener("message", update);
+  }, []);
+
   const workspaceBase = actor.role === "PARTNER" ? "/partner" : "/delivery";
   const resource = portalResource(screen);
-  const query = `page=${page}&q=${encodeURIComponent(q)}&state=${filter}&${periodQuery(selection)}`;
+  const query = `page=${page}&q=${encodeURIComponent(q)}&state=${filter}&${periodQuery(selection)}${screen === "applications" && noticeId(targetParams.get("applicationId")) ? `&applicationId=${targetParams.get("applicationId")}` : ""}${["partners", "drivers"].includes(screen) && noticeId(targetParams.get("accountId")) ? `&accountId=${targetParams.get("accountId")}` : ""}`;
   const datedHref = (href: string) => withPeriod(href, selection);
   const request = useResource<unknown>(
     resource ?? "account",
@@ -813,6 +813,7 @@ function DeliveryPortalContent({
     true,
     initial?.notices,
   );
+  const pushConfig = useResource<{ publicKey: string | null }>("push-config", "", 0, actor.role === "PARTNER" && ["overview", "notifications"].includes(screen));
   const choices = useResource<{
     partners: { id: string; businessName: string }[];
     drivers: { id: string; name: string }[];
@@ -900,6 +901,10 @@ function DeliveryPortalContent({
     setInvoiceId(id);
   }
   function closeInvoice() {
+    if (targetParams.has("invoiceId")) {
+      const next = new URLSearchParams(targetParams.toString()); next.delete("invoiceId"); next.delete("view");
+      targetRouter.replace(`${targetPath}?${next}`, { scroll: false });
+    }
     setInvoiceId(null);
     setInvoiceTab("packages");
     if (invoiceReturnPartnerId) setPartnerHistoryId(invoiceReturnPartnerId);
@@ -1105,12 +1110,14 @@ function DeliveryPortalContent({
   }
   function mainContent() {
     if (screen === "my-workspaces") return <WorkspaceProfiles />;
-    if (screen === "finance" && actor.role === "ADMIN")
+    if (screen === "finance" && ["ADMIN", "PARTNER"].includes(actor.role))
       return (
         <FinancePanel
+          workspace={actor.role as "ADMIN" | "PARTNER"}
+          pay={(invoice) => open({ kind: "submitPayment", invoice: invoice as unknown as Invoice })}
           selection={selection}
           revision={revision}
-          superAdmin={!!actor.superAdmin}
+          superAdmin={actor.role === "ADMIN" && !!actor.superAdmin}
           changed={refresh}
           viewInvoice={(id, tab = "packages") => {
             setInvoiceTab(tab);
@@ -1466,6 +1473,7 @@ function DeliveryPortalContent({
                       <Wallet size={14} /> Finance
                     </Button>
                   )}
+                  {a.partner && a.status === "APPROVED" && <PartnerMessageButton partner={{ id: a.partner.id, businessName: a.partner.businessName }} changed={refresh}/>}
                   {a.partner && (
                     <Button
                       variant="outline"
@@ -1694,10 +1702,12 @@ function DeliveryPortalContent({
     if (screen === "notifications") {
       const d = request.data as List<Notice>;
       return (
+        <>
         <section className="d-card">
           <div className="d-card-header d-notification-header">
             <div>
               <h2>Your notifications</h2>
+              {actor.role === "ADMIN" && <PartnerMessageButton changed={refresh}/>}
             </div>
             <ClearNotifications
               total={notices.data?.total ?? d.total}
@@ -1710,11 +1720,11 @@ function DeliveryPortalContent({
                 <div className="d-info-icon">
                   <Bell size={17} />
                 </div>
-                <div>
+                <Link className="d-notice-link" href={`${workspaceBase}/notifications?open=${n.id}`}>
                   <strong>{n.title}</strong>
                   <p>{n.message}</p>
                   <small className="d-muted">{stamp(n.createdAt)}</small>
-                </div>
+                </Link>
                 {!n.readAt && (
                   <Button
                     variant="outline"
@@ -1737,6 +1747,8 @@ function DeliveryPortalContent({
           )}
           <Pager list={d} onPage={changePage} />
         </section>
+        {actor.role === "ADMIN" && <SentPartnerMessages key={periodQuery(selection)} period={periodQuery(selection)} revision={revision}/>}
+        </>
       );
     }
     if (screen === "audit") {
@@ -2278,6 +2290,8 @@ function DeliveryPortalContent({
               disabled={busy}
             />
           )}
+          {actor.role === "PARTNER" && pushConfig.data && <PushAlerts workspace="PARTNER" userId={actor.userId} publicKey={pushConfig.data.publicKey}/>}
+          {pushConfig.error && <p className="d-error" role="alert">{pushConfig.error}</p>}
           {mainContent()}
         </main>
         <footer className="d-footer">
@@ -2367,6 +2381,7 @@ function DeliveryPortalContent({
           changed={refresh}
         />
       )}
+      <NotificationNavigation />
       {invoiceId && (
         <InvoiceModal
           key={`${invoiceId}:${invoiceTab}`}

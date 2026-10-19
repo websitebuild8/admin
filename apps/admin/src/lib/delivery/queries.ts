@@ -8,7 +8,7 @@ import { Prisma } from "@/generated/prisma/client";
 import { database } from "../db";
 import { DeliveryError, requireRole, type Actor } from "./domain";
 import { riderScreens, riderStage } from "./rider-contract";
-import { riderClientConfig } from "./push-settings";
+import { riderClientConfig, pushSettings } from "./push-settings";
 import { applicationSelection } from "./partner-applications";
 import { storageConfigurationStatus } from "../storage-configuration";
 import { partnerHistory } from "./partner-history";
@@ -61,7 +61,7 @@ export async function deliveryQuery(
   resource: string,
   search: URLSearchParams,
 ): Promise<unknown> {
-  if (["finance", "finance-summary", "finance-partners"].includes(resource)) {
+  if (["finance", "finance-summary", "finance-partners", "partner-finance", "partner-finance-summary"].includes(resource)) {
     const { financeQuery } = await import("./finance");
     return financeQuery(actor, resource, search);
   }
@@ -82,6 +82,36 @@ export async function deliveryQuery(
         : null,
     };
   requireRole(actor, "ADMIN", "PARTNER", "DRIVER");
+  if (resource === "push-config") {
+    requireRole(actor, "PARTNER", "DRIVER");
+    return { publicKey: pushSettings()?.publicKey ?? null };
+  }
+  if (resource === "notification-detail") {
+    const notice = await db.deliveryNotification.findFirst({ where: {
+      id: z.uuid().parse(search.get("id")), recipient: actor.userId,
+      workspace: { in: ["ACCOUNT", actor.role] },
+    } });
+    if (!notice) throw new DeliveryError("This notification has been cleared or is unavailable.", 404);
+    return notice;
+  }
+  if (resource === "package-detail") {
+    const parcel = await db.deliveryParcel.findFirst({ where: {
+      id: z.uuid().parse(search.get("id")),
+      ...(actor.role === "PARTNER" ? { partnerId: actor.partnerId! } : actor.role === "DRIVER" ? { driverId: actor.id! } : {}),
+    }, select: parcelSelection });
+    if (!parcel) throw new DeliveryError("This package is unavailable in your workspace.", 404);
+    return parcel;
+  }
+  if (resource === "admin-messages") {
+    requireRole(actor, "ADMIN");
+    const page = z.coerce.number().int().min(1).max(100000).parse(search.get("page") ?? 1);
+    const where = { kind: "PARTNER_MESSAGE_SENT", createdAt: dateFilter(search) };
+    const [items,total] = await Promise.all([
+      db.deliveryActivity.findMany({ where, orderBy: [{ createdAt: "desc" },{ id: "desc" }], take: 10, skip: (page-1)*10 }),
+      db.deliveryActivity.count({ where }),
+    ]);
+    return { items, total, page, pageSize: 10 };
+  }
   const range = dateFilter(search);
   if (resource === "rider-summary") {
     requireRole(actor, "DRIVER");
@@ -181,17 +211,17 @@ export async function deliveryQuery(
     return partnerHistory(actor, search, page);
   if (resource === "applications") {
     requireRole(actor, "ADMIN");
+    const applicationId = search.get("applicationId") ? z.uuid().parse(search.get("applicationId")) : undefined;
+    const where = { id: applicationId, submittedAt: { not: null, ...(applicationId ? {} : range) } };
     const [items, total] = await Promise.all([
       db.deliveryPartnerApplication.findMany({
-        where: { submittedAt: { not: null, ...range } },
+        where,
         select: applicationSelection,
         orderBy: [{ createdAt: "desc" }, { id: "desc" }],
         take,
         skip,
       }),
-      db.deliveryPartnerApplication.count({
-        where: { submittedAt: { not: null, ...range } },
-      }),
+      db.deliveryPartnerApplication.count({ where }),
     ]);
     return {
       items: items.map((item) => ({
@@ -440,10 +470,12 @@ export async function deliveryQuery(
   }
   if (resource === "partners" || resource === "drivers") {
     requireRole(actor, "ADMIN");
+    const accountId = search.get("accountId") ? z.uuid().parse(search.get("accountId")) : undefined;
     const where = {
+      id: accountId,
       role:
         resource === "partners" ? ("PARTNER" as const) : ("DRIVER" as const),
-      createdAt: range,
+      createdAt: accountId ? undefined : range,
     };
     const [items, total] = await Promise.all([
       db.deliveryAccount.findMany({

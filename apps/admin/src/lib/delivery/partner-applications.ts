@@ -127,6 +127,7 @@ export async function completePartnerApplication(id: string, digest: string) {
         tx,
         "New partner application",
         `${application.businessName} submitted ${application.publicId}. Review it under Partner applications.`,
+        { targetType: "APPLICATION", targetId: application.id },
       );
     }
     return {

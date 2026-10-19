@@ -120,7 +120,7 @@ export async function verifyRiderWorkflows(
       savePushSubscription({ ...rider, userId: foreign.userId }, input),
     );
     ok(
-      "push subscriptions are idempotent, approved-rider-only and cannot be stolen by another account",
+      "push subscriptions are idempotent, approved-workspace-only and cannot be stolen by another account",
     );
     for (let n = 0; n < 12; n++)
       await cmd(partner, {
@@ -236,8 +236,9 @@ export async function verifyRiderWorkflows(
       const subscription = await db.deliveryPushSubscription.findFirstOrThrow({
         where: { driverId: rider.id! },
       });
-      return db.deliveryPushMessage.create({
-        data: { notificationId: notice.id, subscriptionId: subscription.id },
+      return db.deliveryPushMessage.upsert({
+        where: { notificationId_subscriptionId: { notificationId: notice.id, subscriptionId: subscription.id } },
+        create: { notificationId: notice.id, subscriptionId: subscription.id }, update: {},
       });
     }
     const transient = await job();
