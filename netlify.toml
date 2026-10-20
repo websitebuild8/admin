@@ -6,6 +6,9 @@
 
 [build.environment]
   NODE_VERSION = "22"
+  # WEB_PUSH_SUBJECT is our public HTTPS contact URL, also used in docs/tests.
+  # Keep every credential scanned; this exception covers only that public URL.
+  SECRETS_SCAN_OMIT_KEYS = "WEB_PUSH_SUBJECT"
 
 # Public database CA only. Private credentials belong in Netlify's dashboard.
 [functions]

@@ -76,3 +76,14 @@ Do not install duplicate HTTP invoice schedules in Netlify or another host.
   Refresh old browser tabs after deployment; their cached JavaScript is obsolete.
 
 No deployment or live acceptance is implied by this guide.
+
+
+### Secret-scanning false positive for the push contact URL
+
+The failed production deploy `022b412` (20 October 2026) reported only `WEB_PUSH_SUBJECT`, in `scripts/setup-rider-push.ts` and `src/lib/delivery-request-origin.test.ts`. Its configured value is the public site/contact URL, intentionally present in setup code and same-origin tests. This is not a Clerk secret-key leak; the environment-variable list in the resolved configuration is not a list of exposed secrets.
+
+The root `netlify.toml` places `SECRETS_SCAN_OMIT_KEYS = "WEB_PUSH_SUBJECT"` under `[build.environment]`. This is a narrow, public-value exception. All other credentials and file paths remain scanned. Do not put secret credentials in `WEB_PUSH_SUBJECT`; it is exclusively an HTTPS contact origin or `mailto:` contact. Do not add `CLERK_SECRET_KEY`, database credentials, Supabase secret keys, `WEB_PUSH_PRIVATE_KEY` or `PUSH_CRON_SECRET` to the omit list.
+
+Commit/push the configuration and redeploy. A successful Netlify redeploy has not been verified locally. If another variable is reported, inspect its specific findings before changing the exception. Source: [Netlify’s scanning configuration](https://docs.netlify.com/build/environment-variables/secrets-controller/#configure-secret-scanning).
+
+The operator’s current configured private values were checked against tracked files and the local production output in plaintext, Base64 and URI-encoded forms without printing the values. No matches were found. `.env.local` is ignored and not tracked. This check covers the current checkout/build and current local values; it does not certify all historic commits or different values configured on Netlify.

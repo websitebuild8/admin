@@ -596,3 +596,10 @@ At the operator’s request, received notification rows in Admin, Partner and Ri
 Message composer, send review and sent-message dialogs inherit the existing Light/Dark/System tokens, with explicit themed backgrounds, foregrounds, inputs and actions. Fictional-data browser checks confirmed no links in received notification bodies and readable light/dark/system message dialogs. Push keys were verified/preserved by the existing setup command without printing values; `.env.local` remains ignored by Git. No message or external environment setting was submitted.
 
 The revised suite passed all 79 unit tests, including inbox-only push navigation for old/new payloads. TypeScript, ESLint and the production build passed. Browser checks confirmed plain-text notification rows in all three workspaces and readable message dialogs in Light, Dark and System; mobile was checked at 390px.
+
+
+### 20 October 2026 — Netlify push-subject scan failure
+
+Read the failed Netlify deploy `6ad73bc9bebf47be085a113e` directly. The actual scanner finding was only `WEB_PUSH_SUBJECT`, matching the public contact URL in setup code and same-origin tests. Added a root TOML build-environment exception for that single public variable. All credential names and all paths remain scanned; scanning is not disabled. Validated TOML and whitespace.
+
+A read-only audit inspected 515 tracked/build files for current local environment values in plaintext, Base64 and URI-encoded forms. No current Clerk secret, database URL, Supabase secret, private push key or cron-signing secret matched. Expected public-value matches were the push contact URL and Clerk publishable key. Values were not printed. This does not certify Git history or Netlify-only values. No credential rotation, history rewrite, commit, push or redeployment was performed; the hosted scan must be rechecked after the operator pushes this configuration.
