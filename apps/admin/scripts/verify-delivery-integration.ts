@@ -35,6 +35,7 @@ import { verifyRiderCollect } from "./verify-rider-collect";
 import { verifyWorkspaceNotifications } from "./verify-workspace-notifications";
 import { verifyFinance } from "./verify-finance";
 import { verifyMidnightCutoff } from "./verify-midnight-cutoff";
+import { verifyAdminNotifications } from "./verify-admin-notifications";
 import {
   nextCutoff,
   type Actor,
@@ -88,6 +89,7 @@ async function main() {
       "20261019010000_clear_notifications",
       "20261020000000_workspace_notifications",
       "20261020010000_midnight_invoice_cutoff",
+      "20261021000000_admin_browser_alerts",
     ]) {
       if (
         folder === "20261020010000_midnight_invoice_cutoff" &&
@@ -202,6 +204,14 @@ async function main() {
         description: "Not a real delivery",
       },
     });
+    if (process.argv.includes("--admin-alerts")) {
+      await verifyWorkspaceNotifications(db, admin, partner, other, driver, ok);
+      await verifyAdminNotifications(db, admin, partner, other, driver, ok);
+      await verifyNotificationClearing(db, admin, partner, driver, ok);
+      await verifyRiderWorkflows(db, admin, other, ok);
+      console.log(`Verified ${checks} admin/partner/rider notification and push checks in a disposable schema.`);
+      return;
+    }
     if (process.argv.includes("--midnight-cutoff")) {
       await verifyMidnightCutoff(
         db,

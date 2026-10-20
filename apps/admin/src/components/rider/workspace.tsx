@@ -70,6 +70,7 @@ import {
   type RiderSnapshot,
 } from "@/lib/delivery/rider-contract";
 import { PushAlerts } from "./push-alerts";
+import { AdminMessageButton, SentMessages } from "@/components/delivery/partner-messages";
 import {
   Table,
   TableHeader,
@@ -191,7 +192,8 @@ function RiderWorkspaceContent({
     [error, setError] = useState(""),
     [refreshing, setRefreshing] = useState(false);
   const [page, setPage] = useState(1),
-    [query, setQuery] = useState("");
+    [query, setQuery] = useState(""),
+    [messageRevision, setMessageRevision] = useState(0);
   const [selected, setSelected] = useState<string[]>([]),
     [action, setAction] = useState<Action | null>(null),
     [busy, setBusy] = useState(false),
@@ -459,7 +461,7 @@ function RiderWorkspaceContent({
             <RiderSkeleton />
           ) : (
             <>
-              {(screen === "collections" || screen === "notifications") && (
+              {screen === "notifications" && (
                 <PushAlerts
                   publicKey={snapshot.config.pushPublicKey}
                   userId={actor.userId}
@@ -520,10 +522,13 @@ function RiderWorkspaceContent({
                       : "Notifications"}
                 </h2>
                 {screen === "notifications" && (
+                  <div className="d-row-actions">
+                  <AdminMessageButton changed={() => { setMessageRevision(r => r + 1); void load(); }}/>
                   <ClearNotifications
                     total={snapshot.notices.total}
                     onCleared={() => setPage(1)}
                   />
+                  </div>
                 )}
                 {!!chosen.length && (
                   <Button
@@ -637,6 +642,7 @@ function RiderWorkspaceContent({
                   </Button>
                 </div>
               </div>
+              {screen === "notifications" && <SentMessages toAdmin key={period} revision={messageRevision} period={period}/>}
             </>
           )}
         </main>

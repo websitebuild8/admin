@@ -85,11 +85,26 @@ export function PartnerMessageButton({
     </>
   );
 }
+export function AdminMessageButton({ changed }: { changed?: () => void }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <Button variant="outline" onClick={() => setOpen(true)}>
+        <MessageSquare size={15} />
+        Message admin
+      </Button>
+      {open && (
+        <Composer toAdmin close={() => setOpen(false)} changed={changed} />
+      )}
+    </>
+  );
+}
 function Composer({
   initialPartner,
   initialInvoice,
   close,
   changed,
+  toAdmin = false,
 }: {
   initialPartner?: Partner;
   initialInvoice?: {
@@ -100,6 +115,7 @@ function Composer({
   };
   close: () => void;
   changed?: () => void;
+  toAdmin?: boolean;
 }) {
   const [partner, setPartner] = useState(initialPartner),
     [search, setSearch] = useState(""),
@@ -114,7 +130,9 @@ function Composer({
   const key = useRef<string | null>(null),
     locked = useRef(false);
   const partners = useMessageData<Partner[]>(
-    !partner ? `finance-partners?q=${encodeURIComponent(search)}` : null,
+    !toAdmin && !partner
+      ? `finance-partners?q=${encodeURIComponent(search)}`
+      : null,
   );
   const invoices = useMessageData<FinanceList>(
     partner && reminder && !invoice
@@ -127,7 +145,7 @@ function Composer({
     setError("");
   }
   async function send() {
-    if (locked.current || !partner) return;
+    if (locked.current || (!toAdmin && !partner)) return;
     locked.current = true;
     setBusy(true);
     setError("");
@@ -139,13 +157,17 @@ function Composer({
           "Content-Type": "application/json",
           "Idempotency-Key": key.current,
         },
-        body: JSON.stringify({
-          type: "sendPartnerMessage",
-          partnerId: partner.id,
-          title: reminder ? "Payment reminder" : title,
-          message,
-          ...(reminder && invoice ? { invoiceId: invoice.id } : {}),
-        }),
+        body: JSON.stringify(
+          toAdmin
+            ? { type: "sendAdminMessage", title, message }
+            : {
+                type: "sendPartnerMessage",
+                partnerId: partner!.id,
+                title: reminder ? "Payment reminder" : title,
+                message,
+                ...(reminder && invoice ? { invoiceId: invoice.id } : {}),
+              },
+        ),
       });
       const v = await r.json();
       if (!r.ok) throw new Error(v.error ?? "Could not send this message.");
@@ -162,7 +184,7 @@ function Composer({
     }
   }
   const valid =
-    !!partner &&
+    (toAdmin || !!partner) &&
     (reminder
       ? !!invoice
       : title.trim().length >= 3 && message.trim().length >= 5);
@@ -178,12 +200,16 @@ function Composer({
           <DialogTitle>
             {review
               ? "Review message"
-              : reminder
-                ? "Payment reminder"
-                : "Message partner"}
+              : toAdmin
+                ? "Message admin"
+                : reminder
+                  ? "Payment reminder"
+                  : "Message partner"}
           </DialogTitle>
           <DialogDescription>
-            {partner?.businessName ?? "Choose a business"}
+            {toAdmin
+              ? "iGO Delivery administration"
+              : (partner?.businessName ?? "Choose a business")}
           </DialogDescription>
         </DialogHeader>
         {review ? (
@@ -198,11 +224,13 @@ function Composer({
               </p>
             )}
             <p className="d-message-body">{message}</p>
-            <p>Partner inbox · browser alerts if enabled.</p>
+            <p>
+              {toAdmin ? "Admin" : "Partner"} inbox · browser alerts if enabled.
+            </p>
           </div>
         ) : (
           <>
-            {!partner ? (
+            {!partner && !toAdmin ? (
               <div className="d-message-choices">
                 <Label htmlFor="partner-search">Partner</Label>
                 <Input
@@ -225,7 +253,7 @@ function Composer({
               </div>
             ) : (
               <>
-                {!initialPartner && (
+                {!initialPartner && !toAdmin && (
                   <Button
                     variant="ghost"
                     onClick={() => {
@@ -236,7 +264,7 @@ function Composer({
                     Change partner
                   </Button>
                 )}
-                {!initialInvoice && (
+                {!initialInvoice && !toAdmin && (
                   <div className="d-row-actions">
                     <Button
                       variant={!reminder ? "default" : "outline"}
@@ -357,22 +385,24 @@ type Sent = {
     invoiceId?: string;
   };
 };
-export function SentPartnerMessages({
+export function SentMessages({
   revision,
   period = "",
+  toAdmin = false,
 }: {
   revision: number;
   period?: string;
+  toAdmin?: boolean;
 }) {
   const [page, setPage] = useState(1),
     [selected, setSelected] = useState<Sent>();
   const state = useMessageData<{ items: Sent[]; total: number }>(
-    `admin-messages?page=${page}&revision=${revision}&${period}`,
+    `${toAdmin ? "sent-admin-messages" : "admin-messages"}?page=${page}&revision=${revision}&${period}`,
   );
   return (
     <section className="d-card d-sent-messages">
       <header className="d-card-header">
-        <h2>Sent to partners</h2>
+        <h2>{toAdmin ? "Sent to admin" : "Sent to partners"}</h2>
       </header>
       {state.error && (
         <p role="alert" className="d-error">
@@ -388,7 +418,11 @@ export function SentPartnerMessages({
               onClick={() => setSelected(s)}
             >
               <strong>{s.detail.title}</strong>
-              <span>{s.detail.businessName}</span>
+              <span>
+                {toAdmin
+                  ? "iGO Delivery administration"
+                  : s.detail.businessName}
+              </span>
               <time>
                 {new Date(s.createdAt).toLocaleString("en-GB", {
                   timeZone: "Indian/Maldives",
@@ -432,7 +466,9 @@ export function SentPartnerMessages({
           <DialogHeader>
             <DialogTitle>{selected?.detail.title}</DialogTitle>
             <DialogDescription>
-              {selected?.detail.businessName}
+              {toAdmin
+                ? "iGO Delivery administration"
+                : selected?.detail.businessName}
             </DialogDescription>
           </DialogHeader>
           <p className="d-message-body">{selected?.detail.message}</p>

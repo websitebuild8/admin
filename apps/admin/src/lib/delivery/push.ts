@@ -12,32 +12,36 @@ import {
 import { superAdminIds } from "./admin-policy";
 import { workspacePushPayload } from "./notification-contract";
 import { assertOperationalActor } from "./role-authorization";
+import {
+  assertAdministrator,
+  hasAdministratorAccess,
+} from "./admin-authorization";
 import { pushSettings } from "./push-settings";
 
 export async function savePushSubscription(actor: Actor, raw: unknown) {
-  requireRole(actor, "PARTNER", "DRIVER");
+  requireRole(actor, "ADMIN", "PARTNER", "DRIVER");
   const input = pushSubscriptionInput.parse(raw);
   if (input.action === "subscribe" && !pushSettings())
     throw new DeliveryError("Background alerts are not configured yet.", 503);
   return database().$transaction(async (tx) => {
-    await assertOperationalActor(tx, actor);
+    if (actor.role === "ADMIN") await assertAdministrator(tx, actor);
+    else await assertOperationalActor(tx, actor);
     const lock = createHash("sha256").update(input.endpoint).digest("hex");
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${"push:" + lock},0))`;
-    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${"push-driver:" + actor.id},0))`;
-    const current = await tx.deliveryAccount.findFirst({
-      where: {
-        id: actor.id!,
-        clerkUserId: actor.userId,
-        role: actor.role as "PARTNER" | "DRIVER",
-        status: "APPROVED",
-      },
-    });
-    if (!current)
-      throw new DeliveryError("Your approved workspace access has changed.", 403);
+    const owner =
+      actor.role === "ADMIN"
+        ? { adminUserId: actor.userId }
+        : { driverId: actor.id! };
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${"push-owner:" + actor.role + ":" + actor.userId},0))`;
     const existing = await tx.deliveryPushSubscription.findUnique({
       where: { endpoint: input.endpoint },
     });
-    if (existing && existing.driverId !== actor.id)
+    if (
+      existing &&
+      (actor.role === "ADMIN"
+        ? existing.adminUserId !== actor.userId
+        : existing.driverId !== actor.id || existing.adminUserId !== null)
+    )
       throw new DeliveryError(
         "This browser is linked to a different account. Disable its old subscription before enabling this account.",
         409,
@@ -52,7 +56,7 @@ export async function savePushSubscription(actor: Actor, raw: unknown) {
     if (
       !existing &&
       (await tx.deliveryPushSubscription.count({
-        where: { driverId: actor.id! },
+        where: owner,
       })) >= 5
     )
       throw new DeliveryError(
@@ -61,7 +65,7 @@ export async function savePushSubscription(actor: Actor, raw: unknown) {
       );
     await tx.deliveryPushSubscription.upsert({
       where: { endpoint: input.endpoint },
-      create: { driverId: actor.id!, endpoint: input.endpoint, ...input.keys },
+      create: { ...owner, endpoint: input.endpoint, ...input.keys },
       update: input.keys,
     });
     return { message: "Background alerts enabled on this browser." };
@@ -107,9 +111,25 @@ export async function dispatchRiderPush(sender?: PushSender) {
       },
     });
   });
-  const secondaryUsers = [...new Set(jobs.filter(j => !j.subscription.driver.primary).map(j => j.subscription.driver.clerkUserId))];
-  const activeGrants = secondaryUsers.length ? await db.deliveryAdminGrant.findMany({ where: { clerkUserId: { in: secondaryUsers }, active: true }, select: { clerkUserId: true } }) : [];
-  const extraAccess = new Set([...superAdminIds(), ...activeGrants.map(g => g.clerkUserId)]);
+  const secondaryUsers = [
+    ...new Set(
+      jobs.flatMap((j) =>
+        j.subscription.driver && !j.subscription.driver.primary
+          ? [j.subscription.driver.clerkUserId]
+          : [],
+      ),
+    ),
+  ];
+  const activeGrants = secondaryUsers.length
+    ? await db.deliveryAdminGrant.findMany({
+        where: { clerkUserId: { in: secondaryUsers }, active: true },
+        select: { clerkUserId: true },
+      })
+    : [];
+  const extraAccess = new Set([
+    ...superAdminIds(),
+    ...activeGrants.map((g) => g.clerkUserId),
+  ]);
   const send: PushSender =
     sender ??
     ((subscription, payload) =>
@@ -121,13 +141,22 @@ export async function dispatchRiderPush(sender?: PushSender) {
       }));
   async function deliver(job: (typeof jobs)[number]) {
     const subscription = job.subscription;
+    const driver = subscription.driver;
+    const admin = subscription.adminUserId;
+    const role = admin ? "ADMIN" : driver?.role;
+    const allowed = admin
+      ? await hasAdministratorAccess(admin)
+      : !!driver &&
+        driver.status === "APPROVED" &&
+        (driver.primary || extraAccess.has(driver.clerkUserId));
     const where = { id: job.id, state: "PENDING", leaseToken: token };
     if (
-      subscription.driver.status !== "APPROVED" ||
-      (!subscription.driver.primary && !extraAccess.has(subscription.driver.clerkUserId)) ||
-      !["PARTNER", "DRIVER"].includes(subscription.driver.role) ||
-      job.notification.recipient !== subscription.driver.clerkUserId ||
-      !["ACCOUNT", subscription.driver.role].includes(job.notification.workspace) ||
+      !allowed ||
+      !role ||
+      job.notification.recipient !== (admin ?? driver?.clerkUserId) ||
+      !(admin ? ["ADMIN"] : ["ACCOUNT", role]).includes(
+        job.notification.workspace,
+      ) ||
       job.notification.readAt ||
       job.createdAt.getTime() < Date.now() - 86400000 ||
       !allowedPushEndpoint(subscription.endpoint)
@@ -155,7 +184,7 @@ export async function dispatchRiderPush(sender?: PushSender) {
           endpoint: subscription.endpoint,
           keys: { p256dh: subscription.p256dh, auth: subscription.auth },
         },
-        JSON.stringify(workspacePushPayload(job.notification, subscription.driver.role)),
+        JSON.stringify(workspacePushPayload(job.notification, role)),
       );
       await db.deliveryPushMessage.updateMany({
         where,

@@ -193,6 +193,7 @@ export async function manageAdministrator(
       where: { id: grant.id },
       data: { active: false, revokedBy: actor.userId, revokedAt: new Date() },
     });
+    await tx.deliveryPushSubscription.deleteMany({ where: { adminUserId: grant.clerkUserId } });
     await audit(tx, actor, "ADMIN_ACCESS_REVOKED", grant.id, {
       targetUserId: grant.clerkUserId,
       email: grant.email,

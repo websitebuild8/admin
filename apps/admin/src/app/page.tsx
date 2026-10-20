@@ -46,13 +46,6 @@ export default function Page() {
               Delivery rates
             </a>
             <Link
-              className="d-nav-rider"
-              href="/rider/join"
-              transitionTypes={["igo-forward"]}
-            >
-              Become a rider <ArrowUpRight size={14} aria-hidden="true" />
-            </Link>
-            <Link
               className="d-nav-sign-in"
               href="/partner/sign-in"
               aria-label="Partner sign in"

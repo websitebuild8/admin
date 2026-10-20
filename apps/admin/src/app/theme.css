@@ -157,7 +157,6 @@ body:has(.theme-in-header) .theme-fallback { display: none; }
 @media (max-width: 760px) {
   .brand-theme-group { gap: 8px; }
   .d-site-header nav { gap: 8px; }
-  .d-site-header .d-nav-rider svg { display: none; }
   .d-join-header { gap: 12px; flex-wrap: wrap; }
   .d-join-header-actions { gap: 10px; max-width: 100%; margin-left: auto; min-width: 0; flex: 1 1 120px; }
   .d-topbar { gap: 10px; }

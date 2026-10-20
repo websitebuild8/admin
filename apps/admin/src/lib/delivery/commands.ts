@@ -67,8 +67,10 @@ export async function notifyAdmins(tx: Tx, title: string, message: string, targe
   const grants = await tx.deliveryAdminGrant.findMany({
     where: { active: true }, select: { clerkUserId: true },
   });
-  for (const recipient of new Set([...superAdminIds(), ...grants.map((g) => g.clerkUserId)]))
+  const recipients = new Set([...superAdminIds(), ...grants.map((g) => g.clerkUserId)]);
+  for (const recipient of recipients)
     await notify(tx, recipient, title, message, "ADMIN", target);
+  return recipients.size;
 }
 
 export async function serialized<T extends Prisma.InputJsonValue>(
@@ -812,6 +814,12 @@ export async function deliveryCommand(
           "PARTNER",
           { targetType: "PAYMENT", targetId: payment.id },
         );
+        if (command.decision === "CONFIRM") {
+          const paid = payment.invoice.paid + command.confirmedAmount;
+          await notifyAdmins(tx, paid >= payment.invoice.total ? "Invoice paid" : "Invoice payment verified",
+            `${payment.invoice.publicId}: ${money(command.confirmedAmount)} verified. ${paid >= payment.invoice.total ? "The invoice is fully paid." : `${money(payment.invoice.total - paid)} remains outstanding.`}`,
+            { targetType: "PAYMENT", targetId: payment.id });
+        }
         return {
           message:
             command.decision === "REJECT"
@@ -995,12 +1003,23 @@ export async function deliveryCommand(
           { title, message, invoiceId: command.invoiceId ?? null, businessName: partner.businessName }, partner.id);
         return { message: "Message sent to the partner inbox.", notificationId: notice.id };
       }
-      case "testPush": {
+      case "sendAdminMessage": {
         requireRole(actor, "PARTNER", "DRIVER");
+        const profile = await tx.deliveryAccount.findUniqueOrThrow({ where: { id: actor.id! }, include: { partner: { select: { businessName: true } } } });
+        const senderName = actor.role === "PARTNER" ? profile.partner!.businessName : profile.name;
+        const delivered = await notifyAdmins(tx, command.title,
+          `${senderName} · ${actor.role === "PARTNER" ? "Partner" : "Rider"}\n\n${command.message}`);
+        if (!delivered) throw new DeliveryError("The admin inbox is unavailable. Please contact iGO support.", 503);
+        const messageId = randomUUID();
+        await audit(tx, actor, "ADMIN_MESSAGE_SENT", messageId, { title: command.title, message: command.message, senderName }, actor.partnerId ?? undefined);
+        return { message: "Message sent to the admin inbox." };
+      }
+      case "testPush": {
+        requireRole(actor, "ADMIN", "PARTNER", "DRIVER");
         if (!pushSettings()) throw new DeliveryError("Browser alerts need server configuration.", 503);
-        const subscriptions = await tx.deliveryPushSubscription.count({ where: { driverId: actor.id! } });
+        const subscriptions = await tx.deliveryPushSubscription.count({ where: actor.role === "ADMIN" ? { adminUserId: actor.userId } : { driverId: actor.id! } });
         if (!subscriptions) throw new DeliveryError("Enable browser alerts on this device first.", 409);
-        await notify(tx, actor.userId, "Browser alerts test", "Browser alerts are connected to your iGO workspace.", actor.role as "PARTNER" | "DRIVER");
+        await notify(tx, actor.userId, "Browser alerts test", "Browser alerts are connected to your iGO workspace.", actor.role as "ADMIN" | "PARTNER" | "DRIVER");
         return { message: "Test alert queued. Check this device’s notifications." };
       }
       case "openNotice": {

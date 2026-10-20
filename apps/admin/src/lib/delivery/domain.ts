@@ -123,6 +123,7 @@ export const applicationInput = z
 export const commandInput = z.discriminatedUnion("type", [
   z.object({ type: z.literal("openNotice"), id: uuid }).strict(),
   z.object({ type: z.literal("testPush") }).strict(),
+  z.object({ type: z.literal("sendAdminMessage"), title: text(3, 100), message: text(5, 1000) }).strict(),
   z.object({ type: z.literal("sendPartnerMessage"), partnerId: uuid,
     invoiceId: uuid.optional(), title: text(3, 100), message: text(0, 1000),
   }).strict().refine(v => !!v.invoiceId || v.message.length >= 5, { message: "Enter a message of at least 5 characters.", path: ["message"] }),

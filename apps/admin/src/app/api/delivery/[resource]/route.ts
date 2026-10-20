@@ -152,7 +152,7 @@ export async function POST(request: Request, context: Context) {
       ["receipt", "import"].includes(resource) ? 10 : 1,
     );
     if (resource === "push-subscription") {
-      requireRole(actor, "PARTNER", "DRIVER");
+      requireRole(actor, "ADMIN", "PARTNER", "DRIVER");
       const { savePushSubscription } = await import("@/lib/delivery/push");
       return json(
         await savePushSubscription(
@@ -280,7 +280,7 @@ export async function POST(request: Request, context: Context) {
     const command = commandInput.parse(
       JSON.parse((await boundedBody(request, 64000)).toString("utf8")),
     );
-    if (command.type === "sendPartnerMessage" || command.type === "testPush")
+    if (command.type === "sendPartnerMessage" || command.type === "sendAdminMessage" || command.type === "testPush")
       await limitRequests(actor, command.type, command.type === "testPush" ? 3 : 10, 1);
     const result = await deliveryCommand(actor, key, command);
     if (command.type === "rate" || command.type === "destination") {

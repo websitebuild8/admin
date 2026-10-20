@@ -83,7 +83,7 @@ export async function deliveryQuery(
     };
   requireRole(actor, "ADMIN", "PARTNER", "DRIVER");
   if (resource === "push-config") {
-    requireRole(actor, "PARTNER", "DRIVER");
+    requireRole(actor, "ADMIN", "PARTNER", "DRIVER");
     return { publicKey: pushSettings()?.publicKey ?? null };
   }
   if (resource === "notification-detail") {
@@ -102,10 +102,11 @@ export async function deliveryQuery(
     if (!parcel) throw new DeliveryError("This package is unavailable in your workspace.", 404);
     return parcel;
   }
-  if (resource === "admin-messages") {
-    requireRole(actor, "ADMIN");
+  if (resource === "admin-messages" || resource === "sent-admin-messages") {
+    if (resource === "admin-messages") requireRole(actor, "ADMIN");
+    else requireRole(actor, "PARTNER", "DRIVER");
     const page = z.coerce.number().int().min(1).max(100000).parse(search.get("page") ?? 1);
-    const where = { kind: "PARTNER_MESSAGE_SENT", createdAt: dateFilter(search) };
+    const where = { kind: resource === "admin-messages" ? "PARTNER_MESSAGE_SENT" : "ADMIN_MESSAGE_SENT", createdAt: dateFilter(search), ...(resource === "sent-admin-messages" ? { actor: actor.userId, role: actor.role } : {}) };
     const [items,total] = await Promise.all([
       db.deliveryActivity.findMany({ where, orderBy: [{ createdAt: "desc" },{ id: "desc" }], take: 10, skip: (page-1)*10 }),
       db.deliveryActivity.count({ where }),

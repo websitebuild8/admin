@@ -98,6 +98,10 @@ export async function verifyNotificationClearing(
   const before = await db.deliveryNotification.count({
     where: { recipient: admin.userId, workspace: { in: ["ADMIN", "ACCOUNT"] } },
   });
+  const previousClearEvents = await db.deliveryActivity.findMany({
+    where: { kind: "NOTIFICATIONS_CLEARED", actor: admin.userId, role: "ADMIN" },
+    select: { id: true },
+  });
   const key = randomUUID();
   const [first, duplicate] = await Promise.all([
     deliveryCommand(admin, key, { type: "clearNotices" }),
@@ -133,6 +137,7 @@ export async function verifyNotificationClearing(
       kind: "NOTIFICATIONS_CLEARED",
       actor: admin.userId,
       role: "ADMIN",
+      id: { notIn: previousClearEvents.map(event => event.id) },
     },
   });
   assert.deepEqual(
@@ -173,7 +178,7 @@ export async function verifyNotificationClearing(
         role: "ADMIN",
       },
     }),
-    1,
+    previousClearEvents.length + 1,
   );
   await deliveryCommand(admin, randomUUID(), { type: "clearNotices" });
   const empty = await deliveryCommand(admin, randomUUID(), {

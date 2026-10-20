@@ -344,8 +344,9 @@ model DeliveryInvoiceDispatch {
 
 model DeliveryPushSubscription {
   id String @id @default(uuid()) @db.Uuid
-  driverId String @db.Uuid
-  driver DeliveryAccount @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  driverId String? @db.Uuid
+  driver DeliveryAccount? @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  adminUserId String?
   endpoint String @unique
   p256dh String
   auth String
@@ -353,6 +354,7 @@ model DeliveryPushSubscription {
   updatedAt DateTime @updatedAt @db.Timestamptz(3)
   messages DeliveryPushMessage[]
   @@index([driverId])
+  @@index([adminUserId])
 }
 
 model DeliveryPushMessage {

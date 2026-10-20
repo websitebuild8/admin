@@ -4,6 +4,7 @@ import { deliveryFetch } from "@/lib/delivery/fetch";
 import { useEffect, useState } from "react";
 import { Bell, BellRing } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { workspacePaths, type DeliveryWorkspace } from "@/lib/delivery/workspace-contract";
 
 function keyBytes(value: string) {
   const base64 = value.replace(/-/g, "+").replace(/_/g, "/");
@@ -53,9 +54,9 @@ export function PushAlerts({
 }: {
   publicKey: string | null;
   userId: string;
-  workspace?: "PARTNER" | "DRIVER";
+  workspace?: DeliveryWorkspace;
 }) {
-  const base = workspace === "PARTNER" ? "/partner" : "/rider";
+  const base = workspacePaths[workspace];
   const ownerKey = pushOwnerKey(workspace);
   const [supported, setSupported] = useState(true),
     [enabled, setEnabled] = useState(false),

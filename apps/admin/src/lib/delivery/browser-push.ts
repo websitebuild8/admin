@@ -1,5 +1,6 @@
-export const pushOwnerKey = (workspace: "PARTNER" | "DRIVER") =>
-  workspace === "PARTNER" ? "igo-partner-push-owner" : "igo-rider-push-owner";
+import type { DeliveryWorkspace } from "./workspace-contract";
+export const pushOwnerKey = (workspace: DeliveryWorkspace) =>
+  workspace === "ADMIN" ? "igo-admin-push-owner" : workspace === "PARTNER" ? "igo-partner-push-owner" : "igo-rider-push-owner";
 
 // Wait for this workspace's worker, rather than another scope's global ready promise.
 export async function waitForPushWorker(

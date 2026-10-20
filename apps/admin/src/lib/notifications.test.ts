@@ -44,13 +44,33 @@ test("notification commands accept known targets and reject arbitrary recipients
     }).success,
   );
   assert.equal(noticeId("bad-id"), null);
+  assert(
+    commandInput.safeParse({
+      type: "sendAdminMessage",
+      title: "Collection update",
+      message: "Please contact our business.",
+    }).success,
+  );
+  for (const extra of [
+    { recipient: "another-user" },
+    { partnerId: id },
+    { role: "ADMIN" },
+  ])
+    assert(
+      !commandInput.safeParse({
+        type: "sendAdminMessage",
+        title: "Collection update",
+        message: "Please contact our business.",
+        ...extra,
+      }).success,
+    );
 });
 test("browser push contains a protected inbox link, with no message or payment details", () => {
-  for (const role of ["PARTNER", "DRIVER"]) {
+  for (const role of ["ADMIN", "PARTNER", "DRIVER"]) {
     const payload = workspacePushPayload({ id }, role);
     assert.equal(
       payload.url,
-      `/${role === "PARTNER" ? "partner" : "rider"}/notifications`,
+      `/${role === "ADMIN" ? "delivery" : role === "PARTNER" ? "partner" : "rider"}/notifications`,
     );
     assert.equal(payload.body, "You have an update in your iGO workspace.");
   }
@@ -58,6 +78,7 @@ test("browser push contains a protected inbox link, with no message or payment d
 test("phone alerts always open the workspace inbox, including old per-record payloads", () => {
   const source = readFileSync("public/delivery-notifications-sw.js", "utf8");
   for (const [role, base] of [
+    ["ADMIN", "/delivery"],
     ["PARTNER", "/partner"],
     ["DRIVER", "/rider"],
   ]) {

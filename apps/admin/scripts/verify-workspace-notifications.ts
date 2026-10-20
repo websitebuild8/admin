@@ -56,7 +56,7 @@ export async function verifyWorkspaceNotifications(
         action: "unsubscribe",
         endpoint: subscription.endpoint,
       }),
-      { status: 403 },
+      { status: 409 },
     );
     ok(
       "approved partners can enable push; other accounts cannot take or remove their subscription",

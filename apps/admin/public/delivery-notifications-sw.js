@@ -1,5 +1,5 @@
 /* Push only. Private pages and API responses are never cached. */
-const base = self.IGO_WORKSPACE === "PARTNER" ? "/partner" : "/rider";
+const base = self.IGO_WORKSPACE === "ADMIN" ? "/delivery" : self.IGO_WORKSPACE === "PARTNER" ? "/partner" : "/rider";
 // Ignore older per-record destinations too: a phone alert opens only this inbox.
 function safePath() { return `${base}/notifications`; }
 self.addEventListener("install", () => self.skipWaiting());
@@ -14,7 +14,7 @@ self.addEventListener("push", e => {
       data: { url }, renotify: false,
     }),
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(clients => {
-      for (const client of clients) if (new URL(client.url).pathname.startsWith(`${base}/`)) client.postMessage({ type: base === "/rider" ? "IGO_RIDER_UPDATE" : "IGO_PARTNER_UPDATE" });
+      for (const client of clients) if (new URL(client.url).pathname.startsWith(`${base}/`)) client.postMessage({ type: `IGO_${self.IGO_WORKSPACE === "DRIVER" ? "RIDER" : self.IGO_WORKSPACE}_UPDATE` });
     }),
   ]));
 });

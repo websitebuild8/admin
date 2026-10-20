@@ -19,7 +19,7 @@ const WorkspaceProfiles = dynamic(
 );
 import { deliveryFetch } from "@/lib/delivery/fetch";
 import { noticeId } from "@/lib/delivery/notification-contract";
-import { PartnerMessageButton, SentPartnerMessages } from "./partner-messages";
+import { AdminMessageButton, PartnerMessageButton, SentMessages } from "./partner-messages";
 import { PushAlerts } from "@/components/rider/push-alerts";
 import { ClearNotifications } from "./clear-notifications";
 import {
@@ -789,10 +789,10 @@ function DeliveryPortalContent({
   const retry = useRef<{ body: string; key: string } | null>(null);
   useEffect(() => {
     if (!("serviceWorker" in navigator)) return;
-    const update = (event: MessageEvent) => { if (event.data?.type === "IGO_PARTNER_UPDATE") setRevision(r => r+1); };
+    const update = (event: MessageEvent) => { if (event.data?.type === (actor.role === "ADMIN" ? "IGO_ADMIN_UPDATE" : "IGO_PARTNER_UPDATE")) setRevision(r => r+1); };
     navigator.serviceWorker.addEventListener("message", update);
     return () => navigator.serviceWorker.removeEventListener("message", update);
-  }, []);
+  }, [actor.role]);
 
   const workspaceBase = actor.role === "PARTNER" ? "/partner" : "/delivery";
   const resource = portalResource(screen);
@@ -812,7 +812,7 @@ function DeliveryPortalContent({
     true,
     initial?.notices,
   );
-  const pushConfig = useResource<{ publicKey: string | null }>("push-config", "", 0, actor.role === "PARTNER" && ["overview", "notifications"].includes(screen));
+  const pushConfig = useResource<{ publicKey: string | null }>("push-config", "", 0, screen === "notifications");
   const choices = useResource<{
     partners: { id: string; businessName: string }[];
     drivers: { id: string; name: string }[];
@@ -1707,6 +1707,7 @@ function DeliveryPortalContent({
             <div>
               <h2>Your notifications</h2>
               {actor.role === "ADMIN" && <PartnerMessageButton changed={refresh}/>}
+              {actor.role === "PARTNER" && <AdminMessageButton changed={refresh}/>}
             </div>
             <ClearNotifications
               total={notices.data?.total ?? d.total}
@@ -1746,7 +1747,7 @@ function DeliveryPortalContent({
           )}
           <Pager list={d} onPage={changePage} />
         </section>
-        {actor.role === "ADMIN" && <SentPartnerMessages key={periodQuery(selection)} period={periodQuery(selection)} revision={revision}/>}
+        <SentMessages toAdmin={actor.role === "PARTNER"} key={periodQuery(selection)} period={periodQuery(selection)} revision={revision}/>
         </>
       );
     }
@@ -2289,8 +2290,8 @@ function DeliveryPortalContent({
               disabled={busy}
             />
           )}
-          {actor.role === "PARTNER" && pushConfig.data && <PushAlerts workspace="PARTNER" userId={actor.userId} publicKey={pushConfig.data.publicKey}/>}
-          {pushConfig.error && <p className="d-error" role="alert">{pushConfig.error}</p>}
+          {screen === "notifications" && pushConfig.data && <PushAlerts workspace={actor.role === "ADMIN" ? "ADMIN" : "PARTNER"} userId={actor.userId} publicKey={pushConfig.data.publicKey}/>}
+          {screen === "notifications" && pushConfig.error && <p className="d-error" role="alert">{pushConfig.error}</p>}
           {mainContent()}
         </main>
         <footer className="d-footer">

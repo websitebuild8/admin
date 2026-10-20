@@ -1,0 +1,14 @@
+{
+  "id": "/delivery",
+  "name": "iGO Delivery Admin",
+  "short_name": "iGO Admin",
+  "start_url": "/delivery/overview",
+  "scope": "/delivery/",
+  "display": "standalone",
+  "background_color": "#f7f8f5",
+  "theme_color": "#f7f8f5",
+  "icons": [
+    { "src": "/brand/igo-icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/brand/igo-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}
