@@ -574,3 +574,25 @@ production push environment variables, deployment and installation of the retry
 schedule remain external setup steps. There is no live GPS tracking. See
 `docs/rider-web-setup.md` for credentials, setup and device checks. No Git commit,
 push or public deployment was performed.
+
+
+## 20 October 2026 — notification links, partner push, and finance
+
+Implemented typed notification targets and server-checked navigation; partner/rider browser push with independent workspace scopes; administrator messages and invoice reminders with review and durable sent history; and a tenant-scoped partner Finance workspace for invoices, bank receipts, verified payments and completed deliveries.
+
+The notification migration was verified in disposable schemas and applied successfully to Supabase. It preserves existing records and financial rules. The isolated notification/push/finance regression run passed 31 checks; an additional focused run passed 10 target/scheduler checks, including the real SQL invoice function creating exactly one linked notice and push job on replay. These runs overlap; their counts are not additive. Test senders were used and no real notifications or business invoices were created. The final unit suite passed 79 tests, including first-time worker activation, timeout/failure recovery and preserving existing rider subscription ownership.
+
+Browser checks with fictional records passed at 320, 390 and 1440 pixels. Invoice notices opened the precise invoice, rider notices opened package details/directions, general messages opened readable dialogs, the administrator could prepare a custom message and invoice reminder, partner transfer history exposed no verification controls, and finance pages contained at most ten rows. A dark-mode contrast issue in the new dialogs was corrected. No real admin message or browser permission request was submitted.
+
+Local VAPID keys and signing secret were verified without printing values. The retry schedule was absent when checked; Netlify runtime configuration, deployment of the updated code, installation of the retry schedule, and a real-phone closed-site push test remain launch steps. See `docs/notifications-and-partner-finance.md`. The agent did not commit, push or deploy the website.
+
+Final ESLint and production-build checks passed after the browser-activation and dark-dialog fixes. The build retained the existing single-worker CPU limit.
+
+
+### 20 October 2026 — non-clickable notifications and shared message themes
+
+At the operator’s request, received notification rows in Admin, Partner and Rider are plain text again. Explicit mark-read and clear-all controls remain. Browser-push payloads and the shared worker now open only the owning workspace inbox; older queued record destinations are ignored. The unused client notification-navigation component was removed. Existing authorized legacy endpoints/references are retained for compatibility; no database migration or data deletion is needed.
+
+Message composer, send review and sent-message dialogs inherit the existing Light/Dark/System tokens, with explicit themed backgrounds, foregrounds, inputs and actions. Fictional-data browser checks confirmed no links in received notification bodies and readable light/dark/system message dialogs. Push keys were verified/preserved by the existing setup command without printing values; `.env.local` remains ignored by Git. No message or external environment setting was submitted.
+
+The revised suite passed all 79 unit tests, including inbox-only push navigation for old/new payloads. TypeScript, ESLint and the production build passed. Browser checks confirmed plain-text notification rows in all three workspaces and readable message dialogs in Light, Dark and System; mobile was checked at 390px.

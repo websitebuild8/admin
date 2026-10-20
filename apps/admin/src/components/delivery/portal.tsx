@@ -19,7 +19,6 @@ const WorkspaceProfiles = dynamic(
 );
 import { deliveryFetch } from "@/lib/delivery/fetch";
 import { noticeId } from "@/lib/delivery/notification-contract";
-import { NotificationNavigation } from "./notification-navigation";
 import { PartnerMessageButton, SentPartnerMessages } from "./partner-messages";
 import { PushAlerts } from "@/components/rider/push-alerts";
 import { ClearNotifications } from "./clear-notifications";
@@ -1720,11 +1719,11 @@ function DeliveryPortalContent({
                 <div className="d-info-icon">
                   <Bell size={17} />
                 </div>
-                <Link className="d-notice-link" href={`${workspaceBase}/notifications?open=${n.id}`}>
+                <div className="d-notice-body">
                   <strong>{n.title}</strong>
                   <p>{n.message}</p>
                   <small className="d-muted">{stamp(n.createdAt)}</small>
-                </Link>
+                </div>
                 {!n.readAt && (
                   <Button
                     variant="outline"
@@ -2381,7 +2380,6 @@ function DeliveryPortalContent({
           changed={refresh}
         />
       )}
-      <NotificationNavigation />
       {invoiceId && (
         <InvoiceModal
           key={`${invoiceId}:${invoiceTab}`}

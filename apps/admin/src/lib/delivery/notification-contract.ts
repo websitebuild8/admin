@@ -21,6 +21,6 @@ export function workspacePushPayload(notice: { id: string }, role: string) {
     title: "iGO Delivery",
     body: "You have an update in your iGO workspace.",
     tag: `igo-${notice.id}`,
-    url: `${noticeInbox(role)}?open=${notice.id}`,
+    url: noticeInbox(role),
   };
 }

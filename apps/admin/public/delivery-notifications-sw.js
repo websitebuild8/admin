@@ -1,17 +1,7 @@
 /* Push only. Private pages and API responses are never cached. */
 const base = self.IGO_WORKSPACE === "PARTNER" ? "/partner" : "/rider";
-function safePath(raw) {
-  try {
-    const url = new URL(raw, self.location.origin);
-    if (url.origin !== self.location.origin) return `${base}/notifications`;
-    if (base === "/rider" && url.pathname === "/rider/collections" && !url.search) return url.pathname;
-    if (url.pathname === `${base}/notifications`) {
-      const id = url.searchParams.get("open");
-      return /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(id ?? "") ? `${base}/notifications?open=${id}` : `${base}/notifications`;
-    }
-  } catch { /* Open the protected inbox for malformed links. */ }
-  return `${base}/notifications`;
-}
+// Ignore older per-record destinations too: a phone alert opens only this inbox.
+function safePath() { return `${base}/notifications`; }
 self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", e => e.waitUntil(self.clients.claim()));
 self.addEventListener("push", e => {

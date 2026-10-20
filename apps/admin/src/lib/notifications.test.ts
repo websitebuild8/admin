@@ -50,12 +50,12 @@ test("browser push contains a protected inbox link, with no message or payment d
     const payload = workspacePushPayload({ id }, role);
     assert.equal(
       payload.url,
-      `/${role === "PARTNER" ? "partner" : "rider"}/notifications?open=${id}`,
+      `/${role === "PARTNER" ? "partner" : "rider"}/notifications`,
     );
     assert.equal(payload.body, "You have an update in your iGO workspace.");
   }
 });
-test("service workers reject external, cross-workspace and arbitrary notification targets", () => {
+test("phone alerts always open the workspace inbox, including old per-record payloads", () => {
   const source = readFileSync("public/delivery-notifications-sw.js", "utf8");
   for (const [role, base] of [
     ["PARTNER", "/partner"],
@@ -74,7 +74,7 @@ test("service workers reject external, cross-workspace and arbitrary notificatio
       vm.runInContext(`safePath(${JSON.stringify(url)})`, sandbox);
     assert.equal(
       path(`${base}/notifications?open=${id}`),
-      `${base}/notifications?open=${id}`,
+      `${base}/notifications`,
     );
     for (const raw of [
       "https://evil.example/rider/notifications",

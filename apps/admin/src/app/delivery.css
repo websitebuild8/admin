@@ -2997,38 +2997,43 @@ html:has(.d-site) {
   .d-finance-list-controls > [data-slot="select-trigger"] { width: 100%; }
 }
 
-/* Inbox links and message detail share the same touch targets in every workspace. */
-.d-notice-link { display: flex; flex: 1; flex-direction: column; gap: .4rem; min-width: 0; text-align: left; padding: .8rem; border-radius: 14px; color: inherit; text-decoration: none; transition: background .16s ease; overflow-wrap: anywhere; }
-.d-notice-link:hover { background: var(--appearance-soft, #f3f4ef); }
-.d-notice-link:focus-visible { outline: 2px solid var(--appearance-text, #151711); outline-offset: 2px; }
-.d-notice-link p { margin: 0; color: var(--appearance-muted, #777e70); line-height: 1.55; }
-.d-notice-link time { color: var(--appearance-muted, #777e70); font-size: .75rem; }
-.d-message-composer, .d-notification-dialog { max-height: 88dvh; overflow-y: auto; width: min(94vw, 580px); }
+/* Notifications remain readable text; sent-message history has its own action. */
+.d-notice-body, .d-sent-message-button { display: flex; flex: 1; flex-direction: column; gap: .4rem; min-width: 0; text-align: left; padding: .8rem; border-radius: 14px; color: inherit; overflow-wrap: anywhere; }
+.d-notice-body { cursor: default; }
+.d-sent-message-button { transition: background .16s ease; }
+.d-sent-message-button:hover { background: var(--appearance-raised, #f3f4ef); }
+.d-sent-message-button:focus-visible { outline: 2px solid var(--appearance-focus, #bba800); outline-offset: 2px; }
+.d-notice-body p { margin: 0; color: var(--appearance-muted, #777e70); line-height: 1.55; }
+.d-notice-body time, .d-sent-message-button time { color: var(--appearance-muted, #777e70); font-size: .75rem; }
+.d-message-composer, .d-notification-dialog { background: var(--appearance-surface, #fffffff5); color: var(--appearance-text, #151711); max-height: 88dvh; overflow-y: auto; width: min(94vw, 580px); }
 .d-message-choices { display: grid; gap: .55rem; }
 .d-message-choices button { justify-content: flex-start; white-space: normal; text-align: left; height: auto; min-height: 42px; }
 .d-message-input { width: 100%; border: 1px solid var(--appearance-border, #e2e5dc); border-radius: 12px; background: var(--appearance-surface, #fff); padding: .8rem; color: var(--appearance-text, #151711); resize: vertical; }
 .d-message-body { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.7; }
 .d-message-invoice { display: grid; gap: .4rem; padding: 1rem; border: 1px solid var(--appearance-border, #e2e5dc); border-radius: 16px; }
-.d-message-preview { padding: 1rem; border-radius: 16px; background: var(--appearance-soft, #f3f4ef); }
+.d-message-preview { padding: 1rem; border-radius: 16px; background: var(--appearance-raised, #f3f4ef); }
 .d-sent-messages { margin-top: 1.3rem; }
-.d-sent-messages > .d-notice-link { width: 100%; border-bottom: 1px solid var(--appearance-border, #e2e5dc); }
+.d-sent-messages > .d-sent-message-button { width: 100%; border-bottom: 1px solid var(--appearance-border, #e2e5dc); }
 .d-sent-messages > .d-row-actions { padding: 1rem; justify-content: flex-end; }
-.d-linked-package { display: grid; gap: 1.4rem; }
-.d-linked-package h3 { font-weight: 650; margin-bottom: .4rem; }
-.d-linked-package p { color: var(--appearance-muted, #777e70); margin-bottom: .7rem; }
-.d-linked-package dl { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; font-size: .85rem; }
-.d-linked-package dd { text-align: right; }
 .d-app .r-alerts { display: flex; align-items: center; gap: 1rem; padding: 1rem; border: 1px solid var(--appearance-border, #e2e5dc); border-radius: 20px; margin-bottom: 1.3rem; background: var(--appearance-surface, #fff); }
 .d-app .r-alerts > div:nth-child(2) { flex: 1; min-width: 0; }
 .d-app .r-alerts strong { font-size: .875rem; }
 .d-app .r-alerts p { font-size: .75rem; color: var(--appearance-muted, #777e70); margin-top: .25rem; }
 .d-app .r-alert-icon { color: var(--appearance-text, #151711); }
 @media (max-width: 640px) {
-  .d-info-row:has(.d-notice-link) { flex-wrap: wrap; gap: .25rem; align-items: flex-start; }
-  .d-info-row .d-notice-link { flex-basis: calc(100% - 56px); }
-  .d-info-row:has(.d-notice-link) > button { margin-left: 56px; }
+  .d-info-row:has(.d-notice-body) { flex-wrap: wrap; gap: .25rem; align-items: flex-start; }
+  .d-info-row .d-notice-body { flex-basis: calc(100% - 56px); }
+  .d-info-row:has(.d-notice-body) > button { margin-left: 56px; }
   .d-app .r-alerts { flex-wrap: wrap; gap: .65rem; }
   .d-app .r-alerts > div:nth-child(2) { flex-basis: calc(100% - 40px); }
   .d-card-header:has(.d-clear-notifications), .d-card-header:has(.d-row-actions) { flex-wrap: wrap; }
 }
-@media (prefers-reduced-motion: reduce) { .d-notice-link { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .d-sent-message-button { transition: none; } }
+
+/* Portalled message views inherit the site's Light/Dark/System theme tokens. */
+:is(.d-message-composer, .d-notification-dialog) [data-slot="dialog-title"] { color: var(--appearance-text, #151711); padding-right: 28px; }
+:is(.d-message-composer, .d-notification-dialog) [data-slot="dialog-description"] { color: var(--appearance-muted, #687160); }
+.d-message-composer [data-slot="input"] { background: var(--appearance-raised, #fff); border-color: var(--appearance-border, #dfe3d9); color: var(--appearance-text, #151711); }
+.d-message-composer :is([data-variant="outline"], [data-variant="ghost"]), .d-notification-dialog [data-variant="ghost"] { color: var(--appearance-text, #151711); }
+.d-message-composer [data-variant="default"] { background: var(--appearance-accent, #ffea00); color: var(--appearance-on-accent, #17190e); }
+.d-message-composer :is(input, textarea):focus-visible { outline: 2px solid var(--appearance-focus, #c0ad00); outline-offset: 2px; }

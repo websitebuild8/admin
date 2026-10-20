@@ -318,7 +318,7 @@ export async function verifyWorkspaceNotifications(
       assert(!payload.includes("Private"));
       assert(!payload.includes("25.00"));
       assert(
-        JSON.parse(payload).url.startsWith("/partner/notifications?open="),
+        JSON.parse(payload).url === "/partner/notifications",
       );
     }
     ok(

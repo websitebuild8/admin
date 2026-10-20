@@ -198,7 +198,7 @@ function Composer({
               </p>
             )}
             <p className="d-message-body">{message}</p>
-            <p>Sent to the partner’s inbox and enabled browser alerts.</p>
+            <p>Partner inbox · browser alerts if enabled.</p>
           </div>
         ) : (
           <>
@@ -383,7 +383,7 @@ export function SentPartnerMessages({
         state.data.items.length ? (
           state.data.items.map((s) => (
             <button
-              className="d-notice-link"
+              className="d-sent-message-button"
               key={s.id}
               onClick={() => setSelected(s)}
             >
@@ -428,7 +428,7 @@ export function SentPartnerMessages({
           if (!v) setSelected(undefined);
         }}
       >
-        <DialogContent>
+        <DialogContent className="d-notification-dialog">
           <DialogHeader>
             <DialogTitle>{selected?.detail.title}</DialogTitle>
             <DialogDescription>

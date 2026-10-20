@@ -1,4 +1,5 @@
 "use client";
+import { waitForPushWorker, pushOwnerKey } from "@/lib/delivery/browser-push";
 import { deliveryFetch } from "@/lib/delivery/fetch";
 import { useEffect, useState } from "react";
 import { Bell, BellRing } from "lucide-react";
@@ -38,6 +39,13 @@ async function save(
   if (!response.ok)
     throw new Error(result.error ?? "Could not save alert settings.");
 }
+async function alertRegistration(base: string) {
+  const registration = await navigator.serviceWorker.register(`${base}/sw.js`, {
+    scope: `${base}/`,
+    updateViaCache: "none",
+  });
+  return waitForPushWorker(registration);
+}
 export function PushAlerts({
   publicKey,
   userId,
@@ -48,7 +56,7 @@ export function PushAlerts({
   workspace?: "PARTNER" | "DRIVER";
 }) {
   const base = workspace === "PARTNER" ? "/partner" : "/rider";
-  const ownerKey = `igo-${workspace.toLowerCase()}-push-owner`;
+  const ownerKey = pushOwnerKey(workspace);
   const [supported, setSupported] = useState(true),
     [enabled, setEnabled] = useState(false),
     [busy, setBusy] = useState(false),
@@ -66,10 +74,8 @@ export function PushAlerts({
         if (active) setSupported(false);
         return;
       }
-      const registration = await navigator.serviceWorker.register(
-        `${base}/sw.js`,
-        { scope: `${base}/`, updateViaCache: "none" },
-      );
+      if (!publicKey) return;
+      const registration = await alertRegistration(base);
       const sub = await registration.pushManager.getSubscription();
       const owner = localStorage.getItem(ownerKey);
       if (sub && owner === userId && publicKey && usesKey(sub, publicKey)) {
@@ -96,10 +102,7 @@ export function PushAlerts({
         throw new Error(
           "Allow notifications in your browser’s site settings, then try again.",
         );
-      const registration = await navigator.serviceWorker.register(
-        `${base}/sw.js`,
-        { scope: `${base}/`, updateViaCache: "none" },
-      );
+      const registration = await alertRegistration(base);
       let sub = await registration.pushManager.getSubscription();
       if (enabled && sub) {
         await save(sub, "unsubscribe");

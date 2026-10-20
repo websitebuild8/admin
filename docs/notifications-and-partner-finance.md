@@ -7,13 +7,13 @@
 - Admin → Notifications → Sent to partners preserves sent-message history after a recipient clears their inbox. The date selector applies to this history.
 - Partner → Finance combines invoices, bank transfers and completed deliveries. Select an invoice to see its packages, transfers, payment history, invoice document and paid copy. Submit bank transfer starts from the specific outstanding invoice.
 - Partner → Notifications (or Overview), Rider → Collect (or Notifications) → Enable alerts. Test alert sends an alert only to the signed-in workspace’s registered devices.
-- Tap a notification to open the associated invoice, invoice payments, package, collection list or application. General messages open a message dialog. Historical notices with no reliable record relation open their original message rather than guessing a financial record.
+- Inbox notifications are plain, non-clickable text. Mark read and Mark all read & clear remain available. Tapping a phone/browser push opens the workspace inbox; it does not open an invoice or package. Invoice and delivery details are accessed from Finance or package tables.
 
 ## Deployment and configuration
 
 This change includes the additive Prisma migration `20261020000000_workspace_notifications`. It adds typed notification targets, safely links historical invoice notices using existing foreign keys, adds transactional push queuing, and updates the existing invoice scheduler’s notification insert. Invoicing eligibility, locking and fee/payment rules remain unchanged.
 
-From `apps/admin`, apply migrations with `npm run db:deploy` before deploying the updated app. Never run this blindly if unrelated destructive migrations are pending; inspect `npm run db:status` first.
+The migration was applied successfully to the configured Supabase database on 20 October 2026 after disposable-schema verification. For another environment, from `apps/admin`, apply migrations with `npm run db:deploy` before deploying the updated app. Never run this blindly if unrelated destructive migrations are pending; inspect `npm run db:status` first.
 
 Netlify must have these **server-side** environment variables for Functions/runtime, followed by a fresh deployment:
 
@@ -23,9 +23,17 @@ Netlify must have these **server-side** environment variables for Functions/runt
 - `PUSH_CRON_SECRET` (at least 32 characters)
 - `DELIVERY_PUBLIC_URL` (the deployed HTTPS origin, for example `https://igodelivery.netlify.app`)
 
+### Where to find the values
+
+The existing push keys were checked and preserved in `apps/admin/.env.local` on 20 October 2026. Open that ignored file in VS Code. Copy the values after `=` for `WEB_PUSH_PUBLIC_KEY`, `WEB_PUSH_PRIVATE_KEY` and `PUSH_CRON_SECRET` into Netlify; do not include the variable name or surrounding quotes in its Value field. Do not commit the local environment file or paste the private key/signing secret into chat.
+
+For this deployment, `WEB_PUSH_SUBJECT` can be `https://igodelivery.netlify.app` and `DELIVERY_PUBLIC_URL` must be `https://igodelivery.netlify.app`. Neither of these two is a generated key. If the public domain changes, use the new HTTPS origin.
+
+Set all five variables for the Production deploy context and make them available to Functions. Then publish a fresh deploy: [Netlify Functions environment-variable guidance](https://docs.netlify.com/build/functions/environment-variables/). The setup does not require a Google Maps key or a paid key-generation service.
+
 The existing `npm run rider:keys` creates missing VAPID keys/signing secret in the ignored `.env.local` file without printing them or replacing valid keys. Keep existing keys when enabling partners; rotating them disconnects subscribed devices. Only the public VAPID key is returned to authenticated clients. Never put the private key or cron secret into `NEXT_PUBLIC_*` variables.
 
-After the updated site and matching variables are deployed, run `npm run rider:cron` locally from `apps/admin`. The historical command/job name covers **both partners and riders**. It verifies the deployed signed endpoint, then configures the existing Supabase pg_cron/pg_net/Vault retry job. `npm run rider:push-status` reads queue counts and schedule status without exposing secrets. As checked during implementation on 20 October 2026, this retry schedule was absent; do not claim scheduled background delivery is active until this deployment step succeeds.
+After the updated site and matching variables are deployed, run `DELIVERY_PUBLIC_URL=https://igodelivery.netlify.app npm run rider:cron` locally from `apps/admin` (replace the origin if using a different domain). The local ignored environment must contain the same VAPID keys and `PUSH_CRON_SECRET` as Netlify. The historical command/job name covers **both partners and riders**. It verifies the deployed signed endpoint, then configures the existing Supabase pg_cron/pg_net/Vault retry job. `npm run rider:push-status` reads queue counts and schedule status without exposing secrets. As checked during implementation on 20 October 2026, this retry schedule was absent; do not claim scheduled background delivery is active until this deployment step succeeds.
 
 No new email, SMS, maps or storage service is required for these notification features. Delivery is browser Web Push, not SMS.
 
@@ -41,7 +49,7 @@ References: [Apple/WebKit Home Screen Web Push](https://webkit.org/blog/13878/we
 
 ## Security and financial behavior
 
-All notification destinations are generated on the server from typed database references. Opening a message rechecks recipient, current workspace, current role access and record ownership. Missing/deleted/inaccessible targets fall back to the owned message; copied invoice/package URLs are checked separately by their data endpoints.
+Received inbox rows have no navigation action. Phone alerts open only their own workspace inbox, including queued alerts containing older record links. Existing typed references and authorized legacy data endpoints remain for compatibility; record URLs and queries still enforce ownership.
 
 Only authorized admins may send partner messages. Invoice reminders read the server-side invoice balance, require that it belongs to the selected partner and reject fully paid invoices. Commands are transactional, auditable, rate-limited and idempotent. Partner finance endpoints force the current partner ID regardless of submitted filters. Admin finance data and exports remain admin-only.
 
@@ -53,5 +61,5 @@ Push subscriptions are bound to an approved Partner or Rider account. Other acco
 
 - Unit tests include target/input validation, generic payloads, and worker navigation restrictions for both workspaces.
 - `npm run delivery:integration -- --workspace-notifications` uses a disposable database schema and a fake push sender. It verifies real constraints, transactions, tenant isolation, admin-only messaging, duplicate requests, link authorization, payment reminders, partner finance, clear-all, rider workflow and push retry regressions. It does not send real alerts or modify real business records.
-- Browser layout checks use fictional data with the real portal components. They do not prove production Clerk authentication, receipt storage or actual OS notification display.
+- Browser layout checks passed at 320px, 390px and 1440px using fictional data and the real portal components: admin message/reminder review, partner transfer history, ten-row pagination, and absence of admin controls in partner finance. Notification rows have since been changed back to plain text at the operator’s request. Light and dark dialog contrast were inspected. These checks use fictional data with the real portal components. They do not prove production Clerk authentication, receipt storage or actual OS notification display.
 - After deployment, use a real approved partner and rider device to enable alerts, press Test alert, close the site, receive an alert and confirm that tapping it returns to the correct signed-in workspace. This real-device acceptance test remains required.
