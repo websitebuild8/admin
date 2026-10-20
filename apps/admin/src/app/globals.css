@@ -137,4 +137,5 @@
 [data-slot="table-head"]{padding:12px 18px;background:#fafbf7;color:#959b89;font-weight:400;font-size:11px}
 [data-slot="table-cell"]{padding:14px 18px}
 [data-slot="table-row"]{border-color:#f0f1ea}
-[data-slot="dialog-content"]{background:#fffffff5;backdrop-filter:blur(20px)}
+/* Keep dialog surfaces controlled by their component and active theme. */
+[data-slot="dialog-content"]{backdrop-filter:blur(20px)}
