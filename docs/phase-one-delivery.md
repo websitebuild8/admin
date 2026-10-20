@@ -28,8 +28,11 @@ history is retained. See [retirement](legacy-retirement.md).
 - Recipient goods-value collection is not offered. Package registration and
   imports contain no cash amount. The unused retired cash archives are removed
   with the old platform; current delivery-fee invoice/payment records remain.
-- Default daily invoice cutoff is 18:00 Maldives Time; admin may change it per
+- Default daily invoice cutoff is 00:00 midnight Maldives Time; admin may change it per
   partner. Existing unpaid invoices remain outstanding across all later cycles.
+  Migration `20261020010000_midnight_invoice_cutoff` moves the former 18:00
+  schedules to the next midnight and records each change in the activity log.
+  Other custom cutoff times and previously issued invoices remain unchanged.
 - Admin's total earned card counts all-time verified delivery-fee payments received,
   excluding unverified transfers and unpaid fees. Salaries are outside this total.
 - This is manual seller order entry/import, not a Facebook/Instagram API integration.

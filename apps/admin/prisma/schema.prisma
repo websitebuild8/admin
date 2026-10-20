@@ -72,7 +72,7 @@ model DeliveryPartner {
   pickupAddress String
   pickupArea    String
   operatingLocation String?
-  cutoffMinutes Int                         @default(1080)
+  cutoffMinutes Int                         @default(0)
   nextInvoiceAt DateTime?                   @db.Timestamptz(3)
   parcels       DeliveryParcel[]
   invoices      DeliveryInvoice[]

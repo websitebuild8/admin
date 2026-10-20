@@ -34,6 +34,7 @@ import { verifyNotificationClearing } from "./verify-notification-clearing";
 import { verifyRiderCollect } from "./verify-rider-collect";
 import { verifyWorkspaceNotifications } from "./verify-workspace-notifications";
 import { verifyFinance } from "./verify-finance";
+import { verifyMidnightCutoff } from "./verify-midnight-cutoff";
 import {
   nextCutoff,
   type Actor,
@@ -86,7 +87,13 @@ async function main() {
       "20261019000000_remove_legacy_platform",
       "20261019010000_clear_notifications",
       "20261020000000_workspace_notifications",
+      "20261020010000_midnight_invoice_cutoff",
     ]) {
+      if (
+        folder === "20261020010000_midnight_invoice_cutoff" &&
+        process.argv.includes("--midnight-cutoff")
+      )
+        continue;
       if (
         [
           "20261016090000_paid_invoice_history",
@@ -122,7 +129,7 @@ async function main() {
       ),
     });
     (globalThis as unknown as { igoPrisma: PrismaClient }).igoPrisma = db;
-    const cutoff = nextCutoff(new Date(), 1080);
+    const cutoff = nextCutoff(new Date(), 0);
     const account = async (name: string, role: "PARTNER" | "DRIVER") =>
       db!.deliveryAccount.create({
         data: {
@@ -195,9 +202,31 @@ async function main() {
         description: "Not a real delivery",
       },
     });
+    if (process.argv.includes("--midnight-cutoff")) {
+      await verifyMidnightCutoff(
+        db,
+        admin,
+        driver,
+        async () => {
+          const sql = await readFile(
+            "prisma/migrations/20261020010000_midnight_invoice_cutoff/migration.sql",
+            "utf8",
+          );
+          await owner.query(sql.replaceAll("public.", `${schema}.`));
+        },
+        ok,
+      );
+      await verifyPartnerInvoices(db, admin, other, driver, ok);
+      console.log(
+        `Verified ${checks} midnight migration and invoice checks in a disposable schema.`,
+      );
+      return;
+    }
     if (process.argv.includes("--notification-targets")) {
       await verifyWorkspaceNotifications(db, admin, partner, other, driver, ok);
-      console.log(`Verified ${checks} notification target and scheduled-invoice checks in a disposable schema.`);
+      console.log(
+        `Verified ${checks} notification target and scheduled-invoice checks in a disposable schema.`,
+      );
       return;
     }
     if (process.argv.includes("--workspace-notifications")) {
@@ -205,7 +234,9 @@ async function main() {
       await verifyNotificationClearing(db, admin, partner, driver, ok);
       await verifyRiderWorkflows(db, admin, other, ok);
       await verifyFinance(db, admin, driver, ok);
-      console.log(`Verified ${checks} notification, push and partner finance checks in a disposable schema.`);
+      console.log(
+        `Verified ${checks} notification, push and partner finance checks in a disposable schema.`,
+      );
       return;
     }
     if (process.argv.includes("--finance")) {

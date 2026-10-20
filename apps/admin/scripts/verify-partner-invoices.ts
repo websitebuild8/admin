@@ -20,7 +20,7 @@ export async function verifyPartnerInvoices(
 ) {
   const schema = process.env.IGO_DELIVERY_TEST_SCHEMA!;
   assert(/^igo_qa_[a-f0-9]+$/.test(schema));
-  const cutoff = nextCutoff(new Date(), 1080);
+  const cutoff = nextCutoff(new Date(), 0);
   const account = await db.deliveryAccount.create({
     data: {
       clerkUserId: `qa_invoice_${randomUUID()}`,

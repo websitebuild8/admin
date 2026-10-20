@@ -81,6 +81,17 @@ test("Maldives date and cutoff do not depend on machine timezone", () => {
     nextCutoff(new Date("2026-10-16T18:59:59Z"), 0).toISOString(),
     "2026-10-16T19:00:00.000Z",
   );
+  // Midnight MVT is 19:00 UTC on the previous calendar day.
+  for (const time of ["2026-10-16T19:00:00Z", "2026-10-16T19:00:01Z"])
+    assert.equal(
+      nextCutoff(new Date(time), 0).toISOString(),
+      "2026-10-17T19:00:00.000Z",
+    );
+  assert.equal(
+    nextCutoff(new Date("2026-12-31T18:59:59Z"), 0).toISOString(),
+    "2026-12-31T19:00:00.000Z",
+  );
+  assert.equal(localDate(new Date("2026-12-31T19:00:00Z")), "2027-01-01");
   for (const v of [-1, 1440, 1.5])
     assert.throws(() => nextCutoff(new Date(), v));
 });
