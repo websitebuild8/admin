@@ -2313,9 +2313,6 @@ html:has(.d-site) {
   .d-table-wrap {
     margin: 0 -1px;
   }
-  .d-table-mobile-hide {
-    display: none;
-  }
   .d-search {
     max-width: none;
   }
@@ -2957,25 +2954,6 @@ html:has(.d-site) {
 .d-finance-empty { text-align: center; padding: 40px !important; }
 .d-finance-stats strong small { display: block; font-size: 10px; letter-spacing: .6px; color: var(--appearance-muted, #72776b); margin-bottom: 4px; }
 .d-finance-stats strong span { font: inherit; color: inherit; margin: 0; }
-.d-finance-mobile-only { display: none; }
-@media (max-width: 700px) {
-  .d-finance-records table { min-width: 0; table-layout: fixed; }
-  .d-finance-records th, .d-app .d-finance-records [data-slot="table-cell"] { padding: 14px 8px; font-size: 10px; overflow-wrap: anywhere; white-space: normal; }
-  .d-app .d-finance-records [data-slot="table-head"] { padding: 14px 8px; font-size: 10px; overflow-wrap: anywhere; white-space: normal; }
-  .d-finance-records th:first-child, .d-finance-records td:first-child { width: 40%; }
-  .d-finance-records th:nth-child(5), .d-finance-records td:nth-child(5) { width: 30%; }
-  .d-finance-records th:last-child, .d-finance-records td:last-child { width: 30%; }
-  .d-finance-records th:nth-child(2), .d-finance-records td:nth-child(2), .d-finance-records th:nth-child(3), .d-finance-records td:nth-child(3) { display: none; }
-  .d-finance-records:not([data-tab="deliveries"]) th:nth-child(4), .d-finance-records:not([data-tab="deliveries"]) td:nth-child(4) { display: none; }
-  .d-finance-records[data-tab="deliveries"] th:last-child, .d-finance-records[data-tab="deliveries"] td:last-child { display: none; }
-  .d-finance-records[data-tab="deliveries"] th:nth-child(4), .d-finance-records[data-tab="deliveries"] td:nth-child(4) { width: 25%; }
-  .d-finance-records[data-tab="deliveries"] th:nth-child(5), .d-finance-records[data-tab="deliveries"] td:nth-child(5) { width: 35%; }
-  .d-finance-records .d-row-actions { flex-direction: column; align-items: stretch; }
-  .d-finance-records .d-row-actions [data-slot="button"] { width: 100%; white-space: normal; height: auto; padding: 8px 5px !important; font-size: 10px; }
-  .d-finance-mobile-only { display: block; }
-  .d-finance-status { white-space: normal; padding: 4px; }
-  .d-app .d-finance [data-variant="link"] { font-size: 10px; }
-}
 @media (max-width: 1100px) { .d-finance-stats { grid-template-columns: repeat(2,minmax(0,1fr)); } }
 @media (max-width: 600px) {
   .d-finance-toolbar { align-items: stretch; }

@@ -4,10 +4,10 @@ The seller delivery platform now has a separate rider website at `/rider`, with 
 
 ## How it works
 
-1. A rider chooses **Become a rider** on the home page, creates a Clerk account and submits their name and Maldives phone number. Their account is pending, without access to packages.
+1. A rider opens `/rider/join`, creates a Clerk account and submits their name and Maldives phone number. Their account is pending, without access to packages.
 2. Admin opens **Delivery → Riders → Review access**, checks the application and approves it. Partners and riders cannot approve accounts.
 3. Admin selects registered packages in **Packages**, then **Assign rider**. Only approved riders appear in the selector.
-4. **Collect** contains available jobs and the rider's own active packages in one table, with **All active**, **Available jobs**, **To pickup** and **To deliver** filters. Each page contains at most 10 packages. **Details** opens pickup/destination information and directions; narrow screens keep Package, Stage and Actions visible.
+4. **Collect** contains available jobs and the rider's own active packages in one table, with **All active**, **Available jobs**, **To pickup** and **To deliver** filters. Each page contains at most 10 packages. **Details** opens pickup/destination information and directions. On narrow screens, every column becomes a labeled field within its row, including pickup, customer, stage and actions, without sideways scrolling. Available-job privacy restrictions still apply.
 5. **Take job** atomically claims an unassigned package. Customer names, phone numbers and business references become visible only to the assigned rider. A claim is not pickup.
 6. Checkboxes are local selections. **Confirm pickup**, followed by the explicit physical-receipt confirmation, records pickup for only those selected packages. Picked-up packages remain in Collect under **To deliver**.
 7. **Deliver** requires confirmation that the customer physically received the package. Server time and rider attribution are recorded; no customer payment is collected.
@@ -21,7 +21,7 @@ There is no live GPS tracking. Directions open in the rider's Google Maps applic
 
 ## Google Maps setup
 
-Use a **separate browser key** for this web integration. Do not reuse the server Places key or Flutter Android/iOS keys.
+Use a **browser key restricted to Maps Embed API and your website origins** for this web integration.
 
 1. Open [Google Cloud Console](https://console.cloud.google.com/). Create/select the iGO project and attach a billing account.
 2. Under **APIs & Services → Library**, enable **Maps Embed API**. This implementation does not require Maps JavaScript API, Routes API, Places API or Geocoding API.

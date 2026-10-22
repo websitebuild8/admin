@@ -1332,21 +1332,6 @@
   .r-pagination { flex-wrap: wrap; gap: 12px; }
 }
 .r-table-package strong { overflow-wrap: anywhere; }
-.r-table-package .r-mobile-business { display: none; }
-@media (max-width: 700px) {
-  .r-work-table table { min-width: 0; table-layout: fixed; }
-  .r-work-table th:nth-child(2), .r-work-table td:nth-child(2), .r-work-table th:nth-child(3), .r-work-table td:nth-child(3) { display: none; }
-  .r-work-table th:first-child, .r-work-table td:first-child { position: static; min-width: 0; width: 40%; box-shadow: none; }
-  .r-work-table th:nth-child(4), .r-work-table td:nth-child(4) { width: 25%; }
-  .r-work-table th:last-child, .r-work-table td:last-child { width: 35%; }
-  .r-work-table th, .r-work-table td { padding: 14px 8px; }
-  .r-table-package { min-width: 0; gap: 7px; }
-  .r-table-package > div { min-width: 0; }
-  .r-table-package .r-mobile-business { display: block; }
-  .r-table-actions { min-width: 0; }
-  .r-table-actions button { padding: 8px 5px; font-size: 11px; gap: 4px; }
-  .r-work-status { white-space: normal; padding: 6px; font-size: 10px; }
-}
 .r-work-filters a { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .r-work-filters a strong { font-size: 12px; }
 .r-main .d-period-caption { flex: 0 1 auto; }

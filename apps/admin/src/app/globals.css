@@ -6,6 +6,7 @@
 @import "./invoice-document.css";
 @import "./partner-history.css";
 @import "./theme.css";
+@import "./responsive-tables.css";
 
 @custom-variant dark (&:is(.dark *));
 

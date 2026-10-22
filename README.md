@@ -4,6 +4,10 @@ Responsive delivery management for online sellers in the Maldives. The current
 web platform includes Admin, Partner and Rider workspaces backed by Next.js,
 TypeScript, Tailwind, shadcn/ui, Clerk, Prisma and Supabase PostgreSQL/Storage.
 Currency is MVR; dates and invoice cutoffs use Maldives Time (UTC+5).
+Phones use the same responsive website, including browser notifications and
+Google Maps directions. There is no native app build or separate mobile toolchain.
+Tables show every permitted field as labeled rows on narrow screens; desktop
+columns and invoice printing retain their table layout.
 
 - Public website and applications: `/`, `/join`, `/rider/join`
 - Administration: `/delivery`

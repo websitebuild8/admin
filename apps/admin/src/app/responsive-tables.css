@@ -1,0 +1,142 @@
+/* One semantic table for every viewport. Print keeps the original columns. */
+[data-slot="table"] [data-slot="table-cell"] > [data-slot="table-cell-label"] {
+  display: none;
+}
+
+@media screen and (max-width: 960px) {
+  .d-table-wrap,
+  [data-slot="table-container"][data-slot] {
+    min-width: 0;
+    max-width: 100%;
+    overflow: visible;
+  }
+
+  [data-slot="table-container"] [data-slot="table"] {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  /* Keep column headers available to assistive technology. */
+  [data-slot="table"] [data-slot="table-header"] {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  [data-slot="table"]
+    :is([data-slot="table-body"], [data-slot="table-footer"]) {
+    display: block;
+    width: 100%;
+  }
+
+  [data-slot="table"]
+    :is([data-slot="table-body"], [data-slot="table-footer"])
+    > [data-slot="table-row"] {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 14px 24px;
+    padding: 20px;
+    width: 100%;
+    border-bottom: 1px solid var(--appearance-border, #e2e5dc);
+  }
+
+  [data-slot="table"] [data-slot="table-row"] > [data-slot="table-cell"] {
+    display: block;
+    position: static;
+    min-width: 0;
+    width: auto;
+    max-width: 100%;
+    height: auto;
+    padding: 0 !important;
+    border: 0;
+    box-shadow: none;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    text-align: left;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  [data-slot="table"]
+    [data-slot="table-cell"]
+    > [data-slot="table-cell-label"] {
+    display: block;
+    margin: 0 0 5px;
+    color: var(--appearance-muted, #687160);
+    font-size: 10px;
+    font-weight: 600;
+    line-height: 1.4;
+    letter-spacing: 0.025em;
+  }
+
+  [data-slot="table"]
+    [data-slot="table-cell"]
+    :is(strong, small, a, button, span) {
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  [data-slot="table"] [data-slot="table-cell"] strong {
+    font-size: 13px;
+  }
+
+  [data-slot="table"] [data-slot="table-cell"] small {
+    font-size: 11px;
+    line-height: 1.5;
+  }
+
+  [data-slot="table"] [data-slot="table-cell"][data-spanning="true"] {
+    grid-column: 1 / -1;
+    padding-block: 16px !important;
+    text-align: center;
+  }
+
+  [data-slot="table"] :is(.d-row-actions, .r-table-actions) {
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;
+    flex-wrap: wrap;
+    min-width: 0;
+    gap: 8px;
+  }
+
+  [data-slot="table"] [data-slot="table-cell"] [data-slot="button"] {
+    min-height: 44px !important;
+    height: auto;
+    padding: 10px 12px !important;
+    font-size: 12px;
+  }
+
+  [data-slot="table"] .r-table-package {
+    min-width: 0;
+  }
+
+  [data-slot="table"] .r-table-package > div {
+    min-width: 0;
+  }
+
+  .d-pagination {
+    flex-wrap: wrap;
+  }
+}
+
+@media screen and (min-width: 600px) and (max-width: 960px) {
+  [data-slot="table"]
+    :is([data-slot="table-body"], [data-slot="table-footer"])
+    > [data-slot="table-row"] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  [data-slot="table"]
+    [data-slot="table-cell"]:has(.d-row-actions, .r-table-actions) {
+    grid-column: 1 / -1;
+  }
+}

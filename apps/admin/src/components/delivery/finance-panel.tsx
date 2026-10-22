@@ -499,16 +499,6 @@ export function FinancePanel({
                       <strong>{p.bankReference}</strong>
                       <small>{p.partner.businessName}</small>
                       <small>{stamp(p.createdAt)}</small>
-                      <div className="d-finance-mobile-only">
-                        <Button
-                          variant="link"
-                          onClick={() => viewInvoice(p.invoiceId, "payments")}
-                        >
-                          {p.invoice.publicId}
-                        </Button>
-                        <small>Submitted {money(p.amount)}</small>
-                        <small>Verified {money(p.confirmedAmount)}</small>
-                      </div>
                     </TableCell>
                     <TableCell>
                       <Button
@@ -563,11 +553,6 @@ export function FinancePanel({
                       <strong>{p.publicId}</strong>
                       <small>{p.externalReference}</small>
                       <small>{p.partner.businessName}</small>
-                      <div className="d-finance-mobile-only">
-                        <small>{stamp(p.deliveredAt)}</small>
-                        <small>{p.driver?.name ?? "—"}</small>
-                        <small>{p.recipientName}</small>
-                      </div>
                     </TableCell>
                     <TableCell>
                       {p.recipientName}

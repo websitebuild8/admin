@@ -839,9 +839,6 @@ function RiderWorkTable({
                     )}
                     <div>
                       <strong>{p.publicId}</strong>
-                      <small className="r-mobile-business">
-                        {p.partner.businessName}
-                      </small>
                       {!p.available && <small>{p.externalReference}</small>}
                     </div>
                   </div>

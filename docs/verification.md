@@ -603,3 +603,28 @@ The revised suite passed all 79 unit tests, including inbox-only push navigation
 Read the failed Netlify deploy `6ad73bc9bebf47be085a113e` directly. The actual scanner finding was only `WEB_PUSH_SUBJECT`, matching the public contact URL in setup code and same-origin tests. Added a root TOML build-environment exception for that single public variable. All credential names and all paths remain scanned; scanning is not disabled. Validated TOML and whitespace.
 
 A read-only audit inspected 515 tracked/build files for current local environment values in plaintext, Base64 and URI-encoded forms. No current Clerk secret, database URL, Supabase secret, private push key or cron-signing secret matched. Expected public-value matches were the push contact URL and Clerk publishable key. Values were not printed. This does not certify Git history or Netlify-only values. No credential rotation, history rewrite, commit, push or redeployment was performed; the hosted scan must be rechecked after the operator pushes this configuration.
+
+### 23 October 2026 — web-only cleanup and responsive tables
+
+Confirmed that the Flutter source, native platform projects, mobile build workflow,
+mobile contracts and native dependencies were already absent. Removed the empty
+shared-packages directory and outdated mobile-key guidance. Applied migration
+history remains intact; current web push, home-screen installation and Maps
+directions are web features and remain available.
+
+The shared table now derives narrow-screen field labels from its desktop headers.
+Rows stack on phones and use two field columns on tablets through 960px; wider
+screens retain the original table. Removed the old finance/rider column-hiding
+rules and duplicate compact summaries. All authorized data, selection controls,
+actions and existing pagination remain in the same table. Screen-only responsive
+styles preserve invoice print columns.
+
+All 83 unit tests, ESLint, TypeScript and the production build passed. Four new
+table checks cover field/action preservation, fragments and conditional columns,
+spanning empty/total rows, and explicit/accessibility labels. Browser checks used
+actual table components with fictional records and compiled production CSS at
+320, 390, 768 and 1280px. Package tables, rider collection/history, all finance
+tabs, invoice-payment records, invoice lines and empty states were checked.
+Measured narrow table containers had equal client/scroll widths, with all fields
+visible; light/dark styles and desktop header layout were checked. No production
+data, authentication rules, migration, Git commit, push or deployment was changed.
